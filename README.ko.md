@@ -85,7 +85,7 @@ Secure MCP Tunnel은 개발 및 비공개 연결용이며 공개 Plugin 제출�
 - Zod로 검증하는 OpenAI Responses API structured output
 - 근거 연결과 hard blocker를 확인하는 결정론적 후처리
 - Job Assessment Card를 포함한 MCP Apps UI 리소스
-- 합성 데이터 기반 정책 eval fixture 8개
+- 합성 데이터 기반 정책 eval fixture 12개 (결정론적 안전 정책 회귀 케이스 포함)
 - lint, typecheck, build, 단위 테스트 스크립트
 
 아직 구현되지 않음:

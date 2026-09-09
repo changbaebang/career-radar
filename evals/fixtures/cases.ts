@@ -7,6 +7,7 @@ export type EvalCase = {
   draftAssessment: FitAssessment;
   expectedVerdict: FitAssessment["verdict"];
   expectHardBlocker: boolean;
+  expectedHardBlockerCount?: number;
   mustNotClaim: string[];
 };
 
@@ -46,7 +47,7 @@ function assessment(
   };
 }
 
-const gap = (requirement: string, severity: "material" | "hard_blocker") => ({
+const gap = (requirement: string, severity: FitAssessment["gaps"][number]["severity"]) => ({
   requirementId: "req_1", requirement, reason: "No direct evidence", severity,
 });
 
@@ -112,5 +113,43 @@ export const evalCases: EvalCase[] = [
     job: job("language", "Frontend Engineer", { id: "req_1", text: "Native Japanese is mandatory", type: "language", importance: "core" }),
     draftAssessment: assessment("STRETCH", "Built internationalized web applications", gap("Native Japanese is mandatory", "material")),
     expectedVerdict: "PASS", expectHardBlocker: true, mustNotClaim: ["Native Japanese"],
+  },
+  {
+    // Policy regression: a short claim must not be grounded by a longer profile sentence that merely contains it.
+    caseId: "negated-short-claim-not-grounded",
+    profile: profile("negated", "Frontend Engineer", ["Never used Kubernetes in production at any point"]),
+    job: job("negated", "Platform Engineer", { id: "req_1", text: "Kubernetes", type: "technology", importance: "core" }),
+    draftAssessment: assessment("REALISTIC", "Kubernetes", null),
+    expectedVerdict: "STRETCH", expectHardBlocker: false, mustNotClaim: ["Kubernetes"],
+  },
+  {
+    // Policy regression: a hard_blocker gap without a matching requirement ID must still force PASS.
+    caseId: "unlinked-hard-blocker-gap-pass",
+    profile: profile("unlinked", "Frontend Engineer", ["Built authentication user interfaces"]),
+    job: job("unlinked", "Security Architect", { id: "req_1", text: "Ten years of security architecture", type: "role_experience", importance: "core" }),
+    draftAssessment: {
+      ...assessment("REALISTIC", "Built authentication user interfaces", null),
+      gaps: [{ requirement: "Ten years of security architecture", reason: "No security architecture history", severity: "hard_blocker" }],
+    },
+    expectedVerdict: "PASS", expectHardBlocker: true, expectedHardBlockerCount: 1, mustNotClaim: ["Security architect"],
+  },
+  {
+    // Policy regression: a minor gap on a core binary requirement must not be promoted to a hard blocker.
+    caseId: "minor-education-gap-not-pass",
+    profile: profile("education", "Frontend Engineer", ["Shipped accessible React products for eight years"]),
+    job: job("education", "Frontend Engineer", { id: "req_1", text: "Bachelor's degree or equivalent experience", type: "education", importance: "core" }),
+    draftAssessment: assessment("REALISTIC", "Shipped accessible React products for eight years", gap("Bachelor's degree", "minor")),
+    expectedVerdict: "REALISTIC", expectHardBlocker: false, expectedHardBlockerCount: 0, mustNotClaim: ["Computer science degree"],
+  },
+  {
+    // Policy regression: the same requirement reported without an ID and promoted with an ID must dedupe to one blocker.
+    caseId: "duplicate-blocker-deduped",
+    profile: profile("duplicate", "Frontend Engineer", ["Built internationalized web applications"]),
+    job: job("duplicate", "Frontend Engineer", { id: "req_1", text: "Fluent Korean required", type: "language", importance: "core" }),
+    draftAssessment: {
+      ...assessment("STRETCH", "Built internationalized web applications", gap("Fluent Korean required", "material")),
+      hardBlockers: [{ requirement: "Fluent Korean required", reason: "No Korean evidence", severity: "hard_blocker" }],
+    },
+    expectedVerdict: "PASS", expectHardBlocker: true, expectedHardBlockerCount: 1, mustNotClaim: ["Fluent Korean"],
   },
 ];

@@ -1,6 +1,9 @@
 import { FitAssessmentSchema, type CandidateProfile, type EvidenceMatch, type FitAssessment, type Gap, type JobPosting } from "@career-radar/shared";
 
 const BINARY_HARD_REQUIREMENTS = new Set(["language", "location", "certification", "education"]);
+// Substring grounding is only trusted for sentences long enough to be distinctive. Short items such as a
+// skill name would otherwise ground any claim that happens to contain them.
+const MIN_GROUNDING_SENTENCE_LENGTH = 24;
 const normalize = (value: string) => value.trim().toLocaleLowerCase().replaceAll(/\s+/g, " ");
 
 function candidateEvidence(profile: CandidateProfile): string[] {
@@ -8,40 +11,53 @@ function candidateEvidence(profile: CandidateProfile): string[] {
     ...profile.customerFacing, ...profile.aiEvidence, ...profile.cloudEvidence,
     ...profile.roles.flatMap((role) => [role.title, ...role.responsibilities, ...role.evidence])].map(normalize);
 }
+// A claim is grounded when it equals a candidate evidence item or contains a complete, distinctive one.
+// The reverse direction (a profile sentence that merely contains the claim) is deliberately rejected:
+// "Never used Kubernetes in production" would otherwise ground the claim "Kubernetes".
 function isGrounded(match: EvidenceMatch, evidence: string[]): boolean {
   const claim = normalize(match.evidence);
   return evidence.some(
-    (item) =>
-      item === claim ||
-      (item.length >= 24 && (item.includes(claim) || claim.includes(item))),
+    (item) => item === claim || (item.length >= MIN_GROUNDING_SENTENCE_LENGTH && claim.includes(item)),
   );
 }
+// Two gaps describe the same requirement when their IDs match or their normalized text matches, so a
+// model blocker reported without an ID still collapses into the promoted gap that carries one.
 function uniqueGaps(gaps: Gap[]): Gap[] {
-  const seen = new Set<string>();
-  return gaps.filter((gap) => { const key = gap.requirementId ?? normalize(gap.requirement); if (seen.has(key)) return false; seen.add(key); return true; });
+  const seenIds = new Set<string>();
+  const seenText = new Set<string>();
+  return gaps.filter((gap) => {
+    const text = normalize(gap.requirement);
+    if ((gap.requirementId !== undefined && seenIds.has(gap.requirementId)) || seenText.has(text)) return false;
+    if (gap.requirementId !== undefined) seenIds.add(gap.requirementId);
+    seenText.add(text);
+    return true;
+  });
 }
 
 export function applyAssessmentPolicy(profile: CandidateProfile, job: JobPosting, assessment: FitAssessment): FitAssessment {
-  const strongestMatches = assessment.strongestMatches.filter((match) => isGrounded(match, candidateEvidence(profile)));
+  const evidence = candidateEvidence(profile);
+  const strongestMatches = assessment.strongestMatches.filter((match) => isGrounded(match, evidence));
   const removedUngrounded = strongestMatches.length !== assessment.strongestMatches.length;
   const preferredIds = new Set(job.preferred.map((requirement) => requirement.id));
-  const hardBlockers = assessment.hardBlockers.filter(
-    (gap) => gap.requirementId === undefined || !preferredIds.has(gap.requirementId),
-  );
+  const isPreferred = (gap: Gap) => gap.requirementId !== undefined && preferredIds.has(gap.requirementId);
+  const modelBlockers = assessment.hardBlockers.filter((gap) => !isPreferred(gap));
+  const promotedGaps = new Set<Gap>();
   for (const gap of assessment.gaps) {
+    if (isPreferred(gap) || gap.severity === "minor") continue;
     const requirement = job.required.find((candidate) => candidate.id === gap.requirementId);
-    if (!requirement || requirement.importance !== "core") continue;
-    if (gap.severity === "hard_blocker" || BINARY_HARD_REQUIREMENTS.has(requirement.type)) {
-      hardBlockers.push({ ...gap, severity: "hard_blocker" });
-    }
+    const isBinaryCoreGap = requirement?.importance === "core" && BINARY_HARD_REQUIREMENTS.has(requirement.type);
+    // An explicit hard blocker counts even when the model did not link it to a requirement ID.
+    if (gap.severity === "hard_blocker" || isBinaryCoreGap) promotedGaps.add(gap);
   }
-  const dedupedBlockers = uniqueGaps(hardBlockers);
-  let verdict = dedupedBlockers.length > 0 ? "PASS" as const : assessment.verdict;
+  const gaps = assessment.gaps.map((gap) => (promotedGaps.has(gap) ? { ...gap, severity: "hard_blocker" as const } : gap));
+  // Promoted gaps come first so the deduped blocker keeps the requirement ID when the model omitted it.
+  const hardBlockers = uniqueGaps([...gaps.filter((gap) => gap.severity === "hard_blocker"), ...modelBlockers]);
+  let verdict = hardBlockers.length > 0 ? "PASS" as const : assessment.verdict;
   let confidence = removedUngrounded ? "low" as const : assessment.confidence;
   if (assessment.resumeContortion === "high" && verdict === "REALISTIC") verdict = "STRETCH";
   if (strongestMatches.length === 0 && verdict === "REALISTIC") { verdict = "STRETCH"; confidence = "low"; }
   const missingInformation = [...assessment.missingInformation];
   if (removedUngrounded) missingInformation.push("One or more positive claims lacked a traceable candidate-profile evidence sentence.");
-  return FitAssessmentSchema.parse({ ...assessment, verdict, confidence, strongestMatches,
-    hardBlockers: dedupedBlockers, missingInformation: [...new Set(missingInformation)] });
+  return FitAssessmentSchema.parse({ ...assessment, verdict, confidence, strongestMatches, gaps,
+    hardBlockers, missingInformation: [...new Set(missingInformation)] });
 }
