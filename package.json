@@ -13,7 +13,8 @@
     "dev": "pnpm --filter @career-radar/web build && pnpm --filter @career-radar/server dev",
     "lint": "eslint .",
     "typecheck": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/web typecheck && pnpm --filter @career-radar/server typecheck",
-    "test": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/web build && pnpm -r --if-present test"
+    "test": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/web build && pnpm -r --if-present test",
+    "eval": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/server eval"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

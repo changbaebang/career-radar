@@ -3,9 +3,12 @@ import cors from "cors";
 import express, { type Express } from "express";
 
 import { buildCareerRadarStatus } from "./demo.js";
-import { createMcpServer } from "./mcp/createServer.js";
+import {
+  createMcpServer,
+  type McpDependencies,
+} from "./mcp/createServer.js";
 
-export function createHttpApp(): Express {
+export function createHttpApp(dependencies: McpDependencies = {}): Express {
   const app = express();
 
   app.use(
@@ -25,7 +28,7 @@ export function createHttpApp(): Express {
   });
 
   app.all("/mcp", async (request, response) => {
-    const server = createMcpServer();
+    const server = createMcpServer(dependencies);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
     });

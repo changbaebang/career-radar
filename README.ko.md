@@ -4,7 +4,7 @@
 
 Career Radar는 근거 중심의 커리어 의사결정 도구입니다. 경력을 지어내거나 적합도 판정을 채용 확률처럼 표현하지 않고, 지원할 공고를 `REALISTIC`, `STRETCH`, `PASS`로 판단하도록 돕습니다.
 
-현재 저장소에는 **Milestone 0만 구현**되어 있습니다. TypeScript 워크스페이스, Node MCP 서버, 읽기 전용 데모 도구, ChatGPT용 최소 React 위젯을 포함합니다.
+현재 저장소에는 **Milestone 1**이 구현되어 있습니다. 이력서 텍스트에서 후보자 프로필을 추출하고, 붙여 넣은 채용 공고를 정규화한 뒤, 실제 경력 근거에 기반한 단일 공고 판정을 React 위젯으로 보여줍니다.
 
 ## 아키텍처
 
@@ -38,7 +38,7 @@ pnpm dev
 - MCP 엔드포인트: `http://localhost:8000/mcp`
 - 상태 확인 엔드포인트: `http://localhost:8000/health`
 
-Milestone 0은 OpenAI API를 호출하지 않습니다. `.env.local`은 Git에서 제외되며, 이후 마일스톤의 서버 전용 인증 정보를 저장하는 용도로 예약되어 있습니다.
+`.env.example`을 Git에서 제외되는 `.env.local`로 복사한 뒤 `OPENAI_API_KEY`를 설정합니다. `OPENAI_MODEL`은 선택 사항이며 기본값은 `gpt-5-mini`입니다. 서버가 로컬에서 이 파일을 읽고, 인증 정보는 React 위젯으로 전달하지 않습니다.
 
 ## 검증 명령어
 
@@ -47,7 +47,18 @@ pnpm build
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm eval
 ```
+
+## 단일 공고 판정 사용법
+
+ChatGPT에서 Career Radar 앱을 활성화한 뒤 다음 순서로 사용합니다.
+
+1. 이력서 텍스트를 제공해 `profile_upsert`를 호출합니다.
+2. 채용 공고 본문 하나를 붙여 넣어 `job_ingest`를 호출합니다.
+3. 이 공고가 현실적인 선택인지 물어 반환된 프로필 ID와 공고 ID로 `job_assess`를 호출합니다.
+
+Milestone 1은 구조화된 후보자 프로필과 공고만 메모리에 보관합니다. 원본 이력서 텍스트를 저장하거나, 공고 URL을 가져오거나, SQLite에 기록하거나, 이력서를 자동으로 고치지 않습니다.
 
 ## ChatGPT에서 연결하기
 
@@ -70,16 +81,18 @@ Secure MCP Tunnel은 개발 및 비공개 연결용이며 공개 Plugin 제출�
 - 공유 Zod 상태 스키마
 - Stateless Streamable HTTP MCP 엔드포인트
 - 읽기 전용 `career_radar_status` 도구
-- React 위젯을 포함한 MCP Apps UI 리소스
+- `profile_upsert`, 붙여 넣기 전용 `job_ingest`, `job_assess` 도구
+- Zod로 검증하는 OpenAI Responses API structured output
+- 근거 연결과 hard blocker를 확인하는 결정론적 후처리
+- Job Assessment Card를 포함한 MCP Apps UI 리소스
+- 합성 데이터 기반 정책 eval fixture 8개
 - lint, typecheck, build, 단위 테스트 스크립트
 
 아직 구현되지 않음:
 
-- 이력서 파싱
-- 채용 공고 입력 및 적합도 평가
-- OpenAI Responses API 호출
 - SQLite 영속화
 - 지원 현황 관리
+- 채용 공고 URL 가져오기
 - 채용 공고 검색
 
 전체 마일스톤은 [프로젝트 명세](docs/PROJECT_SPEC.md)를 참고하세요.

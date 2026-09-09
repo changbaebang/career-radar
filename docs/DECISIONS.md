@@ -23,3 +23,15 @@ The first milestone proves the MCP-to-widget path using deterministic status dat
 **Status:** Accepted
 
 The server transport and MCP Apps resource/tool registration patterns are adapted from the official `openai/openai-apps-sdk-examples` repository at commit `18cc38e78a968712c357bacdc3c79fead5bfc6b4`. Only the minimal pattern needed by Career Radar is retained.
+
+## ADR-0005: Keep Milestone 1 state ephemeral
+
+**Status:** Accepted
+
+`profile_upsert` and `job_ingest` keep normalized records in process memory so `job_assess` can refer to stable IDs. Raw resume text is not retained. SQLite, migrations, application history, and cross-process persistence remain Milestone 2 work.
+
+## ADR-0006: Separate model judgment from deterministic safety policy
+
+**Status:** Accepted
+
+The Responses API produces strict Zod-validated structures with `store: false`. Server code adds deterministic IDs, `modelVersion`, and `promptVersion`, removes positive claims that do not map to candidate evidence, promotes missing core language/location/certification/education requirements to hard blockers, and prevents unsupported `REALISTIC` results.

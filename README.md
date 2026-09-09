@@ -4,7 +4,7 @@
 
 Career Radar is an evidence-based career decision tool. It is designed to help a candidate decide whether a role is `REALISTIC`, `STRETCH`, or `PASS` without inventing experience or turning a fit label into a hiring probability.
 
-This repository currently contains **Milestone 0 only**: a TypeScript workspace with a Node MCP server, a read-only demo tool, and a minimal React widget for ChatGPT.
+This repository currently contains **Milestone 1**: resume-text profile extraction, pasted job-description normalization, and an evidence-grounded single-job assessment rendered in a React widget.
 
 ## Architecture
 
@@ -38,7 +38,7 @@ The server starts on `http://localhost:8000` by default:
 - MCP endpoint: `http://localhost:8000/mcp`
 - HTTP readiness endpoint: `http://localhost:8000/health`
 
-Milestone 0 does not call the OpenAI API. `.env.local` is ignored and reserved for server-side credentials used by later milestones.
+Copy `.env.example` to the gitignored `.env.local` and set `OPENAI_API_KEY`. `OPENAI_MODEL` is optional and defaults to `gpt-5-mini`. The server loads this file locally; credentials never enter the widget.
 
 ## Checks
 
@@ -47,7 +47,18 @@ pnpm build
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm eval
 ```
+
+## Single-job assessment
+
+In a ChatGPT conversation with the app enabled:
+
+1. Provide resume text so ChatGPT can call `profile_upsert`.
+2. Paste one job description so it can call `job_ingest`.
+3. Ask whether the role is realistic so it can call `job_assess` with the returned profile and job IDs.
+
+The process stores only the structured candidate profile and normalized job in memory. It does not retain raw resume text, fetch job URLs, write SQLite data, or rewrite a resume in Milestone 1.
 
 ## Connect from ChatGPT
 
@@ -70,16 +81,18 @@ Implemented:
 - shared Zod status schema
 - stateless Streamable HTTP MCP endpoint
 - `career_radar_status` read-only tool
-- MCP Apps UI resource with a React widget
+- `profile_upsert`, pasted-text `job_ingest`, and `job_assess` tools
+- OpenAI Responses API structured outputs validated with Zod
+- deterministic evidence-grounding and hard-blocker post-processing
+- MCP Apps UI resource with a Job Assessment Card
+- eight synthetic policy eval fixtures
 - lint, typecheck, build, and unit-test scripts
 
 Not implemented yet:
 
-- resume parsing
-- job ingestion or assessment
-- OpenAI Responses API calls
 - SQLite persistence
 - application tracking
+- job URL fetching
 - job search
 
 See [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md) for the milestone plan.
