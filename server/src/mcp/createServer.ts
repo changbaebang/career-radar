@@ -21,10 +21,10 @@ import { applyAssessmentPolicy } from "../domain/assessment/policy.js";
 import { CareerStore } from "../domain/store.js";
 
 export const CAREER_RADAR_WIDGET_URI = "ui://career-radar/widget-v1.html";
-export const careerStore = new CareerStore();
 
 export type McpDependencies = {
   analyzer?: CareerAnalyzer;
+  createAnalyzer?: () => CareerAnalyzer;
   store?: CareerStore;
 };
 
@@ -43,9 +43,9 @@ function readWidgetBundle(): string {
 }
 
 export function createMcpServer(dependencies: McpDependencies = {}): McpServer {
-  const store = dependencies.store ?? careerStore;
+  const store = dependencies.store ?? new CareerStore();
   let analyzer = dependencies.analyzer;
-  const getAnalyzer = () => (analyzer ??= new OpenAICareerAnalyzer());
+  const getAnalyzer = () => (analyzer ??= dependencies.createAnalyzer?.() ?? new OpenAICareerAnalyzer());
   const server = new McpServer({ name: "career-radar", version: "0.1.0" });
 
   registerAppTool(
@@ -179,9 +179,9 @@ export function createMcpServer(dependencies: McpDependencies = {}): McpServer {
     },
     async ({ candidateProfileId, jobId }) => {
       const profile = store.getProfile(candidateProfileId);
-      if (!profile) throw new Error(`Candidate profile ${candidateProfileId} was not found. Call profile_upsert first.`);
+      if (!profile) throw new Error("Candidate profile was not found or has expired. Call profile_upsert again.");
       const job = store.getJob(jobId);
-      if (!job) throw new Error(`Job ${jobId} was not found. Call job_ingest first.`);
+      if (!job) throw new Error("Job was not found or has expired. Call job_ingest again.");
       const assessment = applyAssessmentPolicy(profile, job, await getAnalyzer().assess(profile, job));
       const result = JobAssessmentResultSchema.parse({ job, assessment });
       return {

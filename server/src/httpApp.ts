@@ -3,6 +3,8 @@ import cors from "cors";
 import express, { type Express } from "express";
 
 import { buildCareerRadarStatus } from "./demo.js";
+import { OpenAICareerAnalyzer } from "./ai/analyzer.js";
+import { CareerStore } from "./domain/store.js";
 import {
   createMcpServer,
   type McpDependencies,
@@ -10,6 +12,12 @@ import {
 
 export function createHttpApp(dependencies: McpDependencies = {}): Express {
   const app = express();
+  let analyzer = dependencies.analyzer;
+  const sharedDependencies: McpDependencies = {
+    ...dependencies,
+    store: dependencies.store ?? new CareerStore(),
+    createAnalyzer: () => (analyzer ??= dependencies.createAnalyzer?.() ?? new OpenAICareerAnalyzer()),
+  };
 
   app.use(
     cors({
@@ -28,7 +36,7 @@ export function createHttpApp(dependencies: McpDependencies = {}): Express {
   });
 
   app.all("/mcp", async (request, response) => {
-    const server = createMcpServer(dependencies);
+    const server = createMcpServer(sharedDependencies);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
     });

@@ -80,22 +80,30 @@ function AssessmentCard({ result }: { result: JobAssessmentResult }) {
       </div>
 
       <h2>Strongest evidence</h2>
-      <ul>
-        {assessment.strongestMatches.slice(0, 3).map((match) => (
-          <li key={`${match.requirementId ?? match.requirement}-${match.evidence}`}>
-            <span><strong>{match.requirement}</strong><br />{match.evidence}</span>
-          </li>
-        ))}
-      </ul>
+      {assessment.strongestMatches.length === 0 ? (
+        <p className="message">No verified matching evidence was found in this profile.</p>
+      ) : (
+        <ul>
+          {assessment.strongestMatches.slice(0, 3).map((match) => (
+            <li key={`${match.requirementId ?? match.requirement}-${match.evidence}`}>
+              <span><strong>{match.requirement}</strong><br />{match.evidence}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <h2>Critical gaps</h2>
-      <ul>
-        {assessment.gaps.slice(0, 3).map((gap) => (
-          <li key={`${gap.requirementId ?? gap.requirement}-${gap.reason}`}>
-            <span><strong>{gap.requirement}</strong><br />{gap.reason}</span>
-          </li>
-        ))}
-      </ul>
+      {assessment.gaps.length === 0 ? (
+        <p className="message">No gaps were identified in this assessment.</p>
+      ) : (
+        <ul>
+          {assessment.gaps.slice(0, 3).map((gap) => (
+            <li key={`${gap.requirementId ?? gap.requirement}-${gap.reason}`}>
+              <span><strong>{gap.requirement}</strong><br />{gap.reason}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {assessment.hardBlockers.length > 0 && (
         <section className="blockers">

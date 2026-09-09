@@ -53,6 +53,27 @@ const gap = (requirement: string, severity: FitAssessment["gaps"][number]["sever
 
 export const evalCases: EvalCase[] = [
   {
+    caseId: "invented-evidence-extension-rejected",
+    profile: profile("inflated", "Frontend Lead", ["Led a React platform team for three years"]),
+    job: job("inflated", "Frontend Lead", { id: "req_1", text: "Lead a React team", type: "leadership", importance: "core" }),
+    draftAssessment: assessment("REALISTIC", "Led a React platform team for three years and owned company-wide architecture", null),
+    expectedVerdict: "STRETCH", expectHardBlocker: false, mustNotClaim: ["owned company-wide architecture"],
+  },
+  ...[undefined, "preferred_1"].map((requirementId): EvalCase => ({
+    caseId: `preferred-hard-blocker-${requirementId ?? "unlinked"}-excluded`,
+    profile: profile("preferred", "Frontend Engineer", ["Built reliable React applications"]),
+    job: {
+      ...job("preferred", "Frontend Engineer", { id: "req_1", text: "Build React applications", type: "technology", importance: "core" }),
+      preferred: [{ id: "preferred_1", text: "AWS certification preferred", type: "certification", importance: "nice_to_have" }],
+    },
+    draftAssessment: {
+      ...assessment("REALISTIC", "Built reliable React applications", null),
+      gaps: [{ requirementId, requirement: "AWS certification preferred", reason: "Not listed", severity: "hard_blocker" }],
+      hardBlockers: [{ requirementId, requirement: "AWS certification preferred", reason: "Not listed", severity: "hard_blocker" }],
+    },
+    expectedVerdict: "REALISTIC", expectHardBlocker: false, expectedHardBlockerCount: 0, mustNotClaim: ["AWS certified"],
+  })),
+  {
     caseId: "frontend-lead-realistic",
     profile: profile("frontend", "Frontend Lead", ["Led a React platform team"]),
     job: job("frontend", "Frontend Engineering Lead", { id: "req_1", text: "Lead a React team", type: "leadership", importance: "core" }),

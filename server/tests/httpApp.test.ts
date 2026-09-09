@@ -7,7 +7,7 @@ import type {
 } from "@career-radar/shared";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CareerAnalyzer } from "../src/ai/analyzer.js";
 import { createHttpApp } from "../src/httpApp.js";
@@ -73,7 +73,8 @@ describe("Career Radar HTTP and MCP server", () => {
     expect(resource.contents[0]).toMatchObject({
       uri: CAREER_RADAR_WIDGET_URI, mimeType: "text/html;profile=mcp-app",
     });
-    expect(resource.contents[0]?.text).toContain('<div id="root"></div>');
+    const content = resource.contents[0];
+    expect(content && "text" in content ? content.text : undefined).toContain('<div id="root"></div>');
   });
 
   it("runs the profile, pasted job, and grounded assessment tool sequence", async () => {
@@ -101,7 +102,9 @@ describe("Career Radar HTTP and MCP server", () => {
       assess: async () => assessment,
     };
     const store = new CareerStore();
-    const client = await connectClient(await startTestServer({ analyzer, store }));
+    const createAnalyzer = vi.fn(() => analyzer);
+    const client = await connectClient(await startTestServer({ createAnalyzer, store }));
+    expect(createAnalyzer).not.toHaveBeenCalled();
 
     await client.callTool({ name: "profile_upsert", arguments: { resumeText: "Frontend engineer with direct production React delivery experience." } });
     await client.callTool({ name: "job_ingest", arguments: { text: "Example seeks a Frontend Engineer to build reliable React applications for commerce customers." } });
@@ -116,5 +119,30 @@ describe("Career Radar HTTP and MCP server", () => {
     });
     expect(store.getProfile(profile.id)).toEqual(profile);
     expect(store.getJob(job.id)).toEqual(job);
+    expect(createAnalyzer).toHaveBeenCalledTimes(1);
+    store.clear();
+  });
+
+  it("does not share default storage between independent HTTP apps", async () => {
+    const { profile } = (await import("../../evals/fixtures/cases.js")).evalCases[0];
+    const createAnalyzer = vi.fn(() => ({
+      extractProfile: async () => ({ profile, warnings: [] }),
+      extractJob: vi.fn(),
+      assess: vi.fn(),
+    }));
+    const first = await connectClient(await startTestServer({ createAnalyzer }));
+    await first.callTool({
+      name: "profile_upsert",
+      arguments: { resumeText: "Synthetic frontend engineer with explicit React leadership experience." },
+    });
+    const second = await connectClient(await startTestServer({ createAnalyzer }));
+    const result = await second.callTool({
+      name: "job_assess", arguments: { candidateProfileId: profile.id, jobId: "unavailable" },
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "text", text: expect.stringContaining("Call profile_upsert again") }),
+    ]));
+    expect(createAnalyzer).toHaveBeenCalledTimes(1);
   });
 });

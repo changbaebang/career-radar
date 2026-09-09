@@ -19,7 +19,7 @@ career-radar/
   data/             # Local-only data location for later milestones
 ```
 
-The MCP implementation follows the official OpenAI examples at commit `18cc38e78a968712c357bacdc3c79fead5bfc6b4`, trimmed to one Career Radar status tool and one widget.
+The MCP implementation started from the official OpenAI examples at commit `18cc38e78a968712c357bacdc3c79fead5bfc6b4`. It now provides a status tool, three single-job analysis tools, and one widget.
 
 ## Requirements
 
@@ -60,6 +60,10 @@ In a ChatGPT conversation with the app enabled:
 
 The process stores only the structured candidate profile and normalized job in memory. It does not retain raw resume text, fetch job URLs, write SQLite data, or rewrite a resume in Milestone 1.
 
+Profiles and jobs are each capped at 100 records and expire 30 minutes after their latest write, even while idle. Oldest writes are evicted when the cap is exceeded. After expiry, eviction, or a server restart, provide the resume/JD again to recreate missing IDs. Structured profiles can still contain personal information.
+
+This version is for one owner's local/private development. It does not authenticate users or isolate their data within an app; do not deploy it as a public or shared multi-user service.
+
 ## Connect from ChatGPT
 
 1. Start the local server with `pnpm dev`.
@@ -85,7 +89,7 @@ Implemented:
 - OpenAI Responses API structured outputs validated with Zod
 - deterministic evidence-grounding and hard-blocker post-processing
 - MCP Apps UI resource with a Job Assessment Card
-- twelve synthetic policy eval fixtures, including regression cases for the deterministic safety policy
+- fifteen synthetic policy eval fixtures, including regression cases for the deterministic safety policy
 - lint, typecheck, build, and unit-test scripts
 
 Not implemented yet:
@@ -96,6 +100,8 @@ Not implemented yet:
 - job search
 
 See [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md) for the milestone plan.
+
+`pnpm typecheck` includes tests and eval fixtures as well as server/widget code. `pnpm eval` checks only deterministic policy behavior without calling a model; its metrics are not model accuracy. Evidence matching uses the structured profile and does not guarantee extraction accuracy against the original resume.
 
 ## Documentation references
 

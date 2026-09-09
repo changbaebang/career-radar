@@ -80,8 +80,8 @@ function requireParsed<T>(value: T | null, operation: string): T {
   return value;
 }
 
-function omitNull<T extends Record<string, unknown>>(value: T): T {
-  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== null)) as T;
+function omitNull(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== null));
 }
 
 export class OpenAICareerAnalyzer implements CareerAnalyzer {
@@ -89,7 +89,11 @@ export class OpenAICareerAnalyzer implements CareerAnalyzer {
   readonly #model: string;
 
   constructor(options: { apiKey?: string; model?: string } = {}) {
-    this.#client = new OpenAI({ apiKey: options.apiKey });
+    const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
+    if (!apiKey?.trim()) {
+      throw new Error("Set OPENAI_API_KEY in .env.local or the server environment before analyzing a resume or job.");
+    }
+    this.#client = new OpenAI({ apiKey });
     this.#model = options.model ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
   }
 

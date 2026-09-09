@@ -66,15 +66,53 @@ describe("applyAssessmentPolicy", () => {
     expect(result.confidence).toBe("low");
   });
 
-  it("grounds a claim that contains a complete candidate evidence sentence", () => {
+  it("rejects an invented extension to a complete candidate evidence sentence", () => {
     const sentence = "Led a React platform team for three years";
     const richProfile: CandidateProfile = { ...profile, roles: [{ company: "Example", title: "Lead", responsibilities: [sentence], evidence: [] }] };
     const result = applyAssessmentPolicy(richProfile, job, {
       ...base,
-      strongestMatches: [{ requirement: "Leadership", evidence: `${sentence} at Example`, source: {}, strength: "direct" }],
+      strongestMatches: [{ requirement: "Leadership", evidence: `${sentence} and owned company-wide architecture`, source: {}, strength: "direct" }],
+    });
+    expect(result.strongestMatches).toEqual([]);
+    expect(result.verdict).toBe("STRETCH");
+    expect(result.confidence).toBe("low");
+  });
+
+  it("accepts exact evidence after case and whitespace normalization", () => {
+    const result = applyAssessmentPolicy(profile, job, {
+      ...base,
+      strongestMatches: [{ requirement: "React", evidence: "  REACT  ", source: {}, strength: "direct" }],
     });
     expect(result.strongestMatches).toHaveLength(1);
     expect(result.verdict).toBe("REALISTIC");
+  });
+
+  it.each(["cert_1", undefined, "unknown_id"])(
+    "excludes preferred hard blockers from both arrays with ID %s",
+    (requirementId) => {
+      const gap = {
+        requirementId, requirement: " AWS certification   preferred ",
+        reason: "Not listed", severity: "hard_blocker" as const,
+      };
+      const result = applyAssessmentPolicy(profile, job, {
+        ...base, gaps: [gap], hardBlockers: [gap],
+      });
+      expect(result.verdict).toBe("REALISTIC");
+      expect(result.hardBlockers).toEqual([]);
+      expect(result.gaps[0]?.severity).toBe("material");
+    },
+  );
+
+  it("keeps a valid required ID authoritative over conflicting preferred text", () => {
+    const result = applyAssessmentPolicy(profile, job, {
+      ...base,
+      gaps: [{
+        requirementId: "language_1", requirement: "AWS certification preferred",
+        reason: "Missing a required qualification", severity: "hard_blocker",
+      }],
+    });
+    expect(result.verdict).toBe("PASS");
+    expect(result.hardBlockers).toHaveLength(1);
   });
 
   it("forces PASS for a hard_blocker gap that has no matching requirement ID", () => {
