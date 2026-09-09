@@ -52,13 +52,15 @@ pnpm test
 ## Connect from ChatGPT
 
 1. Start the local server with `pnpm dev`.
-2. Expose port 8000 through a public HTTPS tunnel, for example `ngrok http 8000`.
+2. Create an [OpenAI Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels) targeting `http://localhost:8000/mcp`. This is recommended for development because it does not expose the local server to the public internet.
 3. In ChatGPT, enable Developer Mode under **Settings → Security and login**.
-4. Open **ChatGPT Plugins**, create a developer-mode app, and enter the tunnel URL with `/mcp`, such as `https://example.ngrok.app/mcp`.
+4. Open **ChatGPT Plugins**, create a developer-mode app, and select the Secure MCP Tunnel. A public development endpoint such as `https://example.ngrok.app/mcp` can be used instead.
 5. Ask ChatGPT to show the Career Radar status.
 6. Refresh the app connection after changing MCP tool or resource metadata.
 
-Do not use a development tunnel as a production endpoint.
+Secure MCP Tunnel is for development and private connectivity, not public Plugin submission. Public submission requires a stable public HTTPS MCP endpoint.
+
+Keep the OpenAI API key used by the tunnel in a server-process environment variable, never in the React widget or committed files. A gitignored `.env.local` is suitable for local development. Use a GitHub Actions Secret only if a workflow actually runs the tunnel or deployment. When moving to another OpenAI account, create a new key and tunnel there, then refresh the ChatGPT app connection; the repository remains portable.
 
 ## Current scope
 
@@ -88,4 +90,6 @@ See [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md) for the milestone plan.
 - [Define tools](https://developers.openai.com/plugins/plan/tools)
 - [Build an MCP server](https://developers.openai.com/plugins/build/mcp-server)
 - [Add UI to an MCP server](https://developers.openai.com/plugins/build/chatgpt-ui)
+- [Connect and test a Plugin](https://developers.openai.com/plugins/deploy/connect-chatgpt)
+- [Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)
 - [Plugin reference](https://developers.openai.com/plugins/reference)

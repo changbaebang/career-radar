@@ -52,13 +52,15 @@ pnpm test
 ## ChatGPT에서 연결하기
 
 1. `pnpm dev`로 로컬 서버를 실행합니다.
-2. `ngrok http 8000`과 같은 방법으로 8000 포트를 공개 HTTPS 주소에 연결합니다.
+2. [OpenAI Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)을 만들어 로컬 `http://localhost:8000/mcp`에 연결합니다. 개발 중에는 로컬 서버를 공개 인터넷에 노출하지 않아도 되는 이 방식을 권장합니다.
 3. ChatGPT의 **설정 → 보안 및 로그인**에서 개발자 모드를 활성화합니다.
-4. **ChatGPT Plugins**에서 개발자 모드 앱을 만들고, `https://example.ngrok.app/mcp`처럼 `/mcp`가 포함된 터널 주소를 입력합니다.
+4. **ChatGPT Plugins**에서 개발자 모드 앱을 만들고 Secure MCP Tunnel을 선택합니다. 공개 HTTPS 개발 주소가 있다면 `https://example.ngrok.app/mcp`처럼 `/mcp`가 포함된 URL을 대신 사용할 수 있습니다.
 5. 새 대화에서 앱을 활성화하고 “Career Radar 상태를 보여줘”라고 요청합니다.
 6. MCP 도구 또는 리소스 메타데이터를 변경했다면 앱 연결 화면에서 새로고침합니다.
 
-개발용 터널은 공개 출시용 엔드포인트로 사용하지 마세요. 공개 제출에는 안정적인 공개 HTTPS MCP 서버가 필요합니다.
+Secure MCP Tunnel은 개발 및 비공개 연결용이며 공개 Plugin 제출에는 사용할 수 없습니다. 공개 제출에는 안정적인 공개 HTTPS MCP 서버가 필요합니다.
+
+터널 인증용 OpenAI API 키는 브라우저나 React 위젯에 넣지 말고 서버 프로세스의 환경 변수로만 전달하세요. 로컬에서는 Git에서 제외된 `.env.local`을 사용할 수 있습니다. GitHub Actions에서 실제로 터널이나 배포 작업을 실행할 때만 GitHub Actions Secret을 사용하며, 저장소 파일에는 키를 커밋하지 않습니다. 계정을 바꾸더라도 새 계정에서 키와 터널을 다시 만들고 ChatGPT 앱 연결만 갱신하면 같은 저장소에서 이어갈 수 있습니다.
 
 ## 현재 범위
 
@@ -89,4 +91,5 @@ pnpm test
 - [MCP 서버 구축](https://developers.openai.com/plugins/build/mcp-server)
 - [MCP 서버에 UI 추가](https://developers.openai.com/plugins/build/chatgpt-ui)
 - [ChatGPT 연결 및 테스트](https://developers.openai.com/plugins/deploy/connect-chatgpt)
+- [Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)
 - [Plugin 레퍼런스](https://developers.openai.com/plugins/reference)

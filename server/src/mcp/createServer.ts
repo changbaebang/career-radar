@@ -11,7 +11,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { buildCareerRadarStatus } from "../demo.js";
 
-export const STATUS_WIDGET_URI = "ui://career-radar/status-v1.html";
+export const STATUS_WIDGET_URI = "ui://career-radar/status-v3.html";
 
 function readWidgetBundle(): string {
   const bundlePath = fileURLToPath(
@@ -85,7 +85,10 @@ export function createMcpServer(): McpServer {
         {
           uri: STATUS_WIDGET_URI,
           mimeType: RESOURCE_MIME_TYPE,
-          text: `<div id="root"></div><script type="module">${readWidgetBundle()}</script>`,
+          // ChatGPT executes the returned HTML in a sandboxed iframe. The Vite
+          // bundle is self-contained, so a classic inline script is sufficient
+          // and avoids hosts that do not execute inline module scripts.
+          text: `<div id="root"></div><script>${readWidgetBundle()}</script>`,
           _meta: {
             ui: {
               prefersBorder: true,
