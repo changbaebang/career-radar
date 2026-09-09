@@ -1,5 +1,7 @@
 # Career Radar
 
+[한국어](README.ko.md) | English
+
 Career Radar is an evidence-based career decision tool. It is designed to help a candidate decide whether a role is `REALISTIC`, `STRETCH`, or `PASS` without inventing experience or turning a fit label into a hiring probability.
 
 This repository currently contains **Milestone 0 only**: a TypeScript workspace with a Node MCP server, a read-only demo tool, and a minimal React widget for ChatGPT.
@@ -51,8 +53,8 @@ pnpm test
 
 1. Start the local server with `pnpm dev`.
 2. Expose port 8000 through a public HTTPS tunnel, for example `ngrok http 8000`.
-3. In ChatGPT, enable Developer Mode under **Settings → Apps & Connectors → Advanced settings**.
-4. Create a new app and enter the tunnel URL with `/mcp`, such as `https://example.ngrok.app/mcp`.
+3. In ChatGPT, enable Developer Mode under **Settings → Security and login**.
+4. Open **ChatGPT Plugins**, create a developer-mode app, and enter the tunnel URL with `/mcp`, such as `https://example.ngrok.app/mcp`.
 5. Ask ChatGPT to show the Career Radar status.
 6. Refresh the app connection after changing MCP tool or resource metadata.
 
