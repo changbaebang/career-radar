@@ -6,14 +6,14 @@ import {
 export function buildCareerRadarStatus(now = new Date()): CareerRadarStatus {
   return CareerRadarStatusSchema.parse({
     name: "Career Radar",
-    milestone: "Milestone 0",
+    milestone: "Milestone 1",
     state: "ready",
-    message: "The MCP server and React widget scaffold are connected.",
+    message: "Single-job assessment is ready for resume and pasted JD text.",
     checkedAt: now.toISOString(),
     capabilities: [
-      "Read-only MCP status tool",
-      "React widget resource",
-      "Shared Zod schema",
+      "Resume evidence extraction",
+      "Pasted job-description normalization",
+      "Grounded REALISTIC / STRETCH / PASS assessment",
     ],
   });
 }

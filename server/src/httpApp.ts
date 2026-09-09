@@ -2,11 +2,23 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import cors from "cors";
 import express, { type Express } from "express";
 
+import { type CareerAnalyzer, OpenAICareerAnalyzer } from "./ai/analyzer.js";
 import { buildCareerRadarStatus } from "./demo.js";
-import { createMcpServer } from "./mcp/createServer.js";
+import { CareerStore } from "./domain/store.js";
+import {
+  createMcpServer,
+  type McpDependencies,
+} from "./mcp/createServer.js";
 
-export function createHttpApp(): Express {
+export function createHttpApp(options: Partial<McpDependencies> = {}): Express {
   const app = express();
+  // One store and one lazily created analyzer per HTTP app, shared by every per-request MCP server.
+  let analyzer: CareerAnalyzer | undefined;
+  const createAnalyzer = options.createAnalyzer ?? (() => new OpenAICareerAnalyzer());
+  const sharedDependencies: McpDependencies = {
+    store: options.store ?? new CareerStore(),
+    createAnalyzer: () => (analyzer ??= createAnalyzer()),
+  };
 
   app.use(
     cors({
@@ -25,7 +37,7 @@ export function createHttpApp(): Express {
   });
 
   app.all("/mcp", async (request, response) => {
-    const server = createMcpServer();
+    const server = createMcpServer(sharedDependencies);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
     });

@@ -4,7 +4,7 @@
 
 Career Radar는 근거 중심의 커리어 의사결정 도구입니다. 경력을 지어내거나 적합도 판정을 채용 확률처럼 표현하지 않고, 지원할 공고를 `REALISTIC`, `STRETCH`, `PASS`로 판단하도록 돕습니다.
 
-현재 저장소에는 **Milestone 0만 구현**되어 있습니다. TypeScript 워크스페이스, Node MCP 서버, 읽기 전용 데모 도구, ChatGPT용 최소 React 위젯을 포함합니다.
+현재 저장소에는 **Milestone 1**이 구현되어 있습니다. 이력서 텍스트에서 후보자 프로필을 추출하고, 붙여 넣은 채용 공고를 정규화한 뒤, 실제 경력 근거에 기반한 단일 공고 판정을 React 위젯으로 보여줍니다.
 
 ## 아키텍처
 
@@ -19,7 +19,7 @@ career-radar/
   data/             # 이후 마일스톤에서 사용할 로컬 전용 데이터 위치
 ```
 
-MCP 구현은 OpenAI 공식 예제의 `18cc38e78a968712c357bacdc3c79fead5bfc6b4` 커밋을 기준으로 하며, Career Radar 상태 도구 하나와 위젯 하나만 남긴 최소 구성입니다.
+MCP 구현은 OpenAI 공식 예제의 `18cc38e78a968712c357bacdc3c79fead5bfc6b4` 커밋을 기준으로 시작했으며, 현재 상태 도구와 단일 공고 분석 도구 3개, 위젯 하나를 제공합니다.
 
 ## 요구 사항
 
@@ -38,7 +38,7 @@ pnpm dev
 - MCP 엔드포인트: `http://localhost:8000/mcp`
 - 상태 확인 엔드포인트: `http://localhost:8000/health`
 
-Milestone 0은 OpenAI API를 호출하지 않습니다. `.env.local`은 Git에서 제외되며, 이후 마일스톤의 서버 전용 인증 정보를 저장하는 용도로 예약되어 있습니다.
+`.env.example`을 Git에서 제외되는 `.env.local`로 복사한 뒤 `OPENAI_API_KEY`를 설정합니다. `OPENAI_MODEL`은 선택 사항이며 기본값은 `gpt-5-mini`입니다. 서버가 로컬에서 이 파일을 읽고, 인증 정보는 React 위젯으로 전달하지 않습니다.
 
 ## 검증 명령어
 
@@ -47,7 +47,22 @@ pnpm build
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm eval
 ```
+
+## 단일 공고 판정 사용법
+
+ChatGPT에서 Career Radar 앱을 활성화한 뒤 다음 순서로 사용합니다.
+
+1. 이력서 텍스트를 제공해 `profile_upsert`를 호출합니다.
+2. 채용 공고 본문 하나를 붙여 넣어 `job_ingest`를 호출합니다.
+3. 이 공고가 현실적인 선택인지 물어 반환된 프로필 ID와 공고 ID로 `job_assess`를 호출합니다.
+
+Milestone 1은 구조화된 후보자 프로필과 공고만 메모리에 보관합니다. 원본 이력서 텍스트를 저장하거나, 공고 URL을 가져오거나, SQLite에 기록하거나, 이력서를 자동으로 고치지 않습니다.
+
+프로필·공고는 각각 최대 100건이며 마지막 저장 후 30분이면 요청이 없어도 삭제됩니다. 상한을 넘으면 가장 먼저 저장된 항목부터 삭제합니다. 만료·퇴출·서버 재시작으로 ID를 찾을 수 없으면 이력서/JD를 다시 제공해야 합니다. 구조화된 프로필도 개인정보를 포함할 수 있습니다.
+
+현재는 소유자 한 명의 로컬/비공개 개발용입니다. 인증과 사용자별 데이터 격리를 구현하지 않았으므로 공개 서비스나 여러 사용자의 공용 서버로 배포하지 마세요.
 
 ## ChatGPT에서 연결하기
 
@@ -70,19 +85,23 @@ Secure MCP Tunnel은 개발 및 비공개 연결용이며 공개 Plugin 제출�
 - 공유 Zod 상태 스키마
 - Stateless Streamable HTTP MCP 엔드포인트
 - 읽기 전용 `career_radar_status` 도구
-- React 위젯을 포함한 MCP Apps UI 리소스
+- `profile_upsert`, 붙여 넣기 전용 `job_ingest`, `job_assess` 도구
+- Zod로 검증하는 OpenAI Responses API structured output
+- 근거 연결과 hard blocker를 확인하는 결정론적 후처리
+- Job Assessment Card를 포함한 MCP Apps UI 리소스
+- 합성 데이터 기반 정책 eval fixture 16개 (결정론적 안전 정책 회귀 케이스 포함)
 - lint, typecheck, build, 단위 테스트 스크립트
 
 아직 구현되지 않음:
 
-- 이력서 파싱
-- 채용 공고 입력 및 적합도 평가
-- OpenAI Responses API 호출
 - SQLite 영속화
 - 지원 현황 관리
+- 채용 공고 URL 가져오기
 - 채용 공고 검색
 
 전체 마일스톤은 [프로젝트 명세](docs/PROJECT_SPEC.md)를 참고하세요.
+
+`pnpm typecheck`는 서버·위젯뿐 아니라 테스트와 eval fixture도 검사합니다. `pnpm eval`은 모델 호출 없이 후처리 정책만 검증하므로 결과를 모델 정확도로 해석하면 안 됩니다. 근거 일치 검사도 구조화된 프로필을 기준으로 하며 원본 이력서의 추출 정확도까지 보장하지 않습니다.
 
 ## 참고 문서
 
