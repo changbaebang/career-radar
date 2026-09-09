@@ -53,6 +53,14 @@ const gap = (requirement: string, severity: FitAssessment["gaps"][number]["sever
 
 export const evalCases: EvalCase[] = [
   {
+    // Policy regression: a trailing period added by the model must not discard otherwise exact evidence.
+    caseId: "trailing-period-evidence-grounded",
+    profile: profile("period", "Frontend Lead", ["Led a React platform team for three years"]),
+    job: job("period", "Frontend Lead", { id: "req_1", text: "Lead a React team", type: "leadership", importance: "core" }),
+    draftAssessment: assessment("REALISTIC", "Led a React platform team for three years.", null),
+    expectedVerdict: "REALISTIC", expectHardBlocker: false, mustNotClaim: ["ten years"],
+  },
+  {
     caseId: "invented-evidence-extension-rejected",
     profile: profile("inflated", "Frontend Lead", ["Led a React platform team for three years"]),
     job: job("inflated", "Frontend Lead", { id: "req_1", text: "Lead a React team", type: "leadership", importance: "core" }),

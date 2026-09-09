@@ -16,6 +16,7 @@ import {
   type McpDependencies,
 } from "../src/mcp/createServer.js";
 import { CareerStore } from "../src/domain/store.js";
+import { syntheticProfile } from "./fixtures.js";
 
 const closeCallbacks: Array<() => Promise<void>> = [];
 
@@ -23,7 +24,7 @@ afterEach(async () => {
   await Promise.all(closeCallbacks.splice(0).map((close) => close()));
 });
 
-async function startTestServer(dependencies: McpDependencies = {}) {
+async function startTestServer(dependencies: Partial<McpDependencies> = {}) {
   const httpServer = createHttpApp(dependencies).listen(0, "127.0.0.1");
   await new Promise<void>((resolve, reject) => {
     httpServer.once("listening", resolve);
@@ -124,7 +125,7 @@ describe("Career Radar HTTP and MCP server", () => {
   });
 
   it("does not share default storage between independent HTTP apps", async () => {
-    const { profile } = (await import("../../evals/fixtures/cases.js")).evalCases[0];
+    const profile = syntheticProfile;
     const createAnalyzer = vi.fn(() => ({
       extractProfile: async () => ({ profile, warnings: [] }),
       extractJob: vi.fn(),

@@ -1,9 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { evalCases } from "../../evals/fixtures/cases.js";
 import { CareerStore } from "../src/domain/store.js";
-
-const { profile, job } = evalCases[0];
+import { syntheticJob as job, syntheticProfile as profile } from "./fixtures.js";
 
 afterEach(() => {
   vi.clearAllTimers();

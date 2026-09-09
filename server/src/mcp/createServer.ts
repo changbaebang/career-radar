@@ -15,17 +15,19 @@ import {
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-import { type CareerAnalyzer, OpenAICareerAnalyzer } from "../ai/analyzer.js";
+import type { CareerAnalyzer } from "../ai/analyzer.js";
 import { buildCareerRadarStatus } from "../demo.js";
 import { applyAssessmentPolicy } from "../domain/assessment/policy.js";
-import { CareerStore } from "../domain/store.js";
+import type { CareerStore } from "../domain/store.js";
 
 export const CAREER_RADAR_WIDGET_URI = "ui://career-radar/widget-v1.html";
 
+// Both are required on purpose: an MCP server is created per request, so a per-call default store
+// would forget every profile between profile_upsert and job_assess. createHttpApp owns the shared
+// instances; any other transport must supply its own.
 export type McpDependencies = {
-  analyzer?: CareerAnalyzer;
-  createAnalyzer?: () => CareerAnalyzer;
-  store?: CareerStore;
+  store: CareerStore;
+  createAnalyzer: () => CareerAnalyzer;
 };
 
 function readWidgetBundle(): string {
@@ -42,10 +44,8 @@ function readWidgetBundle(): string {
   }
 }
 
-export function createMcpServer(dependencies: McpDependencies = {}): McpServer {
-  const store = dependencies.store ?? new CareerStore();
-  let analyzer = dependencies.analyzer;
-  const getAnalyzer = () => (analyzer ??= dependencies.createAnalyzer?.() ?? new OpenAICareerAnalyzer());
+export function createMcpServer(dependencies: McpDependencies): McpServer {
+  const { store, createAnalyzer: getAnalyzer } = dependencies;
   const server = new McpServer({ name: "career-radar", version: "0.1.0" });
 
   registerAppTool(

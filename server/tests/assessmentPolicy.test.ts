@@ -78,6 +78,21 @@ describe("applyAssessmentPolicy", () => {
     expect(result.confidence).toBe("low");
   });
 
+  it.each([
+    "Led a React platform team for three years.",
+    "\"Led a React platform team for three years\"",
+    "\u201cLed a React platform team for three years.\u201d",
+  ])("accepts exact evidence with trailing punctuation or quotes: %s", (evidence) => {
+    const sentence = "Led a React platform team for three years";
+    const richProfile: CandidateProfile = { ...profile, roles: [{ company: "Example", title: "Lead", responsibilities: [sentence], evidence: [] }] };
+    const result = applyAssessmentPolicy(richProfile, job, {
+      ...base,
+      strongestMatches: [{ requirement: "Leadership", evidence, source: {}, strength: "direct" }],
+    });
+    expect(result.strongestMatches).toHaveLength(1);
+    expect(result.verdict).toBe("REALISTIC");
+  });
+
   it("accepts exact evidence after case and whitespace normalization", () => {
     const result = applyAssessmentPolicy(profile, job, {
       ...base,

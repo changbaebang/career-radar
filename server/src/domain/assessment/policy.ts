@@ -1,7 +1,9 @@
 import { FitAssessmentSchema, type CandidateProfile, type EvidenceMatch, type FitAssessment, type Gap, type JobPosting } from "@career-radar/shared";
 
 const BINARY_HARD_REQUIREMENTS = new Set(["language", "location", "certification", "education"]);
-const normalize = (value: string) => value.trim().toLocaleLowerCase().replaceAll(/\s+/g, " ");
+// Exact-match grounding must survive the model adding a trailing period or wrapping quotes.
+const normalize = (value: string) =>
+  value.trim().toLocaleLowerCase().replaceAll(/\s+/g, " ").replace(/^["'\u201c\u2018]+|["'\u201d\u2019.,;:!?]+$/g, "");
 
 function candidateEvidence(profile: CandidateProfile): string[] {
   return [profile.headline, ...profile.skills, ...profile.domains, ...profile.leadership,

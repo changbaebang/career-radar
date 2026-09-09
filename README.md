@@ -89,7 +89,7 @@ Implemented:
 - OpenAI Responses API structured outputs validated with Zod
 - deterministic evidence-grounding and hard-blocker post-processing
 - MCP Apps UI resource with a Job Assessment Card
-- fifteen synthetic policy eval fixtures, including regression cases for the deterministic safety policy
+- sixteen synthetic policy eval fixtures, including regression cases for the deterministic safety policy
 - lint, typecheck, build, and unit-test scripts
 
 Not implemented yet:
