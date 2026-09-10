@@ -25,7 +25,9 @@ export function groupRecommendations(
   return {
     available: { realistic: realistic.length, stretch: stretch.length, pass: pass.length },
     shortfall: { realistic: Math.max(0, realisticCount - realistic.length), stretch: Math.max(0, stretchCount - stretch.length) },
-    realistic: realistic.slice(0, realisticCount), stretch: stretch.slice(0, stretchCount), pass: includePass ? pass : [],
+    // Every assessed role is returned. The requested counts only drive `shortfall`; hiding paid
+    // assessments would force a second batch (and a second model bill) just to see them.
+    realistic, stretch, pass: includePass ? pass : [],
   };
 }
 
@@ -72,6 +74,9 @@ export class JobDiscovery {
     if (hits.some((hit) => !hit)) throw new Error("Every candidate ID must belong to this search. Call job_search to choose valid IDs.");
     const profile = store.getProfile(input.candidateProfileId);
     if (!profile) throw new Error("Candidate profile not found. Call profile_upsert first.");
+    // Configuration failures (for example a missing API key) must surface with their own message and
+    // cost nothing; only per-job analysis failures are reported as batch failures below.
+    const analyzer = createAnalyzer();
     if (this.#busy) throw new Error("A recommendation batch is already running. Wait for it before retrying.");
     this.#busy = true;
     const controller = new AbortController();
@@ -82,7 +87,7 @@ export class JobDiscovery {
     const items: RecommendedJob[] = [];
     const failures: JobRecommendations["failures"] = [];
     const warnings = [...snapshot.result.warnings,
-      "Assessed only the selected jobs. Requested quotas never change verdicts. Ranking uses confidence, contortion, then ID, not hiring probability.",
+      "Assessed only the selected jobs; every assessed role is returned. Requested counts only report shortfalls and never change verdicts. Ranking uses confidence, contortion, then ID, not hiring probability.",
       "Assessment snapshots are saved locally; no application was added or sent. Retrying performs new analysis and may incur model cost."];
     try {
       for (const hit of hits) {
@@ -92,7 +97,6 @@ export class JobDiscovery {
           continue;
         }
         try {
-          const analyzer = createAnalyzer();
           const description = `Greenhouse board token: ${hit.candidate.boardToken}\nTitle: ${hit.candidate.title}\nLocation: ${hit.candidate.location}\n\n${hit.description}`;
           // Bind identity to provider source + content, not an arbitrary model-generated ID.
           const jobId = stableId("job", `${hit.candidate.sourceUrl}\n${description}`);
@@ -102,15 +106,17 @@ export class JobDiscovery {
             job = JobPostingSchema.parse({ ...extracted.job, id: jobId, title: hit.candidate.title,
               sourceUrl: hit.candidate.sourceUrl, location: hit.candidate.location || undefined, description });
             warnings.push(...extracted.warnings);
+            // Public job text: persist as soon as it is extracted so a failed assessment does not
+            // discard a paid extraction and a retry only re-runs the assessment.
+            store.upsertJob(job);
           }
           const draft = await Promise.race([analyzer.assess(profile, job, controller.signal), aborted]);
           const assessment = applyAssessmentPolicy(profile, job, draft);
           controller.signal.throwIfAborted();
-          store.upsertJob(job);
           const assessmentId = store.saveAssessment(profile.id, job, assessment);
           items.push({ candidate: hit.candidate, jobId: job.id, assessmentId, assessment });
         } catch {
-          failures.push({ candidateId: hit.candidate.candidateId, message: "Analysis failed or timed out. Check the model configuration and credit, then retry explicitly. This is not a PASS verdict." });
+          failures.push({ candidateId: hit.candidate.candidateId, message: "Analysis failed or timed out. Check model credit and network, then retry explicitly. This is not a PASS verdict." });
         }
       }
       return JobRecommendationsSchema.parse({

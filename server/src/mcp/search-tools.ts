@@ -19,7 +19,7 @@ export function registerSearchTools(server: McpServer, discovery: JobDiscovery, 
 
   registerAppTool(server, "job_recommend", {
     title: "Recommend selected jobs from evidence",
-    description: "Use this when the user asks to assess selected job_search candidates against an existing profile. Pass only candidate IDs from that search, at most 5; this may make up to 10 paid model operations and saves local assessment snapshots. Stops after the first analysis failure. A requested REALISTIC/STRETCH count is a maximum, not a quota to fill by inventing fit. Returns explicit shortages/failures and optional PASS explanations. Does not search again, save applications, rewrite resumes, or contact employers. Retrying runs new analysis; do not automatically retry failures or shortages.",
+    description: "Use this when the user asks to assess selected job_search candidates against an existing profile. Pass only candidate IDs from that search, at most 5; this may make up to 10 paid model operations and saves local assessment snapshots. Stops after the first analysis failure. Every assessed role is returned; requested REALISTIC/STRETCH counts only report shortfalls and are never filled by inventing fit. Returns explicit shortages/failures and optional PASS explanations. Does not search again, save applications, rewrite resumes, or contact employers. Retrying runs new analysis; do not automatically retry failures or shortages.",
     inputSchema: JobRecommendInputSchema.shape, outputSchema: JobRecommendationsSchema.shape,
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
     _meta: { securitySchemes: [{ type: "noauth" }], ui: { resourceUri }, "openai/outputTemplate": resourceUri },

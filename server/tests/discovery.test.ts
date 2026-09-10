@@ -55,6 +55,7 @@ describe("bounded search snapshots and recommendations", () => {
     const items = [recommendedItem(1, { confidence: "low", score: 100 }), recommendedItem(2, { confidence: "high", score: 1 }), recommendedItem(3, { verdict: "PASS" })];
     const result = groupRecommendations(items, 1, 2, false);
     expect(result.realistic[0]?.candidate.candidateId).toBe("synthetic_2");
+    expect(result.realistic).toHaveLength(2); // every assessed role is returned; the requested count only drives shortfall
     expect(result.shortfall).toEqual({ realistic: 0, stretch: 2 });
     expect(result.pass).toEqual([]);
     expect(result.available.pass).toBe(1);
@@ -95,14 +96,31 @@ describe("bounded search snapshots and recommendations", () => {
     expect(JSON.stringify(result)).not.toContain("SYNTHETIC_PRIVATE_DIAGNOSTIC");
     expect(analyzer.assess).toHaveBeenCalledTimes(2);
     expect(analyzer.extractJob).toHaveBeenCalledTimes(2);
+    // The failed job's extraction was persisted, so the retry re-extracts only the never-attempted third job
+    // (one more call), not the failed second one as well (which would make four).
+    const retry = await discovery.recommend(input, store, createAnalyzer);
+    expect(analyzer.extractJob).toHaveBeenCalledTimes(3);
+    expect(retry.failures).toEqual([]);
+    expect(retry.available.realistic).toBe(3);
   });
 
-  it("reports missing-key failure without treating it as an empty successful recommendation", async () => {
-    const { discovery, store, input } = await setup();
-    const result = await discovery.recommend(input, store, () => { throw new Error("No key"); });
-    expect(result.available).toEqual({ realistic: 0, stretch: 0, pass: 0 });
-    expect(result.failures).toHaveLength(3);
-    expect(result.shortfall).toEqual({ realistic: 2, stretch: 1 });
+  it("fails the whole batch with the configuration message when no analyzer can be created", async () => {
+    const { discovery, store, analyzer, createAnalyzer, input } = await setup();
+    await expect(discovery.recommend(input, store, () => { throw new Error("Set OPENAI_API_KEY in .env.local"); }))
+      .rejects.toThrow("Set OPENAI_API_KEY in .env.local");
+    expect(analyzer.extractJob).not.toHaveBeenCalled();
+    // The batch lock was never taken, so a configured retry proceeds normally.
+    await expect(discovery.recommend(input, store, createAnalyzer)).resolves.toMatchObject({ available: { realistic: 3 } });
+  });
+
+  it("returns every paid assessment even when fewer were requested, so no second batch is needed", async () => {
+    const { discovery, store, analyzer, createAnalyzer, input } = await setup();
+    const result = await discovery.recommend({ ...input, realisticCount: 1, stretchCount: 0 }, store, createAnalyzer);
+    expect(analyzer.assess).toHaveBeenCalledTimes(3);
+    expect(result.available.realistic).toBe(3);
+    expect(result.realistic).toHaveLength(3);
+    expect(result.shortfall).toEqual({ realistic: 0, stretch: 0 });
+    expect(new Set(result.realistic.map((item) => item.assessmentId)).size).toBe(3);
   });
 
   it("aborts a stalled batch and rejects overlapping batches before more work", async () => {

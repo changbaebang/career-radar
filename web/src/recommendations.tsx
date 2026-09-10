@@ -62,7 +62,6 @@ export function RecommendationsCard({ result }: { result: JobRecommendations }) 
     {result.pass.length > 0 && <section aria-label="PASS explanations"><h2 className="group-heading">PASS <span>Why to skip</span></h2>
       {result.pass.map((item) => <JobRow key={item.candidate.candidateId} item={item} />)}</section>}
     {result.available.pass > result.pass.length && <p className="message">{result.available.pass} PASS results; explanations were not requested.</p>}
-    {(result.available.realistic > result.realistic.length || result.available.stretch > result.stretch.length) && <p className="message">More assessed roles exist than requested. Available: {result.available.realistic} REALISTIC, {result.available.stretch} STRETCH.</p>}
     {result.failures.length > 0 && <section className="blockers" aria-label="Analysis failures">
       <h2>Analysis incomplete — not a PASS verdict</h2>
       <ul>{result.failures.map((failure) => <li key={failure.candidateId}><span><strong>{failure.candidateId}</strong><br />{failure.message}</span></li>)}</ul>

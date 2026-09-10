@@ -9,7 +9,7 @@ Live Responses API and ChatGPT-host verification remain separate follow-ups. Thi
 1. Add one `JobSearchProvider`: the official public Greenhouse Job Board GET API. No API key, scraping framework, application submission, or whole-market search.
 2. Search one explicitly named board. Filter title keywords and location **locally**; only the board token goes to Greenhouse. Do not derive queries from raw resumes or send candidate profiles to the search provider.
 3. Return at most 10 candidate summaries with provider, canonical source URL, retrieval time, and optional provider update time. Search ordering is discovery, not fit scoring. Missing or old update dates do not mean a role is open or closed.
-4. Assess at most 5 explicitly selected candidate IDs from a server-held search snapshot. Reuse structured extraction and the existing evidence policy, save immutable assessment snapshots, and return requested REALISTIC/STRETCH groups plus optional PASS explanations. Report shortfalls and failures, never relabel to fill a quota.
+4. Assess at most 5 explicitly selected candidate IDs from a server-held search snapshot. Reuse structured extraction and the existing evidence policy, save immutable assessment snapshots, and return every assessed role grouped as REALISTIC/STRETCH plus optional PASS explanations. Requested counts only report shortfalls; never relabel to fill a quota.
 5. Extend the existing React widget with a compact recommendation view and a keyless synthetic demo. Keep the existing server/web structure and M2 storage/access controls.
 6. Validate schemas, provider boundaries, cache expiry, ranking, shortages, partial failures, MCP chaining, and demo rendering. Publish a normal PR; do not merge.
 
@@ -46,7 +46,7 @@ Directly executed on the M3 PR working tree (Node 24, pnpm 10):
 - `pnpm eval`: **16 pass**, deterministic policy fixtures only. This is not model accuracy or semantic prompt-injection validation.
 - `pnpm build`: shared, widget, and server pass. `pnpm install --frozen-lockfile`: pass; no dependency or lockfile changes.
 - Provider unit/transport checks: malformed tokens, local filters, public IP pinning, mixed/private DNS, redirects, HTTP errors, content type/encoding, streaming size, DNS deadline, duplicate IDs, prospect posts, malformed/unknown dates, HTML cleanup, and redacted failures.
-- Recommendation checks: server-held ID membership, complete-batch validation, expiry/eviction/app-instance separation, policy-before-ranking, quota shortfall, hidden PASS counts, explicit saving/retry preservation, partial failures, overlap rejection, abort propagation, and no SDK retry for batch calls.
+- Recommendation checks: server-held ID membership, complete-batch validation, expiry/eviction/app-instance separation, policy-before-ranking, quota shortfall with every assessed role returned, hidden PASS counts, explicit saving/retry preservation, partial failures, overlap rejection, abort propagation, and no SDK retry for batch calls.
 - HTTP/MCP: search → recommend → explicit save works across per-request MCP servers with an injected synthetic provider/analyzer. The running standalone demo also advertised all nine tools and returned M3 status through a real MCP client.
 - **Live public retrieval only:** at `2026-09-10T02:44:17.791Z`, the `greenhouse` board returned 19 readable posts; the requested top 3 contained 6,892 / 6,892 / 6,406 description characters. Source and update times were present. No profile, key, or model call was involved. Other boards were not live-tested.
 - **Standalone browser rendering:** recommendation groups, the intentional REALISTIC shortage, separate source times, and all-failed presentation rendered at loopback port 8002. Screenshot and accessibility tree inspected. Synthetic/prewritten results only; not ChatGPT iframe validation. Mobile viewport, external-link opening, and keyboard interactions were not manually exercised.
@@ -63,7 +63,7 @@ Scope: `LOCAL_DRAFT`, one local owner, synthetic analysis and public job data. T
 | Recommendation → SQLite → application tools | Server-issued assessment IDs, explicit application save, first-decision/retry behavior covered | Existing persistent/unencrypted data and reset/backup caveats apply |
 | Demo → widget | Ranking/shortage/failure views reuse shared contracts and existing visual language | Standalone demo is not the ChatGPT host bridge |
 
-No additional blocking regression was found in the exercised local scope. The 29CM certificate/login E2E workflow does not apply to this repository; a direct loopback browser render smoke was used instead. Relevant build/UI skills kept the existing app architecture, made new data/render responsibilities explicit, and separated empty/failed result states.
+No additional blocking regression was found in the exercised local scope. A direct loopback browser render smoke was used instead of a hosted E2E workflow. The implementation kept the existing app architecture, made new data/render responsibilities explicit, and separated empty/failed result states.
 
 ## Follow-up gate
 
