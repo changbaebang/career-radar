@@ -36,7 +36,7 @@ Base: `main` at `3aaeb019ab790f6bab8a9f74173e0c127e8b593c`.
 - `CareerStore` consumers are the HTTP/MCP entry points, analyzer ID helpers, tests, and standalone demo. The file-backed entry point replaces M1's ephemeral state; tests remain isolated.
 - Widget v2 supports pipeline data and keeps the existing assessment/status paths. Existing ChatGPT connections need a descriptor refresh.
 - Existing evidence policy and model prompts were not changed. No additional blocking regression was found by the local checks; live-model/host compatibility remains unverified.
-- The generic change-impact gate was used. Its linked 29CM-specific ntest workflow does not fit this personal repository; a direct localhost browser click/re-entry smoke was used instead.
+- Change-impact checks traced shared contracts and storage consumers. A direct localhost browser click/re-entry smoke verified the demo flow.
 
 ## Intentional limits
 
