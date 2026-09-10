@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/web build && pnpm --filter @career-radar/server build",
-    "dev": "pnpm --filter @career-radar/web build && pnpm --filter @career-radar/server dev",
+    "dev": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/web build && pnpm --filter @career-radar/server dev",
     "db:reset": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/server db:reset",
     "demo": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/web build && pnpm --filter @career-radar/server demo",
     "lint": "eslint .",

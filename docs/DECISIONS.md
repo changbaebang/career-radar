@@ -73,3 +73,17 @@ Fetching never uses candidate data. Retrieved text is untrusted input to the exi
 **Status:** Accepted
 
 `pnpm demo` reuses the React widget and real SQLite application operations with clearly labeled synthetic data and prewritten verdicts. It cannot instantiate an AI analyzer and does not read keys or the user database. The small outer demo page is not the ChatGPT host bridge, and successful local UI checks must not be reported as live model or ChatGPT validation. Search, authentication, public hosting/submission, and causal outcome analytics remain out of scope.
+
+## ADR-0011: Discover publicly, assess privately, and never fill a verdict quota
+
+**Status:** Accepted — Milestone 3 private prototype. Supersedes ADR-0010's search deferral only.
+
+Keep the existing React widget archetype and add a `JobSearchProvider` abstraction with one official Greenhouse Job Board GET implementation. No new scaffold, broad scraper, search key, or alternative model provider. Only an explicit board token leaves the server; title/location filters run locally without looking up profiles. Canonical source links are derived from the board and provider post ID, not an arbitrary returned URL. The network boundary independently checks fixed HTTPS host, public DNS/IP pinning, redirects, content type, response size, and timeout.
+
+`job_search` creates a bounded public-job snapshot, so its annotations describe ephemeral mutation and public internet access. Search results contain unassessed summaries and IDs, no raw JD/profile. `job_recommend` validates the entire selection and resolves source content server-side, runs the existing structured analyzer/policy for at most five jobs, and saves local immutable assessments. It is mutating, non-idempotent, and closed-world over this fixed snapshot. It does not create an application or send one. No standard company-knowledge `search`/`fetch` compatibility is claimed.
+
+Rank **only within** the policy's verdict groups by confidence, contortion, then candidate ID. Keep shortages, hidden/excess result counts, and model failures explicit. Stop after an error, disable SDK retries for batch calls, propagate a 90-second abort signal, and permit one active batch per app. Original single-job calls retain their previous SDK defaults. No policy/prompt/model version was silently changed.
+
+Public search snapshots expire after 30 minutes and are capped at ten; profile/assessment persistence still follows M2. Search-ingested job IDs include source URL and exact input content; changed content becomes a different record and old assessment snapshots remain unchanged. Search and pasted-JD identity are not deduplicated together. This is documented private-prototype behavior, not multi-user isolation.
+
+Widget v3 adds grouped recommendations, evidence/gaps, explicit failure/shortage states, source times, and details. Search is data-only; recommendations follow the existing small combined analysis/render pattern. The widget retains the MCP result notification path and ChatGPT initial-output compatibility alias. Host initialization/interaction and public submission remain unverified follow-ups, not inferred from standalone demo success.

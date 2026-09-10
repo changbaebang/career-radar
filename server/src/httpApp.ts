@@ -4,6 +4,8 @@ import express, { type Express } from "express";
 import { type CareerAnalyzer, OpenAICareerAnalyzer } from "./ai/analyzer.js";
 import { buildCareerRadarStatus } from "./demo.js";
 import { CareerStore } from "./domain/store.js";
+import { JobDiscovery } from "./domain/jobs/search.js";
+import { GreenhouseJobSearchProvider } from "./infra/search/greenhouse.js";
 import {
   createMcpServer,
   type McpDependencies,
@@ -29,6 +31,7 @@ export function createHttpApp(options: Partial<McpDependencies> = {}): Express {
     store: options.store ?? new CareerStore(),
     createAnalyzer: () => (analyzer ??= createAnalyzer()),
     fetchJob: options.fetchJob,
+    discovery: options.discovery ?? new JobDiscovery(new GreenhouseJobSearchProvider()),
   };
 
   // This server is private and bound to loopback. Browser pages must not be able to reach it, so
