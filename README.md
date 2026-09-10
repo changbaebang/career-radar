@@ -4,7 +4,18 @@
 
 Career Radar is an evidence-based career decision tool. It is designed to help a candidate decide whether a role is `REALISTIC`, `STRETCH`, or `PASS` without inventing experience or turning a fit label into a hiring probability.
 
-This repository currently contains **Milestone 1**: resume-text profile extraction, pasted job-description normalization, and an evidence-grounded single-job assessment rendered in a React widget.
+This is a **Milestone 2 early prototype**: evidence-grounded assessment, allowed public job URLs, local SQLite decision storage, and application outcome tracking. It is a private toy project to use and improve, not a public hiring-prediction service.
+
+## One-minute demo — no key or API cost
+
+```bash
+pnpm install
+pnpm demo
+```
+
+Open [the local demo](http://127.0.0.1:8001) to inspect three verdict cards and a pipeline. The interview button updates the real SQLite store used by the demo and refreshes the widget.
+
+All demo profiles, jobs, and prewritten verdicts are **synthetic**, not live model results or proof of accuracy. The demo reads no API keys or user database; its in-memory SQLite data resets on restart. Use `pnpm dev` for real analysis.
 
 ## Architecture
 
@@ -16,14 +27,14 @@ career-radar/
   web/              # React widget bundled by Vite
   packages/shared/  # Shared Zod schema and TypeScript types
   docs/             # Product specification and decisions
-  data/             # Local-only data location for later milestones
+  data/             # Gitignored local SQLite database
 ```
 
-The MCP implementation started from the official OpenAI examples at commit `18cc38e78a968712c357bacdc3c79fead5bfc6b4`. It now provides a status tool, three single-job analysis tools, and one widget.
+The MCP implementation started from the official OpenAI examples at commit `18cc38e78a968712c357bacdc3c79fead5bfc6b4`. It now provides a status tool, six product tools, and assessment/pipeline widget views.
 
 ## Requirements
 
-- Node.js 22 or newer
+- Node.js 22.13 or newer (Node 24 recommended; uses built-in `node:sqlite`)
 - pnpm 10
 
 ## Local development
@@ -55,12 +66,18 @@ pnpm eval
 In a ChatGPT conversation with the app enabled:
 
 1. Provide resume text so ChatGPT can call `profile_upsert`.
-2. Paste one job description so it can call `job_ingest`.
+2. Provide one job description or allowed public URL so it can call `job_ingest`.
 3. Ask whether the role is realistic so it can call `job_assess` with the returned profile and job IDs.
 
-The process stores only the structured candidate profile and normalized job in memory. It does not retain raw resume text, fetch job URLs, write SQLite data, or rewrite a resume in Milestone 1.
+4. Ask to save the job: `application_save` accepts the server-issued `assessmentId`.
+5. Report an application, interview, rejection, withdrawal, or offer via `application_update`. No application is sent to an employer.
+6. Ask for `pipeline_summary` to see the current pipeline widget.
 
-Profiles and jobs are each capped at 100 records and expire 30 minutes after their latest write, even while idle. Oldest writes are evicted when the cap is exceeded. After expiry, eviction, or a server restart, provide the resume/JD again to recreate missing IDs. Structured profiles can still contain personal information.
+URL fetching allows HTTPS on `boards.greenhouse.io`, `job-boards.greenhouse.io`, `jobs.lever.co`, and `jobs.ashbyhq.com`. It checks every redirect/DNS result, pins a public IP for the connection, and limits total time to 10 seconds, response size to 1 MB, and redirects to three. No JavaScript, login, discovery, or access-control bypass. Paste the JD when a page cannot be read; review extracted text for navigation/consent boilerplate.
+
+Normal execution persists structured profiles, jobs, assessment snapshots, applications, and events in `data/career-radar.db`. Override with `CAREER_RADAR_DB_PATH`; migrations run on startup. This **replaces M1's 30-minute memory retention**: data no longer expires automatically. Raw resumes are not retained, but structured data, assessments, and notes can still contain personal information. The database is unencrypted. To reset, stop the server and back up or remove only that database and its matching `-wal`/`-shm` files. Move the database separately and securely when changing machines/accounts.
+
+Repeated saves preserve the initial decision and current application status; use `application_update` for changes. Explicit user corrections are allowed. `appliedAt` records the first transition to `applied`, not an inferred historical application date. Omitted stage/notes are preserved; empty strings clear them. Date filters use inclusive last-update timestamps, not application cohorts. Counts cover all matching applications; details are limited to the latest 100 and the widget shows 10.
 
 This version is for one owner's local/private development. It does not authenticate users or isolate their data within an app; do not deploy it as a public or shared multi-user service.
 
@@ -85,7 +102,9 @@ Implemented:
 - shared Zod status schema
 - stateless Streamable HTTP MCP endpoint
 - `career_radar_status` read-only tool
-- `profile_upsert`, pasted-text `job_ingest`, and `job_assess` tools
+- `profile_upsert`, URL/text `job_ingest`, and `job_assess` tools
+- `application_save`, `application_update`, and `pipeline_summary` tools
+- SQLite migrations, persistent decisions, and application event history
 - OpenAI Responses API structured outputs validated with Zod
 - deterministic evidence-grounding and hard-blocker post-processing
 - MCP Apps UI resource with a Job Assessment Card
@@ -94,10 +113,9 @@ Implemented:
 
 Not implemented yet:
 
-- SQLite persistence
-- application tracking
-- job URL fetching
 - job search
+- public deployment, user authentication, automated applications
+- M2 live-model and ChatGPT-host end-to-end validation (separate from local synthetic checks)
 
 See [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md) for the milestone plan.
 

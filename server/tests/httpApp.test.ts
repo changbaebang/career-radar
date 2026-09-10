@@ -5,6 +5,7 @@ import type {
   FitAssessment,
   JobPosting,
 } from "@career-radar/shared";
+import { ApplicationResultSchema, JobAssessmentResultSchema } from "@career-radar/shared";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -49,12 +50,18 @@ async function connectClient(baseUrl: string) {
 }
 
 describe("Career Radar HTTP and MCP server", () => {
+  it("rejects unrelated browser origins before exposing the local database", async () => {
+    const baseUrl = await startTestServer();
+    const response = await fetch(`${baseUrl}/mcp`, { method: "OPTIONS", headers: { Origin: "https://unrelated.example", "Access-Control-Request-Method": "POST" } });
+    expect(response.status).toBe(403);
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
+  });
   it("serves deterministic readiness data", async () => {
     const baseUrl = await startTestServer();
     const response = await fetch(`${baseUrl}/health`);
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      name: "Career Radar", milestone: "Milestone 1", state: "ready",
+      name: "Career Radar", milestone: "Milestone 2", state: "ready",
     });
   });
 
@@ -121,7 +128,18 @@ describe("Career Radar HTTP and MCP server", () => {
     expect(store.getProfile(profile.id)).toEqual(profile);
     expect(store.getJob(job.id)).toEqual(job);
     expect(createAnalyzer).toHaveBeenCalledTimes(1);
+    const assessmentId = JobAssessmentResultSchema.parse(result.structuredContent).assessmentId;
+    expect(typeof assessmentId).toBe("string");
+    const saved = await client.callTool({ name: "application_save", arguments: { assessmentId, status: "saved" } });
+    const savedData = ApplicationResultSchema.parse(saved.structuredContent);
+    const changed = await client.callTool({ name: "application_update", arguments: { applicationId: savedData.application.id, status: "interview", stage: "technical" } });
+    expect(changed.structuredContent).toMatchObject({ application: { status: "interview", verdictAtDecision: "REALISTIC" } });
+    const retried = await client.callTool({ name: "application_save", arguments: { assessmentId, status: "saved" } });
+    expect(retried.structuredContent).toEqual(changed.structuredContent);
+    const summary = await client.callTool({ name: "pipeline_summary", arguments: {} });
+    expect(summary.structuredContent).toMatchObject({ total: 1, applications: [{ status: "interview" }] });
     store.clear();
+    store.close();
   });
 
   it("does not share default storage between independent HTTP apps", async () => {
@@ -145,5 +163,25 @@ describe("Career Radar HTTP and MCP server", () => {
       expect.objectContaining({ type: "text", text: expect.stringContaining("Call profile_upsert again") }),
     ]));
     expect(createAnalyzer).toHaveBeenCalledTimes(1);
+  });
+
+  it("normalizes fetched text, preserves its source, and validates ambiguous input before the model", async () => {
+    const { syntheticJob } = await import("./fixtures.js");
+    const extractJob = vi.fn(async () => ({ job: syntheticJob, warnings: [] }));
+    const createAnalyzer = vi.fn(() => ({ extractProfile: vi.fn(), extractJob, assess: vi.fn() }));
+    const fetchJob = vi.fn(async () => ({ text: "Synthetic public frontend job description with sufficient text.", sourceUrl: "https://jobs.lever.co/example/final", warnings: ["Synthetic fetched page"] }));
+    const client = await connectClient(await startTestServer({ createAnalyzer, fetchJob }));
+    const tools = await client.listTools();
+    expect(tools.tools.find((tool) => tool.name === "job_ingest")?.annotations?.openWorldHint).toBe(true);
+    expect(tools.tools.find((tool) => tool.name === "job_assess")?.annotations?.readOnlyHint).toBe(false);
+    expect(tools.tools.find((tool) => tool.name === "pipeline_summary")?.annotations?.readOnlyHint).toBe(true);
+    const invalid = await client.callTool({ name: "job_ingest", arguments: {} });
+    expect(invalid.isError).toBe(true);
+    const ambiguous = await client.callTool({ name: "job_ingest", arguments: { url: "https://jobs.lever.co/example/job", text: "Synthetic job with more than fifty characters in the job description." } });
+    expect(ambiguous.isError).toBe(true);
+    expect(createAnalyzer).not.toHaveBeenCalled();
+    const result = await client.callTool({ name: "job_ingest", arguments: { url: "https://jobs.lever.co/example/job" } });
+    expect(result.structuredContent).toMatchObject({ job: { sourceUrl: "https://jobs.lever.co/example/final" }, warnings: ["Synthetic fetched page"] });
+    expect(extractJob).toHaveBeenCalledWith("Synthetic public frontend job description with sufficient text.");
   });
 });

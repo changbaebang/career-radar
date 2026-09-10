@@ -18,8 +18,19 @@ export function createHttpApp(options: Partial<McpDependencies> = {}): Express {
   const sharedDependencies: McpDependencies = {
     store: options.store ?? new CareerStore(),
     createAnalyzer: () => (analyzer ??= createAnalyzer()),
+    fetchJob: options.fetchJob,
   };
 
+  // Browser pages on unrelated origins must not read or mutate the local private database.
+  // MCP clients and secure tunnels are server-to-server and normally omit Origin.
+  app.use((request, response, next) => {
+    const origin = request.get("origin");
+    if (origin && origin !== `http://${request.get("host")}`) {
+      response.status(403).json({ error: "Cross-origin browser access is not allowed." });
+      return;
+    }
+    next();
+  });
   app.use(
     cors({
       exposedHeaders: ["Mcp-Session-Id"],
@@ -51,7 +62,7 @@ export function createHttpApp(options: Partial<McpDependencies> = {}): Express {
       await server.connect(transport);
       await transport.handleRequest(request, response, request.body);
     } catch (error) {
-      console.error("MCP request failed", error);
+      console.error("MCP request failed", error instanceof Error ? error.name : "UnknownError");
       if (!response.headersSent) {
         response.status(500).json({
           jsonrpc: "2.0",
