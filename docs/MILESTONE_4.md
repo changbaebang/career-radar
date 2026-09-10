@@ -26,7 +26,7 @@ Verified against the baseline source, not an assertion of live model quality:
 | Outcomes | Status, optional free-text `outcomeStage`; explicit corrections; notes excluded from new events | Stage vocabulary, stage-aware history projection, explicit occurrence/provenance semantics |
 | Summary | Current status/roleFamily/verdict × status counts; filter by last update | Historical stage progression and clearly defined cohorts/unknowns |
 | Snapshots | Job and assessment snapshot, profile ID; profile can be overwritten | Immutable evaluation input/version for reproducible runs |
-| Evals | 16 synthetic policy fixtures; CLI JSON aggregate; nonzero exit on failure | 24–30+ cases, case-level metrics, saved runs and regression comparison |
+| Evals | 16 synthetic policy fixtures; CLI JSON aggregate with verdict agreement, case-level blocker detection, `expectedHardBlockerCount` mismatches, a forbidden-claim check and PASS→REALISTIC over all cases; nonzero exit on failure | 24–30+ cases, requirement-ID blocker matching, explicit denominators, saved runs and regression comparison |
 | Feedback | User-reported support data, not human-reviewed fit labels | Explicit reviewer annotation → synthetic regression case workflow |
 
 Source entry points: `packages/shared/src/index.ts`, `server/src/domain/store.ts`, `server/src/infra/db/migrations.ts`, `server/src/ai/analyzer.ts`, `evals/run-evals.ts`, and `evals/fixtures/cases.ts`. Existing `outcomeStage` is not a missing field: M4 must improve its meaning without silently replacing historical text.
@@ -49,7 +49,7 @@ These are design contracts for subsequent implementation PRs, not current tool f
 ```ts
 type EvidenceRef = {
   source: "candidate" | "job";
-  path: string; // validated locator in the immutable input, not an arbitrary URL
+  path: string; // locator in the input the reference was validated against at write time, not an arbitrary URL
   quote: string; // verified against that located source
 };
 
@@ -83,8 +83,10 @@ type ScreeningContextV1 = {
 - `underleveled` and `overleveled` describe the **candidate's demonstrated scope relative to the role**, not the candidate's worth. Non-uncertain scope judgments require cited candidate and JD scope; title/years alone cannot support them. A deliberately narrow, explicit role scope may support a mismatch risk. Absence of architecture/mentoring language alone does not.
 - `careerStoryRisk` describes an evidence-backed need for clarification, not a prediction of recruiter behavior. Add `uncertain` to the supplied three-level proposal to avoid forcing a risk judgment when facts are missing. No automatic `medium` for former leads applying as ICs; an explicitly explained transition may remain low.
 - Screening risks must carry verified references and be bounded in count/text length by the eventual schema. Missing/invalid evidence must not become a confident risk. Retain uncertainty rather than synthesizing supporting facts. Evidence location checks are not proof of semantic truth; paired evals are still required.
+- **Decision (review #7): reuse the M1 grounding rule.** Candidate quotes are checked with the existing `isGrounded` normalization (lower-case, collapsed whitespace, trailing punctuation stripped, exact match against the candidate evidence pool). Job quotes are checked the same way against `description`, `required[].text`, `preferred[].text` and `responsibilities[]`. A risk whose references fail validation is coerced to `uncertain` — never kept as a confident risk and never dropped silently — and a one-line note is appended to `unknowns`. `seniorityFit` and `careerStoryRisk` values without validated candidate **and** job references are coerced to `uncertain` the same way.
 - Defer `compensation_scope` until explicit candidate preferences and advertised compensation/scope inputs exist. Unknown recruiter preferences belong in `unknowns`, not a scored `unknown` risk.
 - Keep existing `interviewRisks` for compatibility. UI should distinguish interview preparation from screening context and avoid duplicating the same warning. No automatic verdict downgrade or ranking change is part of M4.
+- **Decision (review #7): references are validated at write time only.** Assessment snapshots hold `profileId`, not the profile body, and `profile_upsert` overwrites, so a candidate-side reference cannot be re-opened later. M4-B1 adds the profile's existing `sourceHash` to the snapshot to identify the input version; it does not add a per-assessment profile copy. Replay and reproducibility come from the synthetic eval fixtures in M4-A, not from stored personal profiles.
 
 ### Stage-aware outcomes
 
@@ -97,7 +99,7 @@ resume_screen | recruiter_screen | coding_test | technical_interview
 
 Use `status: rejected` plus `normalizedOutcomeStage: resume_screen` for a reported resume-screen rejection. Use `unknown` for a rejection with no reliable stage; do not mix `resume_screen_rejected` into the stage enum. Withdrawal stays a status and may retain a known stage. Omitted input preserves prior state; explicit clearing must clear the associated normalized projection as well. Conflicting status/stage reports require validation or clarification, not guessed reconciliation.
 
-For new outcome history, record a versioned event with `applicationId`, status, normalized stage, `recordedAt`, optional `occurredAt`, and provenance (`user_report` or `legacy_mapping`). Recording time is not the historical time of an interview/rejection. Unknown occurrence dates remain unknown. Do not copy notes, resume/profile content, or arbitrary private evidence into events.
+For new outcome history, extend the existing `application_events` rows instead of adding a second history store (**Decision, review #7**). Each event JSON gains `eventVersion: 2`, `provenance` (`user_report` or `legacy_mapping`) and optional `occurredAt`; `normalizedOutcomeStage` flows in automatically because events already copy the application record. Rows without `eventVersion` are read as v1 with `provenance: "legacy_mapping"` and stage `unknown`. This keeps one correction/retraction semantics, needs no new table or column, and stays inside the existing `clear`/`db:reset` coverage. Recording time is not the historical time of an interview/rejection. Unknown occurrence dates remain unknown. Do not copy notes, resume/profile content, or arbitrary private evidence into events.
 
 The implementation must specify correction/retraction semantics before aggregating: corrected facts supersede prior interpretations rather than counting as additional applications or permanently inflating stage reach. Preserve the original decision verdict; corrections to outcomes and reviewer annotations are separate records. Do not assume every employer uses every stage or the same order.
 
@@ -148,9 +150,11 @@ These scenarios intentionally omit the owner's exact history, employers, dates, 
 | A — strong technical fit, underspecified scope | Experienced engineer; matching stack; JD states only a minimum experience requirement and tasks | Keep otherwise supported fit; `seniorityFit: uncertain`. No over-level conclusion from minimum years or omitted senior language. A paired JD with explicit narrower scope may surface a mismatch risk, never automatic PASS |
 | B — minimum years with broad scope | Matching architecture, ownership, mentoring evidence; JD explicitly expects these responsibilities | Scope may be aligned despite a modest experience minimum; years-only over-level warning forbidden |
 | C — lead to hands-on IC | Direct implementation evidence plus prior leadership | No automatic penalty. Unknown intent yields a clarification question, not a fabricated motivation; paired explicit intent can remove the clarification need |
-| D — engineering coordination versus specialist program role | Transferable leadership; no direct specialist program tenure; variants make that requirement mandatory or preferred | Total engineering years do not satisfy specialist years. Exact STRETCH/PASS expectation depends on the reviewed mandatory/core requirement; preferred title alone is not a blocker |
-| E — customer-facing UI delivery without matching title | Direct UI integration/prototyping/customer collaboration evidence; title is not a mandatory requirement | Missing the formal title alone cannot lower otherwise supported fit; scope/evidence control the result |
-| F — prototype versus production delivery | Personal prototype evidence; JD explicitly requires production operations/delivery | No invention of production experience. Paired required/preferred versions receive separately reviewed expected verdicts |
+| D — engineering coordination versus specialist program role | Transferable leadership; no direct specialist program tenure; variants make that requirement mandatory or preferred | Total engineering years do not satisfy specialist years. Exact STRETCH/PASS expectation depends on the reviewed mandatory/core requirement; preferred title alone is not a blocker. Extends the existing `formal-tpm-pass` fixture with paired variants |
+| E — customer-facing UI delivery without matching title | Direct UI integration/prototyping/customer collaboration evidence; title is not a mandatory requirement | Missing the formal title alone cannot lower otherwise supported fit; scope/evidence control the result. Shares the preferred-requirement axis with `preferred-certification-not-pass` |
+| F — prototype versus production delivery | Personal prototype evidence; JD explicitly requires production operations/delivery | No invention of production experience. Paired required/preferred versions receive separately reviewed expected verdicts. Extends the existing `ai-application-stretch` fixture |
+
+Where a scenario shares an axis with an existing fixture, write it as a paired variant of that fixture (same profile, one changed requirement) so the case count grows with new failure modes rather than near-duplicates.
 | G — same fit, different stage outcome | Identical initial fit; independently authored resume rejection and final-interview rejection events | Stored verdict unchanged; stage-aware summaries distinguish them and do not infer a rejection cause |
 | H — missing/corrected history | Unknown-stage rejection, pending/withdrawn, duplicate updates, corrected stages and unknown dates | Correct N/unknowns/coverage; no double count, invented progression, hidden exclusions, or causal signal |
 
@@ -159,10 +163,13 @@ These scenarios intentionally omit the owner's exact history, employers, dates, 
 | Slice | Included | Exit gate |
 | --- | --- | --- |
 | M4-A — evaluation foundation | Versioned fixtures/run reports, metric definitions, baseline comparison, human-review template; retain current policy behavior | Existing regressions + expanded reviewed cases pass; incompatible comparisons and empty denominators tested; no API needed |
-| M4-B — screening context | Optional versioned schema, evidence validators, prompt integration, readable uncertainty UI; A–F contract tests | New/legacy payload tests, no risk-driven verdict/ranking downgrade, no proxy inference, prompt/schema version update; synthetic versus live results explicitly separated |
-| M4-C — stage-aware feedback | Additive migration/event semantics, normalized stages, correction-safe aggregates, compact pipeline reporting; G–H tests | Old DB upgrade + clear/reset tests; distinct application counts, stage/date unknowns, original decision preserved; no automatic policy learning |
+| M4-C — stage-aware feedback | Additive event semantics (`eventVersion: 2`), normalized stages, correction-safe aggregates, compact pipeline reporting; G–H tests | Old DB upgrade + clear/reset tests; distinct application counts, stage/date unknowns, original decision preserved; no automatic policy learning |
+| M4-B1 — screening context contract | Optional versioned `ScreeningContextV1` schema, reference validators and `uncertain` coercion (§4), `sourceHash` on snapshots, A–F synthetic contract tests. **No prompt or UI change, and the server does not emit the field yet**, so the strict widget parser keeps working | New/legacy payload tests, no risk-driven verdict/ranking downgrade, no proxy inference; synthetic only |
+| M4-B2 — screening context in the model path | Prompt integration, prompt/schema version bump, widget v4 resource URI with host descriptor refresh, readable uncertainty UI | Starts only after #4 has measured the live path; synthetic versus live results explicitly separated; real local browser smoke |
 
-M4-A must not claim A–F model-behavior success just by adding expected objects: until M4-B executes the relevant producer/validator, those are planned contracts, not passing model evals. M4-B and M4-C need a concise schema/consumer review before coding, especially stage clearing/corrections and the optional strict output shape.
+Order: **A → C → B1 → B2** (Decision, review #7). M4-C depends on no model behaviour, while B2 is the first prompt change since M1 and waits for the live measurements in #4.
+
+M4-A must not claim A–F model-behavior success just by adding expected objects: until M4-B2 executes the relevant producer, those are planned contracts, not passing model evals. M4-B1 and M4-C need a concise schema/consumer review before coding, especially stage clearing/corrections and the optional strict output shape.
 
 Each implementation PR runs lint, typecheck, tests and relevant evals. Runtime UI changes require a real local browser smoke; ChatGPT integration changes require checking current official docs and refreshed host verification. No new search providers, auto-application, resume rewriting, demographic analytics, generalized agent framework, or dashboard expansion.
 

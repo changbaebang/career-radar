@@ -682,7 +682,7 @@ If raw text is retained for debugging, make it an explicit development flag.
 
 Evals are a first-class feature, not a final polish task.
 
-Start with 20-30 hand-labeled cases. Public fixtures must be synthetic; historical private cases require explicit local selection and human-reviewed fit labels, never labels inferred from rejection/offer outcomes. Separate deterministic policy evals, actual model evals, and outcome-analytics tests as specified in [MILESTONE_4.md](MILESTONE_4.md).
+Start with 24-30+ hand-labeled cases. Public fixtures must be synthetic; historical private cases require explicit local selection and human-reviewed fit labels, never labels inferred from rejection/offer outcomes. Separate deterministic policy evals, actual model evals, and outcome-analytics tests as specified in [MILESTONE_4.md](MILESTONE_4.md).
 
 Each fixture should contain:
 
