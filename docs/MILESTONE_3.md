@@ -42,7 +42,7 @@ Checked 2026-09-10: [Greenhouse public GET API](https://docs.greenhouse.io/job-b
 Directly executed on the M3 PR working tree (Node 24, pnpm 10):
 
 - `pnpm typecheck` and `pnpm lint`: pass. Type checks include shared/server tests, scripts, and policy evals.
-- `pnpm test`: **111 pass** (7 shared + 104 server). All model responses and security test inputs are synthetic. The first sandboxed attempt could not bind loopback (`EPERM`); the subsequent loopback-enabled run passed.
+- `pnpm test`: **112 pass** (7 shared + 105 server), rechecked at `f9413ad` and after the review follow-up copy changes. All model responses and security test inputs are synthetic. The first sandboxed attempt could not bind loopback (`EPERM`); the subsequent loopback-enabled run passed.
 - `pnpm eval`: **16 pass**, deterministic policy fixtures only. This is not model accuracy or semantic prompt-injection validation.
 - `pnpm build`: shared, widget, and server pass. `pnpm install --frozen-lockfile`: pass; no dependency or lockfile changes.
 - Provider unit/transport checks: malformed tokens, local filters, public IP pinning, mixed/private DNS, redirects, HTTP errors, content type/encoding, streaming size, DNS deadline, duplicate IDs, prospect posts, malformed/unknown dates, HTML cleanup, and redacted failures.
@@ -50,6 +50,7 @@ Directly executed on the M3 PR working tree (Node 24, pnpm 10):
 - HTTP/MCP: search → recommend → explicit save works across per-request MCP servers with an injected synthetic provider/analyzer. The running standalone demo also advertised all nine tools and returned M3 status through a real MCP client.
 - **Live public retrieval only:** at `2026-09-10T02:44:17.791Z`, the `greenhouse` board returned 19 readable posts; the requested top 3 contained 6,892 / 6,892 / 6,406 description characters. Source and update times were present. No profile, key, or model call was involved. Other boards were not live-tested.
 - **Standalone browser rendering:** recommendation groups, the intentional REALISTIC shortage, separate source times, and all-failed presentation rendered at loopback port 8002. Screenshot and accessibility tree inspected. Synthetic/prewritten results only; not ChatGPT iframe validation. Mobile viewport, external-link opening, and keyboard interactions were not manually exercised.
+- **Review follow-up rendering:** the updated `assessed · target` heading, shortage message, empty groups, and failure explanation were checked in the in-app browser at loopback port 8003 using the rebuilt synthetic demo. This was a text/render smoke, not a live model or ChatGPT-host test.
 
 ## Change-impact / Radar review notes
 
@@ -66,5 +67,7 @@ Scope: `LOCAL_DRAFT`, one local owner, synthetic analysis and public job data. T
 No additional blocking regression was found in the exercised local scope. A direct loopback browser render smoke was used instead of a hosted E2E workflow. The implementation kept the existing app architecture, made new data/render responsibilities explicit, and separated empty/failed result states.
 
 ## Follow-up gate
+
+The 90-second batch deadline remains unchanged pending an authorized live five-job smoke. Saving extraction before assessment avoids re-extracting a job whose assessment failed; it does not establish a 50% cost reduction. A whole-batch retry still reassesses previously successful jobs. Select only failed/unattempted IDs when retrying; live latency and actual cost savings remain unmeasured.
 
 Before calling this personally live-verified: use an explicitly authorized synthetic profile with a funded model, inspect extraction and policy independently, refresh the ChatGPT app descriptors, then test tool selection, confirmation, initialization, follow-up IDs, error recovery, and widget links/interaction in the actual host. Verify small-screen and keyboard behavior there. Public release additionally needs authentication/isolation, privacy/retention policy, hosting, and submission review. No merge, public deployment, or public-readiness claim is part of M3 implementation.

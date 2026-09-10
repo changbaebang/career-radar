@@ -53,9 +53,9 @@ export function RecommendationsCard({ result }: { result: JobRecommendations }) 
       ["REALISTIC", result.realistic, result.requested.realistic, result.shortfall.realistic],
       ["STRETCH", result.stretch, result.requested.stretch, result.shortfall.stretch],
     ] as const).map(([label, items, requested, shortfall]) => <section key={label} aria-label={`${label} recommendations`}>
-      <h2 className="group-heading">{label} <span>{items.length} of {requested} requested</span></h2>
-      {shortfall > 0 && <p className="message">{shortfall} fewer than requested. No verdict was changed to fill this group.</p>}
-      {items.length === 0 && <p className="message">{requested === 0 ? "Not requested." : "No assessed roles in this group. Check other groups and analysis failures."}</p>}
+      <h2 className="group-heading">{label} <span>{items.length} assessed · target {requested}</span></h2>
+      {shortfall > 0 && <p className="message">{shortfall} below target. No verdict was changed to fill this group.</p>}
+      {items.length === 0 && <p className="message">No assessed roles in this group. Check other groups and analysis failures.</p>}
       {items.map((item) => <JobRow key={item.candidate.candidateId} item={item} />)}
     </section>)}
 
