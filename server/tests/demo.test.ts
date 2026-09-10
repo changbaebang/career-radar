@@ -10,7 +10,7 @@ describe("buildCareerRadarStatus", () => {
 
     expect(status).toMatchObject({
       name: "Career Radar",
-      milestone: "Milestone 1",
+      milestone: "Milestone 2",
       state: "ready",
       checkedAt: "2026-09-09T01:02:03.000Z",
     });

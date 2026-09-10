@@ -6,7 +6,7 @@ describe("CareerRadarStatusSchema", () => {
   it("accepts the Milestone 1 status payload", () => {
     const parsed = CareerRadarStatusSchema.parse({
       name: "Career Radar",
-      milestone: "Milestone 1",
+      milestone: "Milestone 2",
       state: "ready",
       message: "MCP and widget scaffold are connected.",
       checkedAt: "2026-09-09T00:00:00.000Z",

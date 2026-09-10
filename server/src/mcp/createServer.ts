@@ -19,8 +19,10 @@ import type { CareerAnalyzer } from "../ai/analyzer.js";
 import { buildCareerRadarStatus } from "../demo.js";
 import { applyAssessmentPolicy } from "../domain/assessment/policy.js";
 import type { CareerStore } from "../domain/store.js";
+import { fetchJobUrl } from "../infra/fetch/job-url.js";
+import { registerPipelineTools } from "./pipeline-tools.js";
 
-export const CAREER_RADAR_WIDGET_URI = "ui://career-radar/widget-v1.html";
+export const CAREER_RADAR_WIDGET_URI = "ui://career-radar/widget-v2.html";
 
 // Both are required on purpose: an MCP server is created per request, so a per-call default store
 // would forget every profile between profile_upsert and job_assess. createHttpApp owns the shared
@@ -28,6 +30,7 @@ export const CAREER_RADAR_WIDGET_URI = "ui://career-radar/widget-v1.html";
 export type McpDependencies = {
   store: CareerStore;
   createAnalyzer: () => CareerAnalyzer;
+  fetchJob?: typeof fetchJobUrl;
 };
 
 function readWidgetBundle(): string {
@@ -46,7 +49,7 @@ function readWidgetBundle(): string {
 
 export function createMcpServer(dependencies: McpDependencies): McpServer {
   const { store, createAnalyzer: getAnalyzer } = dependencies;
-  const server = new McpServer({ name: "career-radar", version: "0.1.0" });
+  const server = new McpServer({ name: "career-radar", version: "0.2.0" });
 
   registerAppTool(
     server,
@@ -94,9 +97,9 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
       outputSchema: ProfileUpsertResultSchema.shape,
       annotations: {
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         openWorldHint: false,
-        idempotentHint: true,
+        idempotentHint: false,
       },
       _meta: {
         securitySchemes: [{ type: "noauth" }],
@@ -121,16 +124,16 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
     server,
     "job_ingest",
     {
-      title: "Ingest pasted job description",
+      title: "Ingest a job URL or description",
       description:
-        "Use this when the user provides pasted job-description text that must be normalized before an assessment. Milestone 1 does not fetch URLs.",
-      inputSchema: { text: z.string().min(50).max(80_000) },
+        "Use this when the user provides exactly one pasted job description or public HTTPS job URL on boards.greenhouse.io, job-boards.greenhouse.io, jobs.lever.co, or jobs.ashbyhq.com. JavaScript-only or unsupported pages require pasted text. This does not search for jobs.",
+      inputSchema: { text: z.string().min(50).max(80_000).optional(), url: z.string().url().max(2048).optional() },
       outputSchema: JobIngestResultSchema.shape,
       annotations: {
         readOnlyHint: false,
-        destructiveHint: false,
-        openWorldHint: false,
-        idempotentHint: true,
+        destructiveHint: true,
+        openWorldHint: true,
+        idempotentHint: false,
       },
       _meta: {
         securitySchemes: [{ type: "noauth" }],
@@ -138,8 +141,14 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
         "openai/toolInvocation/invoked": "Job description normalized",
       },
     },
-    async ({ text }) => {
-      const result = await getAnalyzer().extractJob(text);
+    async ({ text, url }) => {
+      if ((text === undefined) === (url === undefined)) throw new Error("Provide exactly one of text or url.");
+      const fetched = url ? await (dependencies.fetchJob ?? fetchJobUrl)(url) : undefined;
+      const extracted = await getAnalyzer().extractJob(fetched?.text ?? text!);
+      const result = JobIngestResultSchema.parse({
+        job: { ...extracted.job, sourceUrl: fetched?.sourceUrl },
+        warnings: [...extracted.warnings, ...(fetched?.warnings ?? [])],
+      });
       store.upsertJob(result.job);
       return {
         structuredContent: result,
@@ -164,10 +173,10 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
       },
       outputSchema: JobAssessmentResultSchema.shape,
       annotations: {
-        readOnlyHint: true,
+        readOnlyHint: false,
         destructiveHint: false,
         openWorldHint: false,
-        idempotentHint: true,
+        idempotentHint: false,
       },
       _meta: {
         securitySchemes: [{ type: "noauth" }],
@@ -183,7 +192,8 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
       const job = store.getJob(jobId);
       if (!job) throw new Error("Job was not found or has expired. Call job_ingest again.");
       const assessment = applyAssessmentPolicy(profile, job, await getAnalyzer().assess(profile, job));
-      const result = JobAssessmentResultSchema.parse({ job, assessment });
+      const assessmentId = store.saveAssessment(profile.id, job, assessment);
+      const result = JobAssessmentResultSchema.parse({ job, assessment, assessmentId });
       return {
         structuredContent: result,
         content: [{
@@ -193,6 +203,8 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
       };
     },
   );
+
+  registerPipelineTools(server, store, CAREER_RADAR_WIDGET_URI);
 
   registerAppResource(
     server,

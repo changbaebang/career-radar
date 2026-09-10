@@ -4,6 +4,8 @@ import { createRoot } from "react-dom/client";
 import {
   CareerRadarStatusSchema,
   JobAssessmentResultSchema,
+  PipelineSummarySchema,
+  type PipelineSummary,
   type CareerRadarStatus,
   type JobAssessmentResult,
 } from "@career-radar/shared";
@@ -45,9 +47,11 @@ const styles = `
   }
 `;
 
-type ToolOutput = CareerRadarStatus | JobAssessmentResult;
+type ToolOutput = CareerRadarStatus | JobAssessmentResult | PipelineSummary;
 
 function parseOutput(value: unknown): ToolOutput | null {
+  const pipeline = PipelineSummarySchema.safeParse(value);
+  if (pipeline.success) return pipeline.data;
   const assessment = JobAssessmentResultSchema.safeParse(value);
   if (assessment.success) return assessment.data;
   const status = CareerRadarStatusSchema.safeParse(value);
@@ -134,7 +138,37 @@ function App() {
   }, []);
 
   if (!output) return <div className="loading">Waiting for Career Radar…</div>;
+  if ("total" in output) return <PipelineCard summary={output} />;
   return "assessment" in output ? <AssessmentCard result={output} /> : <StatusCard status={output} />;
+}
+
+function PipelineCard({ summary }: { summary: PipelineSummary }) {
+  return (
+    <article className="card" aria-label="Career Radar application pipeline">
+      <p className="eyebrow">Career Radar · Early prototype</p>
+      <h1>Application pipeline</h1>
+      <p className="message">{summary.total} recorded applications</p>
+      <div className="meta">{summary.byStatus.filter((item) => item.count > 0).map((item) => (
+        <span className="pill secondary" key={item.status}>{item.status} · {item.count}</span>
+      ))}</div>
+      <h2>Recent applications</h2>
+      {summary.total === 0 ? <p className="message">No saved applications yet. Assess a job, then ask to save it.</p> : (
+        <ul>{summary.applications.slice(0, 10).map((application) => (
+          <li key={application.id}><span><strong>{application.company} — {application.title}</strong><br />
+            {application.verdictAtDecision} · {application.status}
+            {application.outcomeStage ? ` · ${application.outcomeStage}` : ""}
+          </span></li>
+        ))}</ul>
+      )}
+      {summary.byRoleFamily.length > 0 && (
+        <>
+          <h2>By role family</h2>
+          <ul>{summary.byRoleFamily.map((item) => <li key={item.roleFamily}>{item.roleFamily} · {item.count}</li>)}</ul>
+        </>
+      )}
+      <p className="recommendation">Recorded outcomes are observations, not hiring probabilities or proof of a skill gap. Small samples need caution.</p>
+    </article>
+  );
 }
 
 const styleElement = document.createElement("style");

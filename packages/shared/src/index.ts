@@ -73,10 +73,45 @@ export const JobIngestResultSchema = z.object({
 }).strict();
 export const JobAssessmentResultSchema = z.object({
   job: JobPostingSchema, assessment: FitAssessmentSchema,
+  assessmentId: z.string().min(1).optional(),
 }).strict();
 
+export const ApplicationStatusSchema = z.enum(["discovered", "saved", "applied", "interview", "rejected", "withdrawn", "offer"]);
+export const ApplicationSchema = z.object({
+  id: z.string().min(1), jobId: z.string().min(1), candidateProfileId: z.string().min(1),
+  assessmentId: z.string().min(1), status: ApplicationStatusSchema,
+  verdictAtDecision: VerdictSchema, roleFamily: z.string().min(1),
+  company: z.string().min(1), title: z.string().min(1),
+  createdAt: z.string().datetime(), updatedAt: z.string().datetime(),
+  appliedAt: z.string().datetime().optional(),
+  outcomeStage: z.string().max(200).optional(), notes: z.string().max(2000).optional(),
+}).strict();
+export const ApplicationResultSchema = z.object({ application: ApplicationSchema }).strict();
+export const ApplicationSaveInputSchema = z.object({
+  assessmentId: z.string().min(1).max(100), status: ApplicationStatusSchema.default("saved"),
+}).strict();
+export const ApplicationUpdateInputSchema = z.object({
+  applicationId: z.string().min(1).max(100), status: ApplicationStatusSchema,
+  stage: z.string().max(200).optional(), notes: z.string().max(2000).optional(),
+}).strict();
+export const PipelineInputSchema = z.object({
+  from: z.string().datetime().optional(), to: z.string().datetime().optional(),
+}).strict();
+export const PipelineSummarySchema = z.object({
+  total: z.number().int().nonnegative(),
+  byStatus: z.array(z.object({ status: ApplicationStatusSchema, count: z.number().int().nonnegative() })),
+  byRoleFamily: z.array(z.object({ roleFamily: z.string(), count: z.number().int().nonnegative() })),
+  verdictOutcomes: z.array(z.object({ verdict: VerdictSchema, status: ApplicationStatusSchema, count: z.number().int().nonnegative() })),
+  applications: z.array(ApplicationSchema), observations: z.array(z.string()),
+}).strict();
+export type Application = z.infer<typeof ApplicationSchema>;
+export type ApplicationSaveInput = z.input<typeof ApplicationSaveInputSchema>;
+export type ApplicationUpdateInput = z.infer<typeof ApplicationUpdateInputSchema>;
+export type PipelineInput = z.infer<typeof PipelineInputSchema>;
+export type PipelineSummary = z.infer<typeof PipelineSummarySchema>;
+
 export const CareerRadarStatusSchema = z.object({
-  name: z.literal("Career Radar"), milestone: z.literal("Milestone 1"),
+  name: z.literal("Career Radar"), milestone: z.literal("Milestone 2"),
   state: z.literal("ready"), message: z.string().min(1),
   checkedAt: z.string().datetime(), capabilities: z.array(z.string().min(1)).min(1),
 });

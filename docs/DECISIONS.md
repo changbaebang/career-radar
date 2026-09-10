@@ -26,7 +26,7 @@ The server transport and MCP Apps resource/tool registration patterns are adapte
 
 ## ADR-0005: Keep Milestone 1 state ephemeral
 
-**Status:** Accepted
+**Status:** Superseded by ADR-0008 in Milestone 2
 
 `profile_upsert` and `job_ingest` keep normalized records in process memory so `job_assess` can refer to stable IDs. Raw resume text is not retained. SQLite, migrations, application history, and cross-process persistence remain Milestone 2 work.
 
@@ -42,8 +42,34 @@ Evidence must equal a candidate-profile evidence string after case/whitespace no
 
 ## ADR-0007: Keep bounded analysis tools closed-world
 
-**Status:** Accepted
+**Status:** Partially superseded by ADR-0009 for URL ingestion
 
 The three analysis tools send only supplied resume/JD/profile data to Responses API, with no web search, URL fetching, or external retrieval tools. Keep `openWorldHint: false`: an external API call alone does not imply open-ended access. Revisit this when URL ingestion/search is implemented. The [current official tool guide](https://developers.openai.com/plugins/plan/tools) distinguishes bounded external services from open-world operations.
 
 The analyzer is created lazily once per HTTP app and reused across requests. Status/listing remain available without an API key; analysis reports an actionable configuration error when the key is absent.
+
+## ADR-0008: Persist decisions and explicit outcomes in local SQLite
+
+**Status:** Accepted — Milestone 2 prototype
+
+Use Node's built-in SQLite (`node:sqlite`, Node >=22.13) with prepared values, foreign keys, transactional `user_version` migrations, WAL, and transactional application/event writes. Normal execution uses a gitignored file; tests and the offline demo use isolated databases. New database files are owner-only. The HTTP entry point binds to loopback for private use, and the app rejects any request whose `Host` (or browser `Origin`) is not a loopback address — comparing Origin to Host would let a DNS-rebinding page through. `pnpm db:reset` is the owner's wipe path; the event history excludes free-text notes. Existing files and backups still require the owner's permission/retention management. No authentication or multi-user isolation is implied.
+
+This intentionally replaces the M1 30-minute TTL: records persist until the owner clears the database. Raw resumes are not retained, but structured profiles, assessments, and notes remain potentially sensitive and unencrypted.
+
+`job_assess` now saves an immutable job/assessment snapshot and returns `assessmentId`; it is therefore mutating and non-idempotent. `application_save` accepts that ID rather than trusting a caller-supplied verdict, derives the profile/job association server-side, and preserves the initial decision for each profile/job pair. Retrying a save cannot undo a later interview/rejection. Updates allow explicit user corrections; identical updates create no extra event. Statuses are user-reported facts, not inferred transitions. `appliedAt` means first explicitly recorded `applied` time, not a reconstructed historical date.
+
+Pipeline counts are deterministic and descriptive. Filters are inclusive last-update UTC timestamps, not applied-date cohorts. Counts include all matches; details return the latest 100. These are local, small-data operations, not a scalable analytics implementation.
+
+## ADR-0009: Bounded public job-page reading with a pasted-text fallback
+
+**Status:** Accepted — Milestone 2 prototype
+
+`job_ingest` accepts exactly one text or URL. HTTPS hosts are explicitly allowlisted; every redirect repeats URL/DNS checks and the connection is pinned to a validated public IP while retaining hostname-based TLS validation. No auth/cookies are forwarded. Three redirects, 10 seconds total, 1 MB response, and 80,000 normalized characters bound the request. HTML is parsed without executing JavaScript; scripts/forms/navigation are removed. Dynamic/blocked/unreadable pages require pasted text, and successful extraction warns about possible boilerplate.
+
+Fetching never uses candidate data. Retrieved text is untrusted input to the existing structured extraction prompt. Only `job_ingest` becomes open-world; other analysis remains bounded. This follows the [current OpenAI tool annotation guidance](https://developers.openai.com/plugins/plan/tools). The widget keeps standard MCP Apps resource metadata plus the existing ChatGPT compatibility alias, with a v2 resource URI for pipeline rendering. No new scaffold or job-search provider is introduced.
+
+## ADR-0010: Show a truthful, keyless prototype before public hardening
+
+**Status:** Accepted
+
+`pnpm demo` reuses the React widget and real SQLite application operations with clearly labeled synthetic data and prewritten verdicts. It cannot instantiate an AI analyzer and does not read keys or the user database. The small outer demo page is not the ChatGPT host bridge, and successful local UI checks must not be reported as live model or ChatGPT validation. Search, authentication, public hosting/submission, and causal outcome analytics remain out of scope.
