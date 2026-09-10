@@ -29,7 +29,7 @@ It should model a real job-search decision workflow:
    - interview risks,
    - "how much resume contortion would be required."
 6. Save the application and later record outcomes.
-7. Use the accumulated decisions and outcomes as an eval dataset, not as vague memory.
+7. Use accumulated decisions and outcomes to nominate cases for human review, then create evidence-labeled evals. Hiring outcomes are observations, not fit labels or vague memory.
 
 The product should help answer questions such as:
 
@@ -105,6 +105,14 @@ A resume contains PII. In the MVP:
 - make raw-resume retention optional,
 - never send candidate data to unrelated third parties,
 - redact or omit phone/address from eval fixtures.
+
+### 3.6 Fit and observed response are different evidence
+
+Keep resume/JD fit separate from stage-aware application outcomes. Rejection must not automatically downgrade a verdict; interview progression must not certify it. Repeated comparable observations can motivate human-reviewed hypotheses, not causal claims or hiring probabilities.
+
+Minimum experience is not target seniority. Evaluate documented responsibility and scope rather than inferring overqualification from years or age. A leadership-to-IC transition is not an automatic penalty and candidate intent must not be invented. Do not use age, graduation year, gender, school prestige, or other protected/sensitive demographic proxies in fit or response scoring.
+
+The proposed M4 screening context and normalized stages are defined in [MILESTONE_4.md](MILESTONE_4.md). They are not current runtime fields. Real personal application history stays local; public cases must be independently authored synthetic counterparts rather than lightly renamed personal histories.
 
 ---
 
@@ -674,7 +682,7 @@ If raw text is retained for debugging, make it an explicit development flag.
 
 Evals are a first-class feature, not a final polish task.
 
-Start with 20-30 hand-labeled historical or synthetic cases.
+Start with 20-30 hand-labeled cases. Public fixtures must be synthetic; historical private cases require explicit local selection and human-reviewed fit labels, never labels inferred from rejection/offer outcomes. Separate deterministic policy evals, actual model evals, and outcome-analytics tests as specified in [MILESTONE_4.md](MILESTONE_4.md).
 
 Each fixture should contain:
 
@@ -771,15 +779,15 @@ Definition of done:
 ### Milestone 3 - Search and recommendation
 
 Active implementation plan: [MILESTONE_3.md](MILESTONE_3.md), revised 2026-09-10.
-Start with one explicitly named Greenhouse board, not whole-market discovery. Develop and verify with synthetic analysis while live model/ChatGPT-host checks remain pending. Requested counts are maxima; report shortages and failures rather than changing fit labels. No automatic applications or resume rewriting.
+Start with one explicitly named Greenhouse board, not whole-market discovery. Develop and verify with synthetic analysis while live model/ChatGPT-host checks remain pending. Requested counts are shortfall targets, not return caps: return all assessed REALISTIC/STRETCH roles and optional PASS explanations; report shortages and failures rather than changing fit labels. No automatic applications or resume rewriting.
 
 Definition of done:
 
 - a job-search provider abstraction exists,
 - searches can return candidate jobs,
 - the app can rank a small set and return:
-  - N REALISTIC,
-  - N STRETCH,
+  - all assessed REALISTIC roles with a requested target and shortfall,
+  - all assessed STRETCH roles with a requested target and shortfall,
   - optional PASS explanations.
 - search source and freshness are visible.
 
@@ -787,14 +795,18 @@ Avoid brittle site-specific scraping as the primary architecture.
 
 ### Milestone 4 - Eval and feedback loop
 
+Proposed implementation plan: [MILESTONE_4.md](MILESTONE_4.md), 2026-09-10, based on merged M3. Planning does not implement the proposed schema or change existing verdicts.
+
 Definition of done:
 
-- 20-30+ eval cases,
-- command-line eval runner,
-- verdict agreement report,
-- hard-blocker recall,
-- false-REALISTIC rate,
-- regression comparison by prompt/model version.
+- 24-30+ reviewed synthetic policy/assessment cases, with separate stage-analytics tests,
+- versioned command-line eval runner and case-level JSON/Markdown reports,
+- verdict agreement, requirement-level hard-blocker recall, explicit false-REALISTIC denominators and evidence checks,
+- regression comparison by dataset, schema, policy, prompt and model version,
+- optional evidence-bound seniority/trajectory screening context, without automatic verdict/ranking penalties,
+- backward-compatible normalized outcome stages and correction-safe descriptive summaries,
+- human feedback can nominate synthetic regressions but application outcomes never become automatic fit labels,
+- private input retention/deletion and unverified live model/host boundaries remain explicit.
 
 ### Milestone 5 - Portfolio/public hardening
 

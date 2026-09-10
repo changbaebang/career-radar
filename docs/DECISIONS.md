@@ -87,3 +87,11 @@ Rank **only within** the policy's verdict groups by confidence, contortion, then
 Public search snapshots expire after 30 minutes and are capped at ten; profile/assessment persistence still follows M2. Search-ingested job IDs include source URL and exact input content; changed content becomes a different record and old assessment snapshots remain unchanged. Search and pasted-JD identity are not deduplicated together. This is documented private-prototype behavior, not multi-user isolation.
 
 Widget v3 adds grouped recommendations, evidence/gaps, explicit failure/shortage states, source times, and details. Search is data-only; recommendations follow the existing small combined analysis/render pattern. The widget retains the MCP result notification path and ChatGPT initial-output compatibility alias. Host initialization/interaction and public submission remain unverified follow-ups, not inferred from standalone demo success.
+
+## ADR-0012: Separate fit evidence, screening context, and observed outcomes
+
+**Status:** Proposed — M4 planning only; no runtime changes in this PR.
+
+User feedback motivates explicit role-scope and career-story context plus stage-aware response reporting. Keep evidence-based fit, screening uncertainties, and reported hiring outcomes separate. Neither a rejection nor an interview automatically changes the stored fit verdict, and no outcome supplies a supervised fit label without independent human evidence review. Minimum years, missing title, leadership-to-IC transitions, and demographic proxies must not become automatic negative signals.
+
+Prefer an optional versioned screening context, preserve existing free-text stages while adding a normalized projection, and use correction-safe events without copying private notes. Start with a local, no-API evaluation runner and synthetic fixtures; integrate schemas/prompts/UI and stage analytics in separate implementation PRs. Exact contracts, migration/deletion safeguards, metric definitions, and live-verification boundaries are in [MILESTONE_4.md](MILESTONE_4.md). Broader search, automatic applications, compensation inference, and policy learning from outcomes are deferred.
