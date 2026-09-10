@@ -153,10 +153,10 @@ These scenarios intentionally omit the owner's exact history, employers, dates, 
 | D — engineering coordination versus specialist program role | Transferable leadership; no direct specialist program tenure; variants make that requirement mandatory or preferred | Total engineering years do not satisfy specialist years. Exact STRETCH/PASS expectation depends on the reviewed mandatory/core requirement; preferred title alone is not a blocker. Extends the existing `formal-tpm-pass` fixture with paired variants |
 | E — customer-facing UI delivery without matching title | Direct UI integration/prototyping/customer collaboration evidence; title is not a mandatory requirement | Missing the formal title alone cannot lower otherwise supported fit; scope/evidence control the result. Shares the preferred-requirement axis with `preferred-certification-not-pass` |
 | F — prototype versus production delivery | Personal prototype evidence; JD explicitly requires production operations/delivery | No invention of production experience. Paired required/preferred versions receive separately reviewed expected verdicts. Extends the existing `ai-application-stretch` fixture |
-
-Where a scenario shares an axis with an existing fixture, write it as a paired variant of that fixture (same profile, one changed requirement) so the case count grows with new failure modes rather than near-duplicates.
 | G — same fit, different stage outcome | Identical initial fit; independently authored resume rejection and final-interview rejection events | Stored verdict unchanged; stage-aware summaries distinguish them and do not infer a rejection cause |
 | H — missing/corrected history | Unknown-stage rejection, pending/withdrawn, duplicate updates, corrected stages and unknown dates | Correct N/unknowns/coverage; no double count, invented progression, hidden exclusions, or causal signal |
+
+Where a scenario shares an axis with an existing fixture, write it as a paired variant of that fixture (same profile, one changed requirement) so the case count grows with new failure modes rather than near-duplicates.
 
 ## 8. Small implementation PRs
 
