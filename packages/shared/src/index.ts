@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { SearchCandidateSchema } from "./search.js";
+export * from "./search.js";
 
 export const VerdictSchema = z.enum(["REALISTIC", "STRETCH", "PASS"]);
 export const ConfidenceSchema = z.enum(["low", "medium", "high"]);
@@ -76,6 +78,26 @@ export const JobAssessmentResultSchema = z.object({
   assessmentId: z.string().min(1).optional(),
 }).strict();
 
+export const RecommendedJobSchema = z.object({
+  candidate: SearchCandidateSchema,
+  jobId: z.string().min(1), assessmentId: z.string().min(1),
+  assessment: FitAssessmentSchema,
+}).strict();
+export const JobRecommendationsSchema = z.object({
+  kind: z.literal("job_recommendations"), searchId: z.string().min(1),
+  provider: z.string().min(1), sourceUrl: z.string().url(),
+  retrievedAt: z.string().datetime(), assessedAt: z.string().datetime(),
+  requested: z.object({ realistic: z.number().int().nonnegative(), stretch: z.number().int().nonnegative() }).strict(),
+  available: z.object({ realistic: z.number().int().nonnegative(), stretch: z.number().int().nonnegative(), pass: z.number().int().nonnegative() }).strict(),
+  shortfall: z.object({ realistic: z.number().int().nonnegative(), stretch: z.number().int().nonnegative() }).strict(),
+  realistic: z.array(RecommendedJobSchema).max(5), stretch: z.array(RecommendedJobSchema).max(5),
+  pass: z.array(RecommendedJobSchema).max(5),
+  failures: z.array(z.object({ candidateId: z.string(), message: z.string() }).strict()).max(5),
+  warnings: z.array(z.string()),
+}).strict();
+export type RecommendedJob = z.infer<typeof RecommendedJobSchema>;
+export type JobRecommendations = z.infer<typeof JobRecommendationsSchema>;
+
 export const ApplicationStatusSchema = z.enum(["discovered", "saved", "applied", "interview", "rejected", "withdrawn", "offer"]);
 export const ApplicationSchema = z.object({
   id: z.string().min(1), jobId: z.string().min(1), candidateProfileId: z.string().min(1),
@@ -111,7 +133,7 @@ export type PipelineInput = z.infer<typeof PipelineInputSchema>;
 export type PipelineSummary = z.infer<typeof PipelineSummarySchema>;
 
 export const CareerRadarStatusSchema = z.object({
-  name: z.literal("Career Radar"), milestone: z.literal("Milestone 2"),
+  name: z.literal("Career Radar"), milestone: z.literal("Milestone 3"),
   state: z.literal("ready"), message: z.string().min(1),
   checkedAt: z.string().datetime(), capabilities: z.array(z.string().min(1)).min(1),
 });

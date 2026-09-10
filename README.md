@@ -4,7 +4,7 @@
 
 Career Radar is an evidence-based career decision tool. It is designed to help a candidate decide whether a role is `REALISTIC`, `STRETCH`, or `PASS` without inventing experience or turning a fit label into a hiring probability.
 
-This is a **Milestone 2 early prototype**: evidence-grounded assessment, allowed public job URLs, local SQLite decision storage, and application outcome tracking. It is a private toy project to use and improve, not a public hiring-prediction service.
+This is a **Milestone 3 early prototype**: bounded Greenhouse board discovery, small-set evidence recommendations, allowed public job URLs, local SQLite decisions, and application tracking. It is a private toy project, not a whole-market search engine or public hiring-prediction service.
 
 ## One-minute demo — no key or API cost
 
@@ -14,6 +14,8 @@ pnpm demo
 ```
 
 Open [the local demo](http://127.0.0.1:8001) to inspect three verdict cards and a pipeline. The interview button updates the real SQLite store used by the demo and refreshes the widget.
+
+Open [recommendations](http://127.0.0.1:8001/?view=recommendations) for grouped verdicts with an intentional shortage, or [analysis failure](http://127.0.0.1:8001/?view=failure) to see how failure differs from PASS. `DEMO_PORT=8002 pnpm demo` runs alongside an older demo. Source links in this synthetic demo are placeholders, not real vacancies.
 
 All demo profiles, jobs, and prewritten verdicts are **synthetic**, not live model results or proof of accuracy. The demo reads no API keys or user database; its in-memory SQLite data resets on restart. Use `pnpm dev` for real analysis.
 
@@ -30,7 +32,7 @@ career-radar/
   data/             # Gitignored local SQLite database
 ```
 
-The MCP implementation started from the official OpenAI examples at commit `18cc38e78a968712c357bacdc3c79fead5bfc6b4`. It now provides a status tool, six product tools, and assessment/pipeline widget views.
+The MCP implementation started from the official OpenAI examples at commit `18cc38e78a968712c357bacdc3c79fead5bfc6b4`. It now provides a status tool, eight product tools, and assessment/recommendation/pipeline views. Search is data-only; final recommendations use the existing combined analysis/widget pattern.
 
 ## Requirements
 
@@ -81,6 +83,22 @@ Repeated saves preserve the initial decision and current application status; use
 
 This version is for one owner's local/private development. It does not authenticate users or isolate their data within an app; do not deploy it as a public or shared multi-user service.
 
+## Search and recommendations — M3
+
+1. Name a Greenhouse board token (from its public board URL): “Search the `greenhouse` board for engineer roles.” `job_search({boardToken: "greenhouse", titleKeywords: "engineer", limit: 5})` reads the official public GET API with **no model or API key**. It does not discover companies automatically. Ask for the board token if it is unknown.
+2. Optional title keywords (all words) and a location substring are filtered locally. Only the board token goes to Greenhouse; neither filters nor resume/profile data are sent. Results are limited to 10, sorted by provider update time, and are **unassessed**. This is not keyword-based fit scoring.
+3. After `profile_upsert`, ask to assess 1–5 returned candidate IDs with `job_recommend`, providing the returned `searchId` and profile ID. It can use up to 10 **paid OpenAI operations**. Select explicit IDs; no automatic crawling or retry loop.
+4. Set target counts for REALISTIC/STRETCH roles (at most five combined) and choose whether to include PASS explanations. Targets only report shortfalls, not cap returned results: all assessed REALISTIC/STRETCH roles are returned, even above a target or when that target is zero. Missing results stay missing. Failures are not PASS. The first failure stops further model calls; successful items remain available. Same-label ranking uses confidence, contortion, then stable ID—not scores or hiring odds.
+5. Save a returned `assessmentId` only when you want a pipeline entry. Recommendations save analysis snapshots, not applications, and never contact employers.
+
+Search snapshots are public-job-only process memory: 30 minutes, at most 10 searches × 10 jobs. Restart, expiry, or eviction requires `job_search` again. One recommendation batch runs at a time with a 90-second deadline. Repeating it creates new assessments and may cost more. Extracted jobs reuse existing normalization for identical source+content; changed source/content yields a new job ID (separate from M2 pasted-JD identity).
+
+Successful extraction is saved even if assessment fails, so retrying that job skips extraction. Retrying the whole batch still reassesses previously successful jobs; select only failed or unattempted IDs to avoid that repeated work. Actual cost savings and whether five jobs finish within 90 seconds have not been measured with a live model.
+
+The provider reads only `boards-api.greenhouse.io`, validates/pins public DNS addresses, refuses redirects, and caps requests at 10 seconds and 5 MB. It omits prospect posts and unreadable descriptions. Source links are constructed on `job-boards.greenhouse.io`; arbitrary provider `absolute_url` values are not followed. Unsupported boards need pasted-JD analysis.
+
+Retrieval time, provider update time (or unknown), and assessment time are distinct. Neither a recent fetch nor an update timestamp guarantees that a job is still open. Consult the source before applying. Detailed plan and verification: [Milestone 3](docs/MILESTONE_3.md).
+
 ## Connect from ChatGPT
 
 1. Start the local server with `pnpm dev`.
@@ -104,6 +122,7 @@ Implemented:
 - `career_radar_status` read-only tool
 - `profile_upsert`, URL/text `job_ingest`, and `job_assess` tools
 - `application_save`, `application_update`, and `pipeline_summary` tools
+- `job_search` and `job_recommend`, with bounded snapshots, explicit shortages/failures, and source times
 - SQLite migrations, persistent decisions, and application event history
 - OpenAI Responses API structured outputs validated with Zod
 - deterministic evidence-grounding and hard-blocker post-processing
@@ -113,9 +132,9 @@ Implemented:
 
 Not implemented yet:
 
-- job search
+- broad cross-provider/whole-market job search
 - public deployment, user authentication, automated applications
-- M2 live-model and ChatGPT-host end-to-end validation (separate from local synthetic checks)
+- M2/M3 live-model and ChatGPT-host end-to-end validation (separate from live public search and local synthetic checks)
 
 See [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md) for the milestone plan.
 

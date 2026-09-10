@@ -71,8 +71,8 @@ export type ProfileExtraction = { profile: CandidateProfile; warnings: string[] 
 export type JobExtraction = { job: JobPosting; warnings: string[] };
 export interface CareerAnalyzer {
   extractProfile(resumeText: string, profileId?: string): Promise<ProfileExtraction>;
-  extractJob(description: string): Promise<JobExtraction>;
-  assess(profile: CandidateProfile, job: JobPosting): Promise<FitAssessment>;
+  extractJob(description: string, signal?: AbortSignal): Promise<JobExtraction>;
+  assess(profile: CandidateProfile, job: JobPosting, signal?: AbortSignal): Promise<FitAssessment>;
 }
 
 function requireParsed<T>(value: T | null, operation: string): T {
@@ -123,7 +123,7 @@ export class OpenAICareerAnalyzer implements CareerAnalyzer {
     return { profile, warnings: parsed.warnings };
   }
 
-  async extractJob(description: string): Promise<JobExtraction> {
+  async extractJob(description: string, signal?: AbortSignal): Promise<JobExtraction> {
     const response = await this.#client.responses.parse({
       model: this.#model, store: false,
       instructions: [
@@ -136,7 +136,7 @@ export class OpenAICareerAnalyzer implements CareerAnalyzer {
       ].join(" "),
       input: `<job-description>\n${description}\n</job-description>`,
       text: { format: zodTextFormat(JobExtractionSchema, "job_posting") },
-    });
+    }, { signal, ...(signal ? { maxRetries: 0 } : {}) });
     const parsed = requireParsed(response.output_parsed, "job posting");
     const jobId = stableId("job", description);
     const withIds = (items: typeof parsed.required, kind: "required" | "preferred") =>
@@ -152,7 +152,7 @@ export class OpenAICareerAnalyzer implements CareerAnalyzer {
     return { job, warnings: parsed.warnings };
   }
 
-  async assess(profile: CandidateProfile, job: JobPosting): Promise<FitAssessment> {
+  async assess(profile: CandidateProfile, job: JobPosting, signal?: AbortSignal): Promise<FitAssessment> {
     const response = await this.#client.responses.parse({
       model: this.#model, store: false,
       instructions: [
@@ -170,7 +170,7 @@ export class OpenAICareerAnalyzer implements CareerAnalyzer {
       ].join(" "),
       input: JSON.stringify({ candidateProfile: profile, jobPosting: job }),
       text: { format: zodTextFormat(AssessmentDraftSchema, "fit_assessment") },
-    });
+    }, { signal, ...(signal ? { maxRetries: 0 } : {}) });
     const parsed = requireParsed(response.output_parsed, "fit assessment");
     const normalizeGap = (gap: (typeof parsed.gaps)[number]) => omitNull(gap);
     return FitAssessmentSchema.parse({

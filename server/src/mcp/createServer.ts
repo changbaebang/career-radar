@@ -21,8 +21,10 @@ import { applyAssessmentPolicy } from "../domain/assessment/policy.js";
 import type { CareerStore } from "../domain/store.js";
 import { fetchJobUrl } from "../infra/fetch/job-url.js";
 import { registerPipelineTools } from "./pipeline-tools.js";
+import { registerSearchTools } from "./search-tools.js";
+import type { JobDiscovery } from "../domain/jobs/search.js";
 
-export const CAREER_RADAR_WIDGET_URI = "ui://career-radar/widget-v2.html";
+export const CAREER_RADAR_WIDGET_URI = "ui://career-radar/widget-v3.html";
 
 // Both are required on purpose: an MCP server is created per request, so a per-call default store
 // would forget every profile between profile_upsert and job_assess. createHttpApp owns the shared
@@ -31,6 +33,7 @@ export type McpDependencies = {
   store: CareerStore;
   createAnalyzer: () => CareerAnalyzer;
   fetchJob?: typeof fetchJobUrl;
+  discovery: JobDiscovery;
 };
 
 function readWidgetBundle(): string {
@@ -49,7 +52,7 @@ function readWidgetBundle(): string {
 
 export function createMcpServer(dependencies: McpDependencies): McpServer {
   const { store, createAnalyzer: getAnalyzer } = dependencies;
-  const server = new McpServer({ name: "career-radar", version: "0.2.0" });
+  const server = new McpServer({ name: "career-radar", version: "0.3.0" });
 
   registerAppTool(
     server,
@@ -205,6 +208,7 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
   );
 
   registerPipelineTools(server, store, CAREER_RADAR_WIDGET_URI);
+  registerSearchTools(server, dependencies.discovery, store, getAnalyzer, CAREER_RADAR_WIDGET_URI);
 
   registerAppResource(
     server,
@@ -212,7 +216,7 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
     CAREER_RADAR_WIDGET_URI,
     {
       mimeType: RESOURCE_MIME_TYPE,
-      description: "Career Radar connection status and job assessment card.",
+      description: "Career Radar status, assessment, recommendation, and pipeline views.",
     },
     async () => ({
       contents: [{
@@ -225,7 +229,7 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
             csp: { connectDomains: [], resourceDomains: [] },
           },
           "openai/widgetDescription":
-            "A compact evidence-based Career Radar job assessment card.",
+            "Career Radar evidence-based assessments, recommendation groups with shortages and freshness, and application pipeline.",
           "openai/widgetPrefersBorder": true,
         },
       }],

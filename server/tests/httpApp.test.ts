@@ -6,7 +6,7 @@ import type {
   FitAssessment,
   JobPosting,
 } from "@career-radar/shared";
-import { ApplicationResultSchema, JobAssessmentResultSchema } from "@career-radar/shared";
+import { ApplicationResultSchema, JobAssessmentResultSchema, JobRecommendationsSchema, JobSearchResultSchema } from "@career-radar/shared";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -19,6 +19,9 @@ import {
 } from "../src/mcp/createServer.js";
 import { CareerStore } from "../src/domain/store.js";
 import { syntheticProfile } from "./fixtures.js";
+import { syntheticJob } from "./fixtures.js";
+import { JobDiscovery } from "../src/domain/jobs/search.js";
+import { discoveryResult, groundedAssessment } from "./discovery-fixtures.js";
 
 const closeCallbacks: Array<() => Promise<void>> = [];
 
@@ -64,6 +67,41 @@ function rawStatus(baseUrl: string, headers: Record<string, string>): Promise<nu
 }
 
 describe("Career Radar HTTP and MCP server", () => {
+  it("chains search IDs across MCP requests into grounded recommendations and explicit saves", async () => {
+    const store = new CareerStore();
+    store.upsertProfile(syntheticProfile);
+    const provider = { search: vi.fn(async () => discoveryResult) };
+    const discovery = new JobDiscovery(provider);
+    const createAnalyzer = vi.fn(() => ({ extractProfile: vi.fn(),
+      extractJob: async () => ({ job: syntheticJob, warnings: [] }), assess: async () => groundedAssessment,
+    }));
+    const client = await connectClient(await startTestServer({ store, discovery, createAnalyzer }));
+    closeCallbacks.push(async () => { discovery.close(); store.close(); });
+    const tools = (await client.listTools()).tools;
+    expect(tools.find((tool) => tool.name === "job_search")).toMatchObject({ annotations: { readOnlyHint: false, openWorldHint: true } });
+    expect(tools.find((tool) => tool.name === "job_search")?._meta).not.toHaveProperty("ui");
+    expect(tools.find((tool) => tool.name === "job_recommend")).toMatchObject({
+      annotations: { readOnlyHint: false, openWorldHint: false, idempotentHint: false },
+      _meta: { ui: { resourceUri: CAREER_RADAR_WIDGET_URI } },
+    });
+    const search = JobSearchResultSchema.parse((await client.callTool({ name: "job_search", arguments: { boardToken: "synthetic" } })).structuredContent);
+    expect(createAnalyzer).not.toHaveBeenCalled();
+    const bad = await client.callTool({ name: "job_recommend", arguments: {
+      searchId: search.searchId, candidateProfileId: syntheticProfile.id, candidateIds: ["foreign-id"],
+    } });
+    expect(bad.isError).toBe(true);
+    expect(createAnalyzer).not.toHaveBeenCalled();
+    const result = JobRecommendationsSchema.parse((await client.callTool({ name: "job_recommend", arguments: {
+      searchId: search.searchId, candidateProfileId: syntheticProfile.id, candidateIds: [search.candidates[0]!.candidateId],
+    } })).structuredContent);
+    expect(result.realistic).toHaveLength(1);
+    expect(result.shortfall.stretch).toBe(1);
+    expect(store.pipelineSummary().total).toBe(0);
+    const saved = await client.callTool({ name: "application_save", arguments: { assessmentId: result.realistic[0]!.assessmentId } });
+    expect(saved.structuredContent).toMatchObject({ application: { status: "saved", verdictAtDecision: "REALISTIC" } });
+    expect(provider.search).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects unrelated browser origins before exposing the local database", async () => {
     const baseUrl = await startTestServer();
     const response = await fetch(`${baseUrl}/mcp`, { method: "OPTIONS", headers: { Origin: "https://unrelated.example", "Access-Control-Request-Method": "POST" } });
@@ -86,7 +124,7 @@ describe("Career Radar HTTP and MCP server", () => {
     const response = await fetch(`${baseUrl}/health`);
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      name: "Career Radar", milestone: "Milestone 2", state: "ready",
+      name: "Career Radar", milestone: "Milestone 3", state: "ready",
     });
   });
 

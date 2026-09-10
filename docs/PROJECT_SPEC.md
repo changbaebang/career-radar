@@ -770,6 +770,9 @@ Definition of done:
 
 ### Milestone 3 - Search and recommendation
 
+Active implementation plan: [MILESTONE_3.md](MILESTONE_3.md), revised 2026-09-10.
+Start with one explicitly named Greenhouse board, not whole-market discovery. Develop and verify with synthetic analysis while live model/ChatGPT-host checks remain pending. Requested counts are maxima; report shortages and failures rather than changing fit labels. No automatic applications or resume rewriting.
+
 Definition of done:
 
 - a job-search provider abstraction exists,

@@ -6,7 +6,7 @@ import type { CareerStore } from "../domain/store.js";
 export function registerPipelineTools(server: McpServer, store: CareerStore, resourceUri: string): void {
   registerAppTool(server, "application_save", {
     title: "Save an application",
-    description: "Use this when the user explicitly wants to save an assessed job or record that they applied. Use assessmentId returned by job_assess; do not invent a verdict. Existing records are returned unchanged; use application_update to change status.",
+    description: "Use this when the user explicitly wants to save an assessed job or record that they applied. Use assessmentId returned by job_assess or job_recommend; do not invent a verdict. Existing records are returned unchanged; use application_update to change status.",
     inputSchema: ApplicationSaveInputSchema.shape, outputSchema: ApplicationResultSchema.shape,
     _meta: { securitySchemes: [{ type: "noauth" }] },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },

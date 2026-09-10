@@ -5,10 +5,13 @@ import {
   CareerRadarStatusSchema,
   JobAssessmentResultSchema,
   PipelineSummarySchema,
+  JobRecommendationsSchema,
+  type JobRecommendations,
   type PipelineSummary,
   type CareerRadarStatus,
   type JobAssessmentResult,
 } from "@career-radar/shared";
+import { RecommendationsCard } from "./recommendations";
 
 declare global {
   interface Window {
@@ -38,18 +41,35 @@ const styles = `
   .blockers { padding: 12px 14px; border-radius: 12px; background: rgba(174, 53, 47, .09); }
   .blockers h2 { margin-top: 0; color: #8d2d28; }
   .loading { padding: 22px; color: #506258; font-size: 14px; }
+  .recommendations { overflow-wrap: anywhere; }
+  .group-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; border-bottom: 2px solid #317653; padding-bottom: 9px; margin-top: 28px; }
+  .group-heading span { font-weight: 400; }
+  .recommended-job { padding: 12px 0 18px; border-bottom: 1px solid rgba(75,120,91,.25); }
+  .recommended-job h3 { margin: 4px 0; font-size: 17px; line-height: 1.35; }
+  .comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0 8px; font-size: 13px; line-height: 1.5; }
+  .comparison dt { font-weight: 700; margin-bottom: 5px; }
+  .comparison dd { margin: 0; }
+  .source-line { color: #405147; font-size: 11px; line-height: 1.6; }
+  a { color: #175b38; text-underline-offset: 3px; }
+  details { margin-top: 15px; font-size: 12px; line-height: 1.5; }
+  summary { cursor: pointer; padding: 6px 0; font-weight: 600; }
+  a:focus-visible, summary:focus-visible { outline: 2px solid #317653; outline-offset: 4px; }
+  @media (max-width: 440px) { .comparison { grid-template-columns: 1fr; gap: 10px; } .card { padding: 17px; } }
   @media (prefers-color-scheme: dark) {
     body { color: #e6f3ea; }
     .card { border-color: rgba(137,217,170,.2); background: linear-gradient(145deg, #17211b 0%, #1d3024 100%); }
     .eyebrow { color: #81d6a5; }
     .message, .recommendation, li { color: #c3d6ca; }
     .secondary, .recommendation { background: rgba(255,255,255,.06); color: #c3d6ca; }
+    .source-line, a { color: #c3d6ca; }
   }
 `;
 
-type ToolOutput = CareerRadarStatus | JobAssessmentResult | PipelineSummary;
+type ToolOutput = CareerRadarStatus | JobAssessmentResult | PipelineSummary | JobRecommendations;
 
 function parseOutput(value: unknown): ToolOutput | null {
+  const recommendations = JobRecommendationsSchema.safeParse(value);
+  if (recommendations.success) return recommendations.data;
   const pipeline = PipelineSummarySchema.safeParse(value);
   if (pipeline.success) return pipeline.data;
   const assessment = JobAssessmentResultSchema.safeParse(value);
@@ -138,6 +158,7 @@ function App() {
   }, []);
 
   if (!output) return <div className="loading">Waiting for Career Radar…</div>;
+  if ("kind" in output) return <RecommendationsCard result={output} />;
   if ("total" in output) return <PipelineCard summary={output} />;
   return "assessment" in output ? <AssessmentCard result={output} /> : <StatusCard status={output} />;
 }
