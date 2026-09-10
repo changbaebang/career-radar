@@ -1,3 +1,4 @@
+import { request as httpRequest } from "node:http";
 import type { AddressInfo } from "node:net";
 
 import type {
@@ -49,12 +50,36 @@ async function connectClient(baseUrl: string) {
   return client;
 }
 
+// fetch() refuses to set Host, so raw http is used to imitate DNS-rebinding requests.
+function rawStatus(baseUrl: string, headers: Record<string, string>): Promise<number> {
+  const { hostname, port } = new URL(baseUrl);
+  return new Promise((resolve, reject) => {
+    const req = httpRequest({ hostname, port, path: "/health", method: "GET", headers }, (response) => {
+      response.resume();
+      response.on("end", () => resolve(response.statusCode ?? 0));
+    });
+    req.on("error", reject);
+    req.end();
+  });
+}
+
 describe("Career Radar HTTP and MCP server", () => {
   it("rejects unrelated browser origins before exposing the local database", async () => {
     const baseUrl = await startTestServer();
     const response = await fetch(`${baseUrl}/mcp`, { method: "OPTIONS", headers: { Origin: "https://unrelated.example", "Access-Control-Request-Method": "POST" } });
     expect(response.status).toBe(403);
     expect(response.headers.get("access-control-allow-origin")).toBeNull();
+  });
+
+  it("rejects DNS-rebinding requests whose Host is not a loopback address", async () => {
+    const baseUrl = await startTestServer();
+    const port = new URL(baseUrl).port;
+    // A rebinding page sends its own domain as both Host and Origin; they match each other but not loopback.
+    await expect(rawStatus(baseUrl, { Host: `attacker.example:${port}`, Origin: `http://attacker.example:${port}` })).resolves.toBe(403);
+    await expect(rawStatus(baseUrl, { Host: `attacker.example:${port}` })).resolves.toBe(403);
+    await expect(rawStatus(baseUrl, { Host: `localhost:${port}`, Origin: `http://localhost:${port}` })).resolves.toBe(200);
+    await expect(rawStatus(baseUrl, { Host: `127.0.0.1:${port}` })).resolves.toBe(200);
+    await expect(rawStatus(baseUrl, { Host: `[::1]:${port}`, Origin: `http://[::1]:${port}` })).resolves.toBe(200);
   });
   it("serves deterministic readiness data", async () => {
     const baseUrl = await startTestServer();

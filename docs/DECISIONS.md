@@ -52,7 +52,7 @@ The analyzer is created lazily once per HTTP app and reused across requests. Sta
 
 **Status:** Accepted — Milestone 2 prototype
 
-Use Node's built-in SQLite (`node:sqlite`, Node >=22.13) with prepared values, foreign keys, transactional `user_version` migrations, WAL, and transactional application/event writes. Normal execution uses a gitignored file; tests and the offline demo use isolated databases. New database files are owner-only. The HTTP entry point binds to loopback for private use. Existing files and backups still require the owner's permission/retention management. No authentication or multi-user isolation is implied.
+Use Node's built-in SQLite (`node:sqlite`, Node >=22.13) with prepared values, foreign keys, transactional `user_version` migrations, WAL, and transactional application/event writes. Normal execution uses a gitignored file; tests and the offline demo use isolated databases. New database files are owner-only. The HTTP entry point binds to loopback for private use, and the app rejects any request whose `Host` (or browser `Origin`) is not a loopback address — comparing Origin to Host would let a DNS-rebinding page through. `pnpm db:reset` is the owner's wipe path; the event history excludes free-text notes. Existing files and backups still require the owner's permission/retention management. No authentication or multi-user isolation is implied.
 
 This intentionally replaces the M1 30-minute TTL: records persist until the owner clears the database. Raw resumes are not retained, but structured profiles, assessments, and notes remain potentially sensitive and unencrypted.
 

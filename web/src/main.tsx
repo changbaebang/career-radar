@@ -160,8 +160,12 @@ function PipelineCard({ summary }: { summary: PipelineSummary }) {
           </span></li>
         ))}</ul>
       )}
-      <h2>By role family</h2>
-      <ul>{summary.byRoleFamily.map((item) => <li key={item.roleFamily}>{item.roleFamily} · {item.count}</li>)}</ul>
+      {summary.byRoleFamily.length > 0 && (
+        <>
+          <h2>By role family</h2>
+          <ul>{summary.byRoleFamily.map((item) => <li key={item.roleFamily}>{item.roleFamily} · {item.count}</li>)}</ul>
+        </>
+      )}
       <p className="recommendation">Recorded outcomes are observations, not hiring probabilities or proof of a skill gap. Small samples need caution.</p>
     </article>
   );

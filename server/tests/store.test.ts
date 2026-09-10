@@ -116,6 +116,24 @@ describe("SQLite CareerStore", () => {
     expect(() => new CareerStore(path)).toThrow("newer than this app");
   });
 
+  it("keeps notes out of the event history and wipes the file on reset", () => {
+    const path = filePath(); const store = storeAt(path);
+    const saved = store.saveApplication({ assessmentId: store.saveAssessment(profile.id, job, assessment) });
+    store.updateApplication({ applicationId: saved.id, status: "interview", notes: "Interviewer: SECRET-NAME" });
+    store.updateApplication({ applicationId: saved.id, status: "interview", notes: "" });
+    const db = new DatabaseSync(path); cleanup.push(() => db.close());
+    const events = db.prepare("SELECT data FROM application_events").all().map((row) => String(row.data));
+    expect(events).toHaveLength(3);
+    expect(events.join(" ")).not.toContain("SECRET-NAME");
+    expect(events.join(" ")).not.toContain('"notes"');
+    db.close(); cleanup.pop();
+    store.reset();
+    expect(store.pipelineSummary().total).toBe(0);
+    expect(store.getProfile(profile.id)).toBeUndefined();
+    const reopened = new CareerStore(path); cleanup.push(() => reopened.close());
+    expect(reopened.pipelineSummary().total).toBe(0);
+  });
+
   it("clears records in foreign-key-safe order", () => {
     const store = storeAt();
     store.saveApplication({ assessmentId: store.saveAssessment(profile.id, job, assessment) });

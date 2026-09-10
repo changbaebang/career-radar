@@ -1,22 +1,12 @@
-import { fileURLToPath } from "node:url";
-import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { ensureDatabaseDirectory, loadLocalEnv, resolveDatabasePath } from "./config.js";
 import { CareerStore } from "./domain/store.js";
-
 import { createHttpApp } from "./httpApp.js";
 
-try {
-  process.loadEnvFile(
-    fileURLToPath(new URL("../../.env.local", import.meta.url)),
-  );
-} catch (error) {
-  if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-}
+loadLocalEnv();
 
 const port = Number.parseInt(process.env.PORT ?? "8000", 10);
-const root = fileURLToPath(new URL("../../", import.meta.url));
-const databasePath = resolve(root, process.env.CAREER_RADAR_DB_PATH ?? "data/career-radar.db");
-mkdirSync(dirname(databasePath), { recursive: true, mode: 0o700 });
+const databasePath = resolveDatabasePath();
+ensureDatabaseDirectory(databasePath);
 const store = new CareerStore(databasePath);
 const app = createHttpApp({ store });
 

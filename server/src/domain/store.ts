@@ -65,9 +65,11 @@ export class CareerStore {
     try { const result = work(); this.#db.exec("COMMIT"); return result; }
     catch (error) { this.#db.exec("ROLLBACK"); throw error; }
   }
+  // The event history records status transitions. Free-text notes are deliberately left out so
+  // that clearing notes on the application actually removes them from the database.
   private event(application: Application): void {
     this.#db.prepare("INSERT INTO application_events (application_id, data) VALUES (?, ?)")
-      .run(application.id, JSON.stringify(application));
+      .run(application.id, JSON.stringify({ ...application, notes: undefined }));
   }
   saveApplication(input: ApplicationSaveInput): Application {
     const { assessmentId, status } = ApplicationSaveInputSchema.parse(input);
@@ -132,6 +134,13 @@ export class CareerStore {
   }
   clear(): void {
     this.transaction(() => this.#db.exec("DELETE FROM application_events; DELETE FROM applications; DELETE FROM assessments; DELETE FROM jobs; DELETE FROM candidate_profiles;"));
+  }
+  // Owner-initiated wipe: clear every table, then rewrite the file so deleted pages and the WAL
+  // no longer hold the old content. VACUUM cannot run inside a transaction.
+  reset(): void {
+    this.clear();
+    this.#db.exec("VACUUM");
+    this.#db.exec("PRAGMA wal_checkpoint(TRUNCATE)");
   }
   close(): void { this.#db.close(); }
 }
