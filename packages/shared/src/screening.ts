@@ -5,7 +5,7 @@ const confidence = z.enum(["low", "medium", "high"]);
 export const EvidenceRefSchema = z.object({
   source: z.enum(["candidate", "job"]),
   path: z.string().min(1).max(160),
-  quote: z.string().trim().min(1).max(16000),
+  quote: z.string().trim().min(1).max(2000),
 }).strict();
 const evidence = z.array(EvidenceRefSchema).max(8);
 
@@ -25,8 +25,12 @@ export const ScreeningContextV1Schema = z.object({
       "domain_depth", "recent_experience", "formal_title_gap"]),
     severity: z.enum(["low", "medium", "high"]), explanation: text, evidence, confidence,
   }).strict()).max(8),
-  unknowns: z.array(z.string().trim().min(1).max(500)).max(32),
+  // A producer may supply at most MAX_PRODUCER_UNKNOWNS; the validator reserves the rest for its
+  // own diagnostics (2 judgments + 8 risks) so validation itself can never overflow this bound.
+  unknowns: z.array(z.string().trim().min(1).max(500)).max(48),
 }).strict();
+
+export const MAX_PRODUCER_UNKNOWNS = 32;
 
 export const AssessmentInputIdentitySchema = z.object({
   version: z.literal("structured-input-v1"),

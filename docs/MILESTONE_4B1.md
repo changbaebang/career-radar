@@ -47,14 +47,14 @@ remains its gate. B1 does not make funded model testing unnecessary.
 | Source | Allowed paths (zero-based indices) |
 | --- | --- |
 | candidate | `headline`, `skills[i]`, `domains[i]`, `leadership[i]`, `customerFacing[i]`, `aiEvidence[i]`, `cloudEvidence[i]`, `roles[i].title`, `roles[i].responsibilities[j]`, `roles[i].evidence[j]` |
-| job | `description`, `required[i].text`, `preferred[i].text`, `responsibilities[i]` |
+| job | `required[i].text`, `preferred[i].text`, `responsibilities[i]` (no whole-description quoting; sentence-level anchors exist for pasted, fetched and searched jobs) |
 
 No generic object traversal, URLs, negative/leading-zero indices, dates, employer
 names, constraints, yearsExperience, prototype properties or unlisted fields.
 Indices must exist in the exact input. A preferred quote with a required path fails.
 Normalization preserves M1 behavior: lower case, collapsed whitespace and enclosing
-quotes/trailing punctuation. A normalized empty string is never evidence. A whole
-description must match; sentence extraction/substring matching is not supported.
+quotes/trailing punctuation. A normalized empty string is never evidence. Substring
+matching is not supported; a reference must equal one located sentence-level field.
 
 Candidate title/headline/skill/domain tokens alone cannot support a seniority
 comparison or seniority-mismatch risk: at least one located role responsibility,
@@ -68,11 +68,12 @@ tests preserve manually authored judgments and exercise bad/missing references;
 they do not certify full A–F model behavior. Semantic paired evals and human labels
 remain necessary before producer integration.
 
-Bounds: 160-character paths, 16,000-character quotes, 2,000-character explanations
-and questions, 8 refs per judgment/risk, 8 risks, 32 unknowns of at most 500 characters.
-Unknown versions, unexpected keys and bound violations fail closed. If adding
-validation reasons exceeds the unknowns bound, validation fails rather than truncating
-reasons. Future callers must handle validation errors without logging source content.
+Bounds: 160-character paths, 2,000-character quotes, explanations and questions,
+8 refs per judgment/risk, 8 risks, unknowns of at most 500 characters. A producer may
+supply at most 32 unknowns (`MAX_PRODUCER_UNKNOWNS`); the schema bound is 48 so the
+validator's own diagnostics (at most 10) can never push a contract-abiding context over
+the limit. Unknown versions, unexpected keys and bound violations fail closed. Future
+callers must handle validation errors without logging source content.
 
 ## Identity and storage
 
@@ -84,8 +85,8 @@ New assessment snapshots include optional `inputIdentity`:
 
 Hash schema-validated input JSON with recursively sorted object keys and a version
 prefix. Omit undefined object properties, retain array order and exact strings.
-The profile hash covers all current structured fields, including raw `sourceHash`;
-the job hash covers the exact normalized job passed to assessment. Same resume text
+The profile hash covers all current structured content fields, including raw `sourceHash`
+but excluding the storage `id`; the job hash covers the exact normalized job passed to assessment. Same resume text
 with different extracted structure yields a different profile hash.
 
 `saveAssessment` now takes the captured profile object rather than only its ID.

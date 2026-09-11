@@ -32,6 +32,10 @@ describe("structured-input-v1 identity, not retained input or extraction provena
     expect(assessmentInputIdentity({ ...profile, headline: `${profile.headline}.` }, job).profileHash).not.toBe(initial.profileHash);
     expect(assessmentInputIdentity(profile, { ...job, description: `${job.description} Different scope.` }).jobHash).not.toBe(initial.jobHash);
   });
+  it("identifies structured content, not the storage id", () => {
+    expect(assessmentInputIdentity({ ...profile, id: "profile_other" }, job).profileHash)
+      .toBe(assessmentInputIdentity(profile, job).profileHash);
+  });
   it("distinguishes different structured profiles extracted from the same raw source", () => {
     const changed = { ...profile, leadership: ["Owned a synthetic platform roadmap"] };
     expect(changed.sourceHash).toBe(profile.sourceHash);

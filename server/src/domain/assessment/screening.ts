@@ -1,4 +1,4 @@
-import { EvidenceRefSchema, ScreeningContextV1Schema, ScreeningAssessmentSchema,
+import { EvidenceRefSchema, ScreeningContextV1Schema, ScreeningAssessmentSchema, MAX_PRODUCER_UNKNOWNS,
   type CandidateProfile, type JobPosting, type EvidenceRef, type ScreeningContextV1,
   type ScreeningAssessment } from "@career-radar/shared";
 import { normalizeEvidence } from "./policy.js";
@@ -15,7 +15,6 @@ function located(ref: EvidenceRef, profile: CandidateProfile, job: JobPosting): 
     const title = ref.path.match(new RegExp(`^roles\\[${index}\\]\\.title$`));
     return title ? profile.roles[Number(title[1])]?.title : undefined;
   }
-  if (ref.path === "description") return job.description;
   const requirement = ref.path.match(new RegExp(`^(required|preferred)\\[${index}\\]\\.text$`));
   if (requirement) return job[requirement[1] as "required"][Number(requirement[2])]?.text;
   const responsibility = ref.path.match(new RegExp(`^responsibilities\\[${index}\\]$`));
@@ -42,6 +41,9 @@ function bothSources(refs: EvidenceRef[]): boolean {
 // Pure, opt-in B1 validator. No outcome input, model calls, ranking or verdict policy.
 export function validateScreeningContext(profile: CandidateProfile, job: JobPosting, input: unknown): ScreeningContextV1 {
   const context = ScreeningContextV1Schema.parse(input);
+  // The producer contract is smaller than the schema bound; the difference is reserved for the
+  // diagnostics added below, so a contract-abiding producer can never be rejected by validation.
+  if (context.unknowns.length > MAX_PRODUCER_UNKNOWNS) throw new Error(`Producer supplied more than ${MAX_PRODUCER_UNKNOWNS} unknowns.`);
   const unknowns = new Set(context.unknowns);
   function check(refs: EvidenceRef[], scope: boolean) {
     const valid = refs.filter((ref) => isEvidenceRefGrounded(profile, job, ref));
@@ -66,7 +68,7 @@ export function validateScreeningContext(profile: CandidateProfile, job: JobPost
     unknowns.add(`screeningRisks[${index}] (${risk.type}): excluded for missing references or invalid source/path/quote.`);
     return false;
   });
-  // Fail closed if the bounded unknowns contract overflows; never silently lose diagnostics.
+  // Still parse the result: bounds other than unknowns (which has reserved headroom) fail closed.
   return ScreeningContextV1Schema.parse({ ...context, unknowns: [...unknowns] });
 }
 

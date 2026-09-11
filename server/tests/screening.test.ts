@@ -41,11 +41,23 @@ describe("B1 located evidence (synthetic, no model or semantic evaluator)", () =
     expect(isEvidenceRefGrounded(profile, { ...job, description: "!!!" }, { source: "job", path: "description", quote: "!" })).toBe(false);
     expect(isEvidenceRefGrounded(profile, job, { ...candidate, source: "outcome" })).toBe(false);
   });
-  it("validates full JD sentences, never substrings of a description", () => {
-    const ref = { source: "job", path: "description", quote: job.description };
-    expect(isEvidenceRefGrounded(profile, job, ref)).toBe(true);
-    expect(isEvidenceRefGrounded(profile, job, { ...ref, quote: "React" })).toBe(false);
-    expect(isEvidenceRefGrounded(profile, job, { ...ref, path: "title", quote: job.title })).toBe(false);
+  it("anchors job evidence to sentence-level fields, never the whole description or title", () => {
+    expect(isEvidenceRefGrounded(profile, job, { source: "job", path: "description", quote: job.description })).toBe(false);
+    expect(isEvidenceRefGrounded(profile, job, { source: "job", path: "title", quote: job.title })).toBe(false);
+    const j = { ...job, responsibilities: ["Build reliable React applications for commerce customers."] };
+    expect(isEvidenceRefGrounded(profile, j, { source: "job", path: "responsibilities[0]", quote: j.responsibilities[0]! })).toBe(true);
+    expect(isEvidenceRefGrounded(profile, j, { source: "job", path: "responsibilities[0]", quote: "React" })).toBe(false);
+  });
+
+  it("reserves unknowns headroom so validator diagnostics never reject a contract-abiding context", () => {
+    const bad = { ...candidate, path: "roles[9].evidence[0]" };
+    const full = context(); full.unknowns = Array.from({ length: 32 }, (_, i) => `Unknown ${i}`);
+    full.screeningRisks = Array.from({ length: 8 }, () => ({ type: "career_story" as const, severity: "low" as const, confidence: "low" as const, explanation: "x", evidence: [bad] }));
+    const result = validateScreeningContext(profile, job, full);
+    expect(result.screeningRisks).toEqual([]);
+    expect(result.unknowns).toHaveLength(40);
+    const over = context(); over.unknowns = Array.from({ length: 33 }, (_, i) => `Unknown ${i}`);
+    expect(() => validateScreeningContext(profile, job, over)).toThrow("more than 32 unknowns");
   });
   it("requires both sources, downgrades the whole judgment on any failed ref and removes unsupported prose", () => {
     const bad = context([candidate, role, { ...candidate, path: "roles[9].evidence[0]" }]);
@@ -82,9 +94,8 @@ describe("B1 located evidence (synthetic, no model or semantic evaluator)", () =
     expect(ScreeningContextV1Schema.safeParse({ ...context(), version: "2" }).success).toBe(false);
     expect(ScreeningContextV1Schema.safeParse({ ...context(), extra: true }).success).toBe(false);
     expect(ScreeningContextV1Schema.safeParse(context(Array(9).fill(candidate))).success).toBe(false);
-    expect(ScreeningContextV1Schema.safeParse(context([{ ...candidate, quote: "a".repeat(16001) }])).success).toBe(false);
-    const full = context([]); full.unknowns = Array.from({ length: 32 }, (_, i) => `Unknown ${i}`);
-    expect(() => validateScreeningContext(profile, job, full)).toThrow();
+    expect(ScreeningContextV1Schema.safeParse(context([{ ...candidate, quote: "a".repeat(2001) }])).success).toBe(false);
+    expect(ScreeningContextV1Schema.safeParse({ ...context(), unknowns: Array.from({ length: 49 }, (_, i) => `u${i}`) }).success).toBe(false);
   });
 });
 
