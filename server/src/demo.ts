@@ -6,9 +6,9 @@ import {
 export function buildCareerRadarStatus(now = new Date()): CareerRadarStatus {
   return CareerRadarStatusSchema.parse({
     name: "Career Radar",
-    milestone: "Milestone 3",
+    milestone: "Milestone 4",
     state: "ready",
-    message: "Search one Greenhouse board, assess selected roles, and track decisions locally. Early private-use prototype; live model/host validation remains separate.",
+    message: "Search one Greenhouse board, assess selected roles with screening context, and track decisions and reported stages locally. Early private-use prototype; live model/host validation remains separate.",
     checkedAt: now.toISOString(),
     capabilities: [
       "Resume evidence extraction",
@@ -19,6 +19,8 @@ export function buildCareerRadarStatus(now = new Date()): CareerRadarStatus {
       "Application status updates and pipeline summary",
       "Bounded Greenhouse board search without model calls",
       "Small-set evidence recommendations with explicit shortages and source times",
+      "Stage-aware application outcomes with correction-safe summaries",
+      "Located screening context (role scope, career story) that stays uncertain without verified references",
     ],
   });
 }

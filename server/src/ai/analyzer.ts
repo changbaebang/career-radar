@@ -2,6 +2,8 @@ import {
   CandidateProfileSchema,
   FitAssessmentSchema,
   JobPostingSchema,
+  MAX_PRODUCER_UNKNOWNS,
+  ScreeningContextV1Schema,
   type CandidateProfile,
   type FitAssessment,
   type JobPosting,
@@ -10,9 +12,11 @@ import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
+import { SCREENING_CONTEXT_DISCARDED } from "../domain/assessment/pipeline.js";
 import { hashSource, stableId } from "../domain/store.js";
 
-export const PROMPT_VERSION = "milestone-1-v1";
+// milestone-4b2-v1: the assessment call also produces located screening context (M4-B2).
+export const PROMPT_VERSION = "milestone-4b2-v1";
 export const DEFAULT_OPENAI_MODEL = "gpt-5-mini";
 const nullableText = z.string().min(1).nullable();
 
@@ -52,6 +56,29 @@ const RawGapSchema = z.object({
   severity: z.enum(["minor", "material", "hard_blocker"]),
 }).strict();
 
+// Structured-output shape for the screening context: no optional keys (nullable instead) and no
+// array bounds, which OpenAI strict schemas reject; bounds are applied after parsing.
+const EvidenceRefDraftSchema = z.object({
+  source: z.enum(["candidate", "job"]), path: z.string().min(1), quote: z.string().min(1),
+}).strict();
+const draftConfidence = z.enum(["low", "medium", "high"]);
+const ScreeningContextDraftSchema = z.object({
+  seniorityFit: z.object({
+    value: z.enum(["aligned", "underleveled", "overleveled", "uncertain"]), explanation: z.string().min(1),
+    evidence: z.array(EvidenceRefDraftSchema), confidence: draftConfidence,
+  }).strict(),
+  careerStoryRisk: z.object({
+    value: z.enum(["low", "medium", "high", "uncertain"]), explanation: z.string().min(1),
+    evidence: z.array(EvidenceRefDraftSchema), clarificationQuestion: nullableText, confidence: draftConfidence,
+  }).strict(),
+  screeningRisks: z.array(z.object({
+    type: z.enum(["seniority_mismatch", "job_family_transition", "career_story", "domain_depth", "recent_experience", "formal_title_gap"]),
+    severity: z.enum(["low", "medium", "high"]), explanation: z.string().min(1),
+    evidence: z.array(EvidenceRefDraftSchema), confidence: draftConfidence,
+  }).strict()),
+  unknowns: z.array(z.string().min(1)),
+}).strict();
+
 const AssessmentDraftSchema = z.object({
   verdict: z.enum(["REALISTIC", "STRETCH", "PASS"]),
   confidence: z.enum(["low", "medium", "high"]),
@@ -65,6 +92,7 @@ const AssessmentDraftSchema = z.object({
   gaps: z.array(RawGapSchema), hardBlockers: z.array(RawGapSchema),
   interviewRisks: z.array(z.string().min(1)), recommendation: z.string().min(1),
   missingInformation: z.array(z.string().min(1)),
+  screeningContext: ScreeningContextDraftSchema,
 }).strict();
 
 export type ProfileExtraction = { profile: CandidateProfile; warnings: string[] };
@@ -231,16 +259,29 @@ export class OpenAICareerAnalyzer implements CareerAnalyzer {
         "Use requirement IDs from the job whenever one applies.",
         "A truthful STRETCH is better than a fabricated REALISTIC.",
         "A label is not a hiring probability.",
+        "Also produce screeningContext from the same structured inputs; it never changes the verdict.",
+        "Every screening evidence reference cites one exact location: source candidate with path headline, skills[i], domains[i], leadership[i], customerFacing[i], aiEvidence[i], cloudEvidence[i], roles[i].title, roles[i].responsibilities[j] or roles[i].evidence[j]; source job with path required[i].text, preferred[i].text or responsibilities[i]. Indices are zero-based positions in the supplied JSON and the quote copies that field's exact text.",
+        "seniorityFit compares the candidate's demonstrated scope with the role's stated scope, never the candidate's worth. Do not conclude overleveled or underleveled from years, titles or headlines alone; cite at least one role responsibility, role evidence or leadership entry and one job requirement or responsibility, otherwise answer uncertain.",
+        "careerStoryRisk describes an evidence-backed need to clarify the candidate's path for this role, not recruiter behavior. A leadership-to-IC move or a job-family change is not automatically a risk; when intent is unknown ask one clarificationQuestion instead of inventing a motivation.",
+        "Each screeningRisk cites both candidate and job references; omit any risk you cannot cite and do not repeat interviewRisks there.",
+        "Never use age, gender, nationality, employment gaps, school prestige or other demographic proxies as evidence.",
+        "Record missing facts in unknowns; uncertainty is better than a fabricated judgment.",
       ].join(" "),
       input: JSON.stringify({ candidateProfile: profile, jobPosting: job }),
       text: { format: zodTextFormat(AssessmentDraftSchema, "fit_assessment") },
     }, { signal, ...(signal ? { maxRetries: 0 } : {}) }));
-    const parsed = requireParsed(response.output_parsed, "fit assessment");
+    const { screeningContext: rawContext, ...parsed } = requireParsed(response.output_parsed, "fit assessment");
     const normalizeGap = (gap: (typeof parsed.gaps)[number]) => omitNull(gap);
+    // Producer normalization only: bounds and shape. Reference validation against the captured inputs
+    // happens in finalizeAssessment. A context outside the contract is dropped, never the fit.
+    const context = ScreeningContextV1Schema.safeParse({ version: "1", ...rawContext, careerStoryRisk: omitNull(rawContext.careerStoryRisk) });
+    const contextKept = context.success && context.data.unknowns.length <= MAX_PRODUCER_UNKNOWNS;
     return FitAssessmentSchema.parse({
       ...parsed, ...(parsed.score === null ? { score: undefined } : { score: parsed.score }),
       strongestMatches: parsed.strongestMatches.map((match) => ({ ...omitNull(match), source: omitNull(match.source) })),
       gaps: parsed.gaps.map(normalizeGap), hardBlockers: parsed.hardBlockers.map(normalizeGap),
+      missingInformation: contextKept ? parsed.missingInformation : [...parsed.missingInformation, SCREENING_CONTEXT_DISCARDED],
+      ...(contextKept ? { screeningContext: context.data } : {}),
       modelVersion: response.model ?? this.#model, promptVersion: PROMPT_VERSION,
     });
   }

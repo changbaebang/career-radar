@@ -27,6 +27,19 @@ function filePath() {
 }
 
 describe("SQLite CareerStore", () => {
+  it("round-trips an assessment snapshot with screening context and still reads legacy snapshots without one", () => {
+    const store = storeAt();
+    const context = { version: "1" as const,
+      seniorityFit: { value: "uncertain" as const, confidence: "low" as const, explanation: "Synthetic.", evidence: [] },
+      careerStoryRisk: { value: "uncertain" as const, confidence: "low" as const, explanation: "Synthetic.", evidence: [] },
+      screeningRisks: [], unknowns: ["Synthetic unknown"] };
+    const withContext = store.saveAssessment(profile, job, { ...assessment, screeningContext: context });
+    const legacy = store.saveAssessment(profile, job, assessment);
+    expect(store.saveApplication({ assessmentId: withContext, status: "saved" }).verdictAtDecision).toBe("STRETCH");
+    expect(store.saveApplication({ assessmentId: legacy, status: "saved" }).verdictAtDecision).toBe("STRETCH");
+    expect(JSON.stringify(store.pipelineSummary())).not.toContain("Synthetic unknown");
+  });
+
   it("migrates once and survives a full close/reopen with snapshots and outcomes", () => {
     const path = filePath();
     const first = new CareerStore(path);

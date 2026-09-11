@@ -145,13 +145,16 @@ describe("B1 A-F authored contracts, not measured model judgments", () => {
       expect(validateScreeningContext(fixture.profile, j, wrong).seniorityFit.value).toBe("uncertain");
     }
   });
-  it("keeps old payloads valid, absence unevaluated, and the new envelope out of existing strict tool/widget contracts", () => {
+  it("keeps old payloads valid and absence unevaluated; since B2 the strict tool contract carries the optional context", () => {
     expect(validateScreeningAssessment(profile, job, fit)).toEqual(fit);
     expect(validateScreeningAssessment(profile, job, fit)).not.toHaveProperty("screeningContext");
     const next = { ...fit, screeningContext: context() };
     expect(ScreeningAssessmentSchema.safeParse(next).success).toBe(true);
-    expect(FitAssessmentSchema.safeParse(next).success).toBe(false);
-    expect(JobAssessmentResultSchema.safeParse({ job, assessment: next }).success).toBe(false);
+    expect(FitAssessmentSchema.safeParse(next).success).toBe(true);
+    expect(JobAssessmentResultSchema.safeParse({ job, assessment: next }).success).toBe(true);
     expect(JobAssessmentResultSchema.safeParse({ job, assessment: fit }).success).toBe(true);
+    // Unknown versions and extra keys still fail closed; a v4 widget parsing strictly would reject the new field, hence the v5 URI.
+    expect(FitAssessmentSchema.safeParse({ ...fit, screeningContext: { ...context(), version: "2" } }).success).toBe(false);
+    expect(FitAssessmentSchema.safeParse({ ...fit, screeningContext: { ...context(), extra: true } }).success).toBe(false);
   });
 });
