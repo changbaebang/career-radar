@@ -78,6 +78,9 @@ describe("Career Radar HTTP and MCP server", () => {
     const client = await connectClient(await startTestServer({ store, discovery, createAnalyzer }));
     closeCallbacks.push(async () => { discovery.close(); store.close(); });
     const tools = (await client.listTools()).tools;
+    // B1 adds an opt-in schema only; do not advertise new fields to the cached v4 widget/model.
+    expect(JSON.stringify(tools)).not.toContain("screeningContext");
+    expect(JSON.stringify(tools)).not.toContain("inputIdentity");
     expect(tools.find((tool) => tool.name === "job_search")).toMatchObject({ annotations: { readOnlyHint: false, openWorldHint: true } });
     expect(tools.find((tool) => tool.name === "job_search")?._meta).not.toHaveProperty("ui");
     expect(tools.find((tool) => tool.name === "job_recommend")).toMatchObject({
@@ -95,6 +98,8 @@ describe("Career Radar HTTP and MCP server", () => {
       searchId: search.searchId, candidateProfileId: syntheticProfile.id, candidateIds: [search.candidates[0]!.candidateId],
     } })).structuredContent);
     expect(result.realistic).toHaveLength(1);
+    expect(result.realistic[0]!.assessment).not.toHaveProperty("screeningContext");
+    expect(result.realistic[0]).not.toHaveProperty("inputIdentity");
     expect(result.shortfall.stretch).toBe(1);
     expect(store.pipelineSummary().total).toBe(0);
     const saved = await client.callTool({ name: "application_save", arguments: { assessmentId: result.realistic[0]!.assessmentId } });

@@ -113,7 +113,7 @@ export class JobDiscovery {
           const draft = await Promise.race([analyzer.assess(profile, job, controller.signal), aborted]);
           const assessment = applyAssessmentPolicy(profile, job, draft);
           controller.signal.throwIfAborted();
-          const assessmentId = store.saveAssessment(profile.id, job, assessment);
+          const assessmentId = store.saveAssessment(profile, job, assessment);
           items.push({ candidate: hit.candidate, jobId: job.id, assessmentId, assessment });
         } catch {
           failures.push({ candidateId: hit.candidate.candidateId, message: "Analysis failed or timed out. Check model credit and network, then retry explicitly. This is not a PASS verdict." });

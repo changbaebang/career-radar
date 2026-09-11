@@ -31,7 +31,7 @@ describe("SQLite CareerStore", () => {
     const path = filePath();
     const first = new CareerStore(path);
     first.upsertProfile(profile); first.upsertJob(job);
-    const id = first.saveAssessment(profile.id, job, assessment);
+    const id = first.saveAssessment(profile, job, assessment);
     const saved = first.saveApplication({ assessmentId: id });
     const updated = first.updateApplication({ applicationId: saved.id, status: "rejected", stage: "resume screen" });
     first.close();
@@ -47,11 +47,11 @@ describe("SQLite CareerStore", () => {
 
   it("keeps the original verdict/job snapshot and does not revert an outcome on save retry", () => {
     const store = storeAt();
-    const id = store.saveAssessment(profile.id, job, assessment);
+    const id = store.saveAssessment(profile, job, assessment);
     const saved = store.saveApplication({ assessmentId: id });
     const updated = store.updateApplication({ applicationId: saved.id, status: "interview" });
     store.upsertJob({ ...job, roleFamily: "Changed family" });
-    const later = store.saveAssessment(profile.id, { ...job, roleFamily: "Changed family" }, { ...assessment, verdict: "REALISTIC" });
+    const later = store.saveAssessment(profile, { ...job, roleFamily: "Changed family" }, { ...assessment, verdict: "REALISTIC" });
     expect(store.saveApplication({ assessmentId: later, status: "applied" })).toEqual(updated);
     expect(store.pipelineSummary().total).toBe(1);
     expect(updated.verdictAtDecision).toBe("STRETCH");
@@ -62,7 +62,7 @@ describe("SQLite CareerStore", () => {
     let time = new Date("2026-09-10T00:00:00Z");
     const path = filePath();
     const store = storeAt(path, () => time);
-    const saved = store.saveApplication({ assessmentId: store.saveAssessment(profile.id, job, assessment) });
+    const saved = store.saveApplication({ assessmentId: store.saveAssessment(profile, job, assessment) });
     expect(saved.appliedAt).toBeUndefined();
     const applied = store.updateApplication({ applicationId: saved.id, status: "applied", notes: "It's synthetic; DROP TABLE jobs;" });
     time = new Date("2026-09-11T00:00:00Z");
@@ -80,17 +80,17 @@ describe("SQLite CareerStore", () => {
     const store = storeAt();
     expect(() => store.saveApplication({ assessmentId: "invented" })).toThrow("Assessment not found");
     expect(() => store.updateApplication({ applicationId: "invented", status: "offer" })).toThrow("Application not found");
-    expect(() => store.saveAssessment("missing-profile", job, assessment)).toThrow();
+    expect(() => store.saveAssessment({ ...profile, id: "missing-profile" }, job, assessment)).toThrow();
     expect(() => store.upsertJob({ ...job, title: "" })).toThrow();
     expect(store.pipelineSummary().total).toBe(0);
-    const id = store.saveAssessment(profile.id, job, assessment);
+    const id = store.saveAssessment(profile, job, assessment);
     expect(store.saveApplication({ assessmentId: id }).status).toBe("saved");
   });
 
   it("reports zero states and inclusive last-update filtering without invented probabilities", () => {
     const store = storeAt(":memory:", () => new Date("2026-09-10T00:00:00Z"));
     expect(store.pipelineSummary().byStatus).toHaveLength(7);
-    store.saveApplication({ assessmentId: store.saveAssessment(profile.id, job, assessment), status: "applied" });
+    store.saveApplication({ assessmentId: store.saveAssessment(profile, job, assessment), status: "applied" });
     const summary = store.pipelineSummary({ from: "2026-09-10T00:00:00Z", to: "2026-09-10T00:00:00.000Z" });
     expect(summary.total).toBe(1);
     expect(summary.byStatus.find((item) => item.status === "applied")?.count).toBe(1);
@@ -105,7 +105,7 @@ describe("SQLite CareerStore", () => {
     const path = filePath(); const store = storeAt(path);
     const db = new DatabaseSync(path); cleanup.push(() => db.close());
     db.exec("CREATE TRIGGER reject_event BEFORE INSERT ON application_events BEGIN SELECT RAISE(ABORT, 'event failed'); END;");
-    const id = store.saveAssessment(profile.id, job, assessment);
+    const id = store.saveAssessment(profile, job, assessment);
     expect(() => store.saveApplication({ assessmentId: id })).toThrow("event failed");
     expect(store.pipelineSummary().total).toBe(0);
   });
@@ -118,7 +118,7 @@ describe("SQLite CareerStore", () => {
 
   it("keeps notes out of the event history and wipes the file on reset", () => {
     const path = filePath(); const store = storeAt(path);
-    const saved = store.saveApplication({ assessmentId: store.saveAssessment(profile.id, job, assessment) });
+    const saved = store.saveApplication({ assessmentId: store.saveAssessment(profile, job, assessment) });
     store.updateApplication({ applicationId: saved.id, status: "interview", notes: "Interviewer: SECRET-NAME" });
     store.updateApplication({ applicationId: saved.id, status: "interview", notes: "" });
     const db = new DatabaseSync(path); cleanup.push(() => db.close());
@@ -136,7 +136,7 @@ describe("SQLite CareerStore", () => {
 
   it("clears records in foreign-key-safe order", () => {
     const store = storeAt();
-    store.saveApplication({ assessmentId: store.saveAssessment(profile.id, job, assessment) });
+    store.saveApplication({ assessmentId: store.saveAssessment(profile, job, assessment) });
     store.clear();
     expect(store.pipelineSummary().total).toBe(0);
     expect(store.getProfile(profile.id)).toBeUndefined();

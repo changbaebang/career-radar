@@ -195,7 +195,7 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
       const job = store.getJob(jobId);
       if (!job) throw new Error("Job was not found or has expired. Call job_ingest again.");
       const assessment = applyAssessmentPolicy(profile, job, await getAnalyzer().assess(profile, job));
-      const assessmentId = store.saveAssessment(profile.id, job, assessment);
+      const assessmentId = store.saveAssessment(profile, job, assessment);
       const result = JobAssessmentResultSchema.parse({ job, assessment, assessmentId });
       return {
         structuredContent: result,

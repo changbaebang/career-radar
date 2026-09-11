@@ -162,6 +162,16 @@ changing fit verdicts or claiming probabilities. [Contract and examples](docs/MI
 Widget URI is v4: refresh ChatGPT descriptors before testing. Local synthetic checks do
 not establish actual host/model behavior. No API calls are required for this slice.
 
+### M4-B1 evidence contract (not yet a model/UI feature)
+
+The opt-in screening context schema and located-reference validator are implemented.
+Missing/invalid evidence produces uncertainty, not a verdict/ranking penalty. Current
+MCP outputs still omit this field; prompt and widget integration waits for B2 and
+the separately approved live measurement. New assessment snapshots record hashes of
+the actual structured profile/JD inputs, without adding a profile copy. Old snapshots
+stay readable and are not backfilled. Hashes do not restore missing inputs or record
+extraction-run provenance. [B1 contract and limits](docs/MILESTONE_4B1.md).
+
 ## Documentation references
 
 - [Plugin quickstart](https://developers.openai.com/plugins/build/app-quickstart)
