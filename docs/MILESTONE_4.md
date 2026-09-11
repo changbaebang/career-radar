@@ -1,6 +1,6 @@
 # Milestone 4 — Evaluation and stage-aware feedback
 
-**Status:** proposed implementation plan, not implemented. Baseline: `0aeb5e4` (M3 merged). Scope: private, single-owner use. This planning PR changes documentation only; it does not add schemas, migrations, fixtures, model calls, or new UI.
+**Status:** M4-A evaluation tooling implemented for review; screening context and stage-aware feedback remain proposed. Original planning baseline: `0aeb5e4` (M3); implementation base: `c286587` (planning PR #7 merged). Scope: private, single-owner use. [M4-A implementation notes](MILESTONE_4A.md) separate policy-contract verification from pending human fit-label review. No M4 model calls, application schemas, migrations, or new UI have been added.
 
 ## 1. Product question and evidence boundary
 
@@ -26,7 +26,7 @@ Verified against the baseline source, not an assertion of live model quality:
 | Outcomes | Status, optional free-text `outcomeStage`; explicit corrections; notes excluded from new events | Stage vocabulary, stage-aware history projection, explicit occurrence/provenance semantics |
 | Summary | Current status/roleFamily/verdict × status counts; filter by last update | Historical stage progression and clearly defined cohorts/unknowns |
 | Snapshots | Job and assessment snapshot, profile ID; profile can be overwritten | Immutable evaluation input/version for reproducible runs |
-| Evals | 16 synthetic policy fixtures; CLI JSON aggregate with verdict agreement, case-level blocker detection, `expectedHardBlockerCount` mismatches, a forbidden-claim check and PASS→REALISTIC over all cases; nonzero exit on failure | 24–30+ cases, requirement-ID blocker matching, explicit denominators, saved runs and regression comparison |
+| Evals | M4-A: 28 synthetic policy contracts (16 original + 12 variants) with rationale and expected requirement IDs; versioned JSON/Markdown run reports; requirement-ID recall, explicit denominators, confusion matrix; baseline comparison by contract hash (annotation changes listed separately) | Human-reviewed fit labels (all 28 pending), model mode, screening-context and outcome-analytics cases |
 | Feedback | User-reported support data, not human-reviewed fit labels | Explicit reviewer annotation → synthetic regression case workflow |
 
 Source entry points: `packages/shared/src/index.ts`, `server/src/domain/store.ts`, `server/src/infra/db/migrations.ts`, `server/src/ai/analyzer.ts`, `evals/run-evals.ts`, and `evals/fixtures/cases.ts`. Existing `outcomeStage` is not a missing field: M4 must improve its meaning without silently replacing historical text.

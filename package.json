@@ -19,6 +19,7 @@
     "eval": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/server eval"
   },
   "devDependencies": {
+    "@career-radar/shared": "workspace:*",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.8.1",
     "typescript-eslint": "^8.42.0"
