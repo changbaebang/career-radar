@@ -29,8 +29,9 @@ dataset/metric/report versions and fixture prompt/model labels. Those labels ide
 the **injected drafts**, not models executed in this run. Use a clean committed checkout
 for a reproducible baseline; a dirty flag alone is not a copy of uncommitted code.
 
-Exit status: `0` all contracts pass (and requested comparison is compatible without
-regressions); `1` failed assertions, errors, skips or empty run; `2` invalid arguments,
+Exit status: `0` no failed or error cases (skips are deliberate deferrals: counted in
+totals and coverage, not failures) and any requested comparison is compatible without
+regressions; `1` failed assertions, errors or empty run; `2` invalid arguments,
 unreadable/invalid baseline, incompatible versions, zero comparable cases or output error.
 The new versioned JSON shape replaces the old aggregate CLI shape.
 
@@ -81,10 +82,13 @@ They do not prove semantic truth, original-resume extraction, or all prose groun
 ## Comparison boundaries
 
 Report version, metric version, execution mode and schema hash must match.
-Then compare by **case ID plus full contract hash**, which includes inputs, injected
-draft, expectations, review state and rationale. Added, removed and changed cases
-are listed separately; changed cases are not presented as regressions or improvements.
-Prompt/model label changes within a fixture also change its hash.
+Then compare by **case ID plus contract hash**, which covers inputs, injected draft
+and expectations (verdict, blocker IDs/count, forbidden and required evidence, skip
+state). Rationale, review state and provenance live in a separate annotation hash:
+accepting a human review or fixing prose keeps the case comparable and lists it under
+`annotated`. Added, removed and changed-contract cases are listed separately; changed
+cases are not presented as regressions or improvements. Prompt/model label changes
+within a fixture change its contract hash.
 
 Different code/policy hashes are permitted and disclosed: this is how a policy
 change is tested against unchanged contracts. A previously passing comparable case

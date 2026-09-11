@@ -11,6 +11,12 @@ export type PolicyCase = EvalCase & {
   skipReason?: string;
 };
 
+// Expected required-requirement IDs for the legacy fixtures. Explicit per case; nothing is inferred.
+const legacyBlockerIds: Record<string, string[]> = {
+  "security-specialist-pass": ["req_1"], "formal-tpm-pass": ["req_1"], "mandatory-language-pass": ["req_1"],
+  "unlinked-hard-blocker-gap-pass": ["req_1"], "duplicate-blocker-deduped": ["req_1"],
+};
+
 const rationales: Record<string, string> = {
   "trailing-period-evidence-grounded": "A trailing period must preserve an otherwise exact evidence sentence.",
   "invented-evidence-extension-rejected": "An invented extension invalidates the sole match; unsupported REALISTIC becomes STRETCH.",
@@ -36,17 +42,16 @@ function base(id: string): EvalCase {
   return structuredClone(fixture);
 }
 
-function annotate(fixture: EvalCase, rationale: string, requiredEvidence: string[] = []): PolicyCase {
-  return { ...fixture, rationale, provenance: "synthetic-policy-contract", humanReview: "pending",
-    expectedBlockerIds: fixture.expectHardBlocker ? ["req_1"] : [], requiredEvidence };
+function annotate(fixture: EvalCase, rationale: string, requiredEvidence: string[], expectedBlockerIds: string[]): PolicyCase {
+  return { ...fixture, rationale, provenance: "synthetic-policy-contract", humanReview: "pending", expectedBlockerIds, requiredEvidence };
 }
 
 function variant(id: string, source: string, rationale: string, change: (fixture: EvalCase) => void,
-  requiredEvidence: string[] = []): PolicyCase {
+  requiredEvidence: string[] = [], expectedBlockerIds: string[] = []): PolicyCase {
   const fixture = base(source);
   fixture.caseId = id;
   change(fixture);
-  return annotate(fixture, rationale, requiredEvidence);
+  return annotate(fixture, rationale, requiredEvidence, expectedBlockerIds);
 }
 
 const leadEvidence = "Led a React platform team for three years";
@@ -84,7 +89,7 @@ const newCases: PolicyCase[] = [
       f.job.required[0] = { id: "req_1", text: "On-site presence in Example City required", type: "location", importance: "core" };
       f.job.description = f.job.required[0].text;
       f.draftAssessment.gaps[0].requirement = f.job.required[0].text;
-    }),
+    }, [], ["req_1"]),
   variant("important-language-not-promoted", "mandatory-language-pass",
     "Only core binary requirements are automatically promoted; an important material gap stays STRETCH.", (f) => {
       f.job.required[0].importance = "important";
@@ -95,7 +100,7 @@ const newCases: PolicyCase[] = [
       const certificate = f.job.preferred[0];
       f.job.preferred = []; f.job.required.push({ ...certificate, importance: "core" });
       f.expectedVerdict = "PASS"; f.expectHardBlocker = true;
-    }),
+    }, [], ["preferred_1"]),
   variant("formal-tpm-preferred-control", "formal-tpm-pass",
     "Paired preferred classification removes the explicit blocker; high contortion still prevents REALISTIC.", (f) => {
       f.job.preferred = [{ ...f.job.required[0], importance: "nice_to_have" }]; f.job.required = [];
@@ -111,10 +116,8 @@ const newCases: PolicyCase[] = [
       f.job.required.push({ id: "req_2", text: "Example certification required", type: "certification", importance: "core" });
       f.draftAssessment.gaps.push({ requirementId: "req_2", requirement: "Example certification required", reason: "No certification evidence", severity: "material" });
       f.expectedHardBlockerCount = 2;
-    }),
+    }, [], ["req_1", "req_2"]),
 ];
-newCases.find((f) => f.caseId === "required-certification-control")!.expectedBlockerIds = ["preferred_1"];
-newCases.find((f) => f.caseId === "two-required-blockers-preserved")!.expectedBlockerIds = ["req_1", "req_2"];
 
 // These are explicit policy contracts, not human-reviewed hiring/fit labels.
 // New human review remains pending until a person records the review template.
@@ -125,7 +128,7 @@ export const policyCases: PolicyCase[] = [
     const validMatches: FitAssessment["strongestMatches"] =
       ["invented-evidence-extension-rejected", "negated-short-claim-not-grounded"].includes(fixture.caseId)
         ? [] : fixture.draftAssessment.strongestMatches;
-    return annotate(fixture, rationale, validMatches.map((match) => match.evidence));
+    return annotate(fixture, rationale, validMatches.map((match) => match.evidence), legacyBlockerIds[fixture.caseId] ?? []);
   }),
   ...newCases,
 ];

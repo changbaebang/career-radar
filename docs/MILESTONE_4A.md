@@ -24,8 +24,11 @@ Usage and exact metric/comparison/retention definitions: [evals/README.md](../ev
 ## Decisions limited to this slice
 
 1. Policy-only CLI. No model mode, private data import, provider fallback or paid calls.
-2. New JSON contract is `reportVersion: 1`, `policy-metrics-v2`; legacy aggregate-only
-   reports cannot be reconstructed into case-level baselines. Generate a new baseline.
+2. New JSON contract is `reportVersion: 2`, `policy-metrics-v2`. Each case carries a
+   `contractHash` (inputs, injected draft, expectations) and a separate `annotationHash`
+   (rationale, review state, provenance); baselines compare contracts only, so accepting a
+   human review or editing prose does not drop a case from comparison. Legacy aggregate-only
+   or v1 reports cannot be reconstructed; generate a new baseline.
 3. Allow comparison across policy revisions when schemas/metrics and per-case
    contracts match. Disclose policy changes; never compute cross-dataset quality gains.
 4. An ID-less legacy blocker is matched only by unique full required-text equality,

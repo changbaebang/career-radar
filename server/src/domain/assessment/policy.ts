@@ -2,18 +2,19 @@ import { FitAssessmentSchema, type CandidateProfile, type EvidenceMatch, type Fi
 
 const BINARY_HARD_REQUIREMENTS = new Set(["language", "location", "certification", "education"]);
 // Exact-match grounding must survive the model adding a trailing period or wrapping quotes.
-const normalize = (value: string) =>
+// Exported so the evaluation harness compares evidence with exactly the rule the policy uses.
+export const normalizeEvidence = (value: string) =>
   value.trim().toLocaleLowerCase().replaceAll(/\s+/g, " ").replace(/^["'\u201c\u2018]+|["'\u201d\u2019.,;:!?]+$/g, "");
 
 function candidateEvidence(profile: CandidateProfile): string[] {
   return [profile.headline, ...profile.skills, ...profile.domains, ...profile.leadership,
     ...profile.customerFacing, ...profile.aiEvidence, ...profile.cloudEvidence,
-    ...profile.roles.flatMap((role) => [role.title, ...role.responsibilities, ...role.evidence])].map(normalize);
+    ...profile.roles.flatMap((role) => [role.title, ...role.responsibilities, ...role.evidence])].map(normalizeEvidence);
 }
 // Require the exact evidence the prompt asks the model to copy. Substrings allow
 // either dropping a negation or appending an invented achievement.
 function isGrounded(match: EvidenceMatch, evidence: string[]): boolean {
-  const claim = normalize(match.evidence);
+  const claim = normalizeEvidence(match.evidence);
   return evidence.includes(claim);
 }
 // Two gaps describe the same requirement when their IDs match or their normalized text matches, so a
@@ -22,7 +23,7 @@ function uniqueGaps(gaps: Gap[]): Gap[] {
   const seenIds = new Set<string>();
   const seenText = new Set<string>();
   return gaps.filter((gap) => {
-    const text = normalize(gap.requirement);
+    const text = normalizeEvidence(gap.requirement);
     if ((gap.requirementId !== undefined && seenIds.has(gap.requirementId)) || seenText.has(text)) return false;
     if (gap.requirementId !== undefined) seenIds.add(gap.requirementId);
     seenText.add(text);
@@ -36,14 +37,14 @@ export function applyAssessmentPolicy(profile: CandidateProfile, job: JobPosting
   const removedUngrounded = strongestMatches.length !== assessment.strongestMatches.length;
   const preferredIds = new Set(job.preferred.map((requirement) => requirement.id));
   const requiredIds = new Set(job.required.map((requirement) => requirement.id));
-  const preferredText = new Set(job.preferred.map((requirement) => normalize(requirement.text)));
+  const preferredText = new Set(job.preferred.map((requirement) => normalizeEvidence(requirement.text)));
   const isPreferred = (gap: Gap) => {
     // A valid ID is authoritative; text is a fallback for absent/unknown IDs.
     if (gap.requirementId !== undefined) {
       if (requiredIds.has(gap.requirementId)) return false;
       if (preferredIds.has(gap.requirementId)) return true;
     }
-    return preferredText.has(normalize(gap.requirement));
+    return preferredText.has(normalizeEvidence(gap.requirement));
   };
   const modelBlockers = assessment.hardBlockers.filter((gap) => !isPreferred(gap));
   const promotedGaps = new Set<Gap>();

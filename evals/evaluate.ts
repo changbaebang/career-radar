@@ -1,14 +1,17 @@
 import { createHash } from "node:crypto";
 import { CandidateProfileSchema, FitAssessmentSchema, JobPostingSchema, type FitAssessment } from "@career-radar/shared";
-import { applyAssessmentPolicy } from "../server/src/domain/assessment/policy.js";
+import { applyAssessmentPolicy, normalizeEvidence } from "../server/src/domain/assessment/policy.js";
 import { DATASET_VERSION, type PolicyCase } from "./dataset.js";
 
 export const VERDICTS = ["REALISTIC", "STRETCH", "PASS"] as const;
 export const METRIC_VERSION = "policy-metrics-v2";
-export const REPORT_VERSION = 1;
+export const REPORT_VERSION = 2;
 export type RunMetadata = { codeSha: string; dirty: boolean; policyHash: string; schemaHash: string };
 export type CaseResult = {
-  caseId: string; caseHash: string; inputHash: string;
+  // contractHash covers only what the run executes and asserts; annotationHash covers prose and
+  // review state. Baselines compare contracts, so accepting a human review or fixing a rationale
+  // typo never removes a case from regression comparison.
+  caseId: string; contractHash: string; annotationHash: string; inputHash: string;
   status: "passed" | "failed" | "error" | "skipped";
   fixture: PolicyCase; actual?: FitAssessment;
   violations: string[]; error?: "invalid_fixture" | "policy_execution_failed" | "invalid_output";
@@ -25,8 +28,15 @@ export function canonical(value: unknown): string {
   return JSON.stringify(value) ?? "null";
 }
 export const digest = (value: unknown) => createHash("sha256").update(canonical(value)).digest("hex");
-const normalize = (text: string) => text.trim().toLowerCase().replace(/\s+/g, " ")
-  .replace(/^["'“‘]+|["'”’.,;:!?]+$/g, "");
+const normalize = normalizeEvidence;
+export function contractOf(fixture: PolicyCase) {
+  const { profile, job, draftAssessment, expectedVerdict, expectedBlockerIds, expectedHardBlockerCount, mustNotClaim, requiredEvidence, skipReason } = fixture;
+  return { profile, job, draftAssessment, expectedVerdict, expectedBlockerIds, expectedHardBlockerCount, mustNotClaim, requiredEvidence, skipReason };
+}
+export function annotationOf(fixture: PolicyCase) {
+  const { rationale, humanReview, provenance } = fixture;
+  return { rationale, humanReview, provenance };
+}
 export const ratio = (numerator: number, denominator: number) => ({
   numerator, denominator, value: denominator === 0 ? null : numerator / denominator,
 });
@@ -74,7 +84,7 @@ export function runEvaluation(fixtures: PolicyCase[], metadata: RunMetadata,
   const cases: CaseResult[] = fixtures.map((source) => {
     const fixture = structuredClone(source);
     const result: CaseResult = {
-      caseId: fixture.caseId, caseHash: digest(fixture),
+      caseId: fixture.caseId, contractHash: digest(contractOf(fixture)), annotationHash: digest(annotationOf(fixture)),
       inputHash: digest({ profile: fixture.profile, job: fixture.job, draft: fixture.draftAssessment }),
       fixture, status: "error", violations: [],
       blockers: { found: [], missing: [], spurious: [], duplicates: [], unlinked: 0, textResolved: 0 },
@@ -142,7 +152,8 @@ export function runEvaluation(fixtures: PolicyCase[], metadata: RunMetadata,
       textResolvedBlockers: evaluated.reduce((n, c) => n + c.blockers.textResolved, 0),
       positiveEvidenceFailures: evaluated.filter((c) => c.violations.includes("required_evidence_missing") || c.violations.includes("forbidden_positive_claim")).length,
     }, confusionMatrix, cases,
-    success: cases.length > 0 && cases.every((c) => c.status === "passed"),
+    // Skips are deliberate deferrals: reported in totals/coverage, not a failed run.
+    success: evaluated.length > 0 && cases.every((c) => c.status !== "failed" && c.status !== "error"),
   };
 }
 export type EvalReport = ReturnType<typeof runEvaluation>;

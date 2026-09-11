@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { policyCases, type PolicyCase } from "../../evals/dataset.js";
 import { evalCases } from "../../evals/fixtures/cases.js";
-import { digest, runEvaluation } from "../../evals/evaluate.js";
+import { contractOf, digest, runEvaluation } from "../../evals/evaluate.js";
 import { compareReports, renderMarkdown } from "../../evals/report.js";
 import { applyAssessmentPolicy } from "../src/domain/assessment/policy.js";
 
@@ -107,6 +107,14 @@ describe("M4-A policy evaluation", () => {
     expect(runEvaluation([f], metadata).success).toBe(true);
   });
 
+  it("treats a deliberate skip as a deferral, not a failed run", () => {
+    const skipped = fixture("frontend-lead-realistic"); skipped.skipReason = "Deferred pending human review";
+    const report = runEvaluation([skipped, fixture("mandatory-language-pass")], metadata);
+    expect(report.totals).toMatchObject({ cases: 2, evaluated: 1, passed: 1, failed: 0, errors: 0, skipped: 1 });
+    expect(report.success).toBe(true);
+    expect(runEvaluation([skipped], metadata).success).toBe(false); // nothing evaluated
+  });
+
   it("keeps execution errors and skips out of verdict labels and preserves coverage", () => {
     const skipped = fixture("frontend-lead-realistic"); skipped.skipReason = "Explicitly deferred";
     const f = fixture("mandatory-language-pass");
@@ -129,7 +137,7 @@ describe("M4-A policy evaluation", () => {
     expect(() => runEvaluation([f, f], metadata)).toThrow("Duplicate case IDs");
     const report = runEvaluation([f], metadata, (p, _j, d) => { p.headline = "changed"; return d; });
     expect(report.cases[0].fixture.profile.headline).toBe(f.profile.headline);
-    expect(report.cases[0].caseHash).toBe(digest(f));
+    expect(report.cases[0].contractHash).toBe(digest(contractOf(f)));
     expect(digest({ a: 1, b: 2 })).toBe(digest({ b: 2, a: 1 }));
   });
 });
@@ -151,10 +159,28 @@ describe("saved-run comparison", () => {
 
   it("separates added, removed, modified and comparable cases without an aggregate quality claim", () => {
     const before = runEvaluation([f, fixture("mandatory-language-pass"), fixture("ai-application-stretch")], metadata);
-    const changed = fixture("mandatory-language-pass"); changed.rationale += " Revised contract.";
+    const changed = fixture("mandatory-language-pass"); changed.expectedHardBlockerCount = 2;
     const after = runEvaluation([f, changed, fixture("formal-tpm-pass")], metadata);
     expect(compareReports(after, before)).toMatchObject({ compared: 1, datasetChanged: true,
       added: ["formal-tpm-pass"], removed: ["ai-application-stretch"], modified: [changed.caseId] });
+  });
+
+  it("keeps a case comparable when only its rationale or review state changes", () => {
+    const before = runEvaluation(policyCases, metadata);
+    const accepted = structuredClone(policyCases);
+    for (const c of accepted) c.humanReview = "accepted";
+    accepted[3].rationale += " Typo fixed.";
+    const broken = runEvaluation(accepted, metadata, (_p, _j, d) => ({ ...d, verdict: "REALISTIC" }));
+    const comparison = compareReports(broken, before);
+    expect(comparison).toMatchObject({ compatible: true, compared: 28, modified: [] });
+    expect(comparison.annotated).toHaveLength(28);
+    expect(comparison.regressions.length).toBeGreaterThan(0);
+  });
+
+  it("rejects a v1 baseline that only has caseHash", () => {
+    const report = runEvaluation([f], metadata);
+    const legacy = { ...report, reportVersion: 1, cases: [{ caseId: f.caseId, caseHash: "a".repeat(64), status: "passed" }] };
+    expect(() => compareReports(report, legacy)).toThrow("older report version");
   });
 
   it("does not treat zero comparable cases as regression-free success", () => {

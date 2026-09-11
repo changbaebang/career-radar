@@ -12,7 +12,7 @@ function main() {
   let output: string | undefined, baseline: string | undefined, save = true;
   const args = process.argv.slice(2);
   if (args.includes("--help")) {
-    console.log("pnpm eval [--output NEW_DIRECTORY] [--baseline REPORT_JSON] [--no-save]\nPaths are relative to repository root. Policy-only; no model, DB, or network access. Exit 0: all pass; 1: failed/error/skipped/empty run; 2: invalid command/baseline or no comparable cases.");
+    console.log("pnpm eval [--output NEW_DIRECTORY] [--baseline REPORT_JSON] [--no-save]\nPaths are relative to repository root. Policy-only; no model, DB, or network access. Exit 0: no failed/error cases (skips are reported, not failures); 1: failed/error/empty run; 2: invalid command/baseline or no comparable cases.");
     return;
   }
   for (let i = 0; i < args.length; i++) {
@@ -25,8 +25,11 @@ function main() {
   }
   if (!save && output) throw new Error("--output cannot be combined with --no-save");
   const git = (args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  // Outside a Git checkout (tarball, export) the evaluation still runs; the report says so.
+  let codeSha = "unknown", dirty = true;
+  try { codeSha = git(["rev-parse", "HEAD"]); dirty = git(["status", "--porcelain"]) !== ""; } catch { /* not a git checkout */ }
   const report = runEvaluation(policyCases, {
-    codeSha: git(["rev-parse", "HEAD"]), dirty: git(["status", "--porcelain"]) !== "",
+    codeSha, dirty,
     policyHash: digest(readFileSync(resolve(root, "server/src/domain/assessment/policy.ts"), "utf8")),
     schemaHash: digest(readFileSync(resolve(root, "packages/shared/src/index.ts"), "utf8")),
   });
@@ -54,6 +57,7 @@ catch (error) {
     "Unknown option or missing value. Use --help. Model mode is not implemented.",
     "--output cannot be combined with --no-save", "Baseline exceeds 5 MB",
     "Baseline has no case-level results (legacy reports cannot be compared)",
+    "Baseline uses an older report version; generate a new baseline",
   ].includes(error.message);
   console.error(allowed ? error.message : "Evaluation could not complete. Check arguments, baseline format, Git checkout, and output permissions; output directories must be new.");
   process.exitCode = 2;

@@ -17,9 +17,11 @@ function projectBaseline(value: unknown) {
     const item = object(value);
     const status = string(item.status);
     if (!["passed", "failed", "error", "skipped"].includes(status)) throw new Error("Invalid baseline status");
-    const caseHash = string(item.caseHash);
-    if (!/^[a-f0-9]{64}$/.test(caseHash)) throw new Error("Invalid baseline case hash");
-    return { caseId: string(item.caseId), caseHash, status };
+    if (typeof item.contractHash !== "string") throw new Error("Baseline uses an older report version; generate a new baseline");
+    const contractHash = string(item.contractHash);
+    const annotationHash = typeof item.annotationHash === "string" ? item.annotationHash : "";
+    if (!/^[a-f0-9]{64}$/.test(contractHash)) throw new Error("Invalid baseline case hash");
+    return { caseId: string(item.caseId), contractHash, annotationHash, status };
   });
   if (new Set(cases.map((c) => c.caseId)).size !== cases.length) throw new Error("Duplicate baseline case IDs");
   return { reportVersion: record.reportVersion, metricVersion: string(record.metricVersion), mode: string(record.mode),
@@ -36,17 +38,19 @@ export function compareReports(current: EvalReport, baseline: unknown) {
   const currentIds = new Set(current.cases.map((c) => c.caseId));
   const added = current.cases.filter((c) => !oldCases.has(c.caseId)).map((c) => c.caseId);
   const removed = previous.cases.filter((c) => !currentIds.has(c.caseId)).map((c) => c.caseId);
-  const modified = current.cases.filter((c) => oldCases.has(c.caseId) && oldCases.get(c.caseId)?.caseHash !== c.caseHash).map((c) => c.caseId);
-  const comparable = incompatibleReasons.length ? [] : current.cases.filter((c) => oldCases.get(c.caseId)?.caseHash === c.caseHash);
+  const modified = current.cases.filter((c) => oldCases.has(c.caseId) && oldCases.get(c.caseId)?.contractHash !== c.contractHash).map((c) => c.caseId);
+  const comparable = incompatibleReasons.length ? [] : current.cases.filter((c) => oldCases.get(c.caseId)?.contractHash === c.contractHash);
+  // Same executable contract, different prose/review state: still compared, listed for transparency.
+  const annotated = comparable.filter((c) => oldCases.get(c.caseId)?.annotationHash !== c.annotationHash).map((c) => c.caseId);
   return {
     compatible: incompatibleReasons.length === 0 && comparable.length > 0,
-    incompatibleReasons, compared: comparable.length, added, removed, modified,
+    incompatibleReasons, compared: comparable.length, added, removed, modified, annotated,
     baselineCodeSha: previous.codeSha, currentCodeSha: current.codeSha,
     policyChanged: current.policyHash !== previous.policyHash,
     datasetChanged: current.datasetHash !== previous.datasetHash || current.datasetVersion !== previous.datasetVersion,
     regressions: comparable.filter((c) => oldCases.get(c.caseId)?.status === "passed" && c.status !== "passed").map((c) => c.caseId),
     improvements: comparable.filter((c) => oldCases.get(c.caseId)?.status !== "passed" && c.status === "passed").map((c) => c.caseId),
-    note: "Case-level policy contract comparison only. No aggregate quality delta across changed datasets; no live model accuracy claim.",
+    note: "Case-level policy contract comparison only (inputs, injected draft, expectations). Annotation changes are listed, not compared. No aggregate quality delta across changed datasets; no live model accuracy claim.",
   };
 }
 export type Comparison = ReturnType<typeof compareReports>;
@@ -83,7 +87,7 @@ export function renderMarkdown(report: EvalReport, comparison?: Comparison): str
   ];
   if (comparison) lines.push("## Baseline comparison", "",
     `Compatible: ${comparison.compatible}; comparable cases: ${comparison.compared}; policy changed: ${comparison.policyChanged}; dataset changed: ${comparison.datasetChanged}.`, "",
-    ...(["incompatibleReasons", "added", "removed", "modified", "regressions", "improvements"] as const)
+    ...(["incompatibleReasons", "added", "removed", "modified", "annotated", "regressions", "improvements"] as const)
       .map((key) => `- ${key}: ${comparison[key].join(", ") || "none"}`), "", comparison.note, "");
   return lines.join("\n");
 }
