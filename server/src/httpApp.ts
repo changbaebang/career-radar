@@ -1,7 +1,8 @@
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import express, { type Express } from "express";
 
-import { type CareerAnalyzer, OpenAICareerAnalyzer } from "./ai/analyzer.js";
+import type { CareerAnalyzer } from "./ai/analyzer.js";
+import { createAnalyzerFromEnv } from "./ai/provider.js";
 import { buildCareerRadarStatus } from "./demo.js";
 import { CareerStore } from "./domain/store.js";
 import { JobDiscovery } from "./domain/jobs/search.js";
@@ -26,7 +27,7 @@ export function createHttpApp(options: Partial<McpDependencies> = {}): Express {
   const app = express();
   // One store and one lazily created analyzer per HTTP app, shared by every per-request MCP server.
   let analyzer: CareerAnalyzer | undefined;
-  const createAnalyzer = options.createAnalyzer ?? (() => new OpenAICareerAnalyzer());
+  const createAnalyzer = options.createAnalyzer ?? (() => createAnalyzerFromEnv());
   const sharedDependencies: McpDependencies = {
     store: options.store ?? new CareerStore(),
     createAnalyzer: () => (analyzer ??= createAnalyzer()),

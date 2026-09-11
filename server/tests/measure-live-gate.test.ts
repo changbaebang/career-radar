@@ -33,6 +33,15 @@ describe("measure:live gate (argv decides the mode, the environment can only ref
     expect(resolveMode(parseArgs([]), env, 5).refusal).toBeUndefined();
   });
 
+  it("selects the provider explicitly and scopes the OPENAI_BASE_URL refusal to the openai provider", () => {
+    expect(parseArgs([]).provider).toBe("openai");
+    expect(parseArgs(["--provider", "openrouter"]).provider).toBe("openrouter");
+    expect(() => parseArgs(["--provider", "bogus"])).toThrow(REFUSALS.unknownOption);
+    const env: GateEnv = { OPENAI_BASE_URL: "https://synthetic-review.invalid/v1" };
+    expect(resolveMode(parseArgs(["--provider", "openrouter", "--approve-network", "--approve-model-cost"]), env, 5).refusal).toBeUndefined();
+    expect(resolveMode(parseArgs(["--provider", "openai", "--approve-network", "--approve-model-cost"]), env, 5).refusal).toBe(REFUSALS.baseUrlSet);
+  });
+
   it("tolerates the bare -- that pnpm forwards from the root script", () => {
     expect(parseArgs(["--"])).toMatchObject({ save: true });
     expect(parseArgs(["--", "--no-save", "--scenario", "fail-at-3"])).toMatchObject({ save: false, scenario: "fail-at-3" });

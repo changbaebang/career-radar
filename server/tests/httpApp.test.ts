@@ -135,6 +135,16 @@ describe("Career Radar HTTP and MCP server", () => {
     });
   });
 
+  it("surfaces a fixed provider configuration message instead of a stack when the environment names an unknown provider", async () => {
+    vi.stubEnv("CAREER_RADAR_PROVIDER", "bogus");
+    try {
+      const client = await connectClient(await startTestServer({ store: new CareerStore() }));
+      const result = await client.callTool({ name: "profile_upsert", arguments: { resumeText: "Synthetic resume text that is long enough to pass the minimum length check." } });
+      expect(result.isError).toBe(true);
+      expect(JSON.stringify(result.content)).toContain("Set CAREER_RADAR_PROVIDER to openai or openrouter.");
+    } finally { vi.unstubAllEnvs(); }
+  });
+
   it("lists and calls the status tool and serves its widget resource", async () => {
     const client = await connectClient(await startTestServer());
     const tools = await client.listTools();

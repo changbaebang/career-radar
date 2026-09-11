@@ -51,7 +51,7 @@ The server starts on `http://localhost:8000` by default:
 - MCP endpoint: `http://localhost:8000/mcp`
 - HTTP readiness endpoint: `http://localhost:8000/health`
 
-Copy `.env.example` to the gitignored `.env.local` and set `OPENAI_API_KEY`. `OPENAI_MODEL` is optional and defaults to `gpt-5-mini`. The server loads this file locally; credentials never enter the widget.
+Copy `.env.example` to the gitignored `.env.local` and set `OPENAI_API_KEY`. `OPENAI_MODEL` is optional and defaults to `gpt-5-mini`. The server loads this file locally; credentials never enter the widget. `CAREER_RADAR_PROVIDER=openrouter` with `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` selects the OpenRouter adapter instead; see [model providers](docs/PROVIDERS.md) for what a result from another provider does and does not prove.
 
 ## Checks
 
@@ -181,6 +181,16 @@ note. The widget (URI v5) shows the context separately from fit evidence and int
 risks; absence renders as not evaluated. Whether the live model actually cites correct
 locations or keeps judgments uncertain is **not** established here: model-mode evals are not
 implemented in the runner yet, and they and the #4 live measurement run only after explicit cost approval. [B2 notes](docs/MILESTONE_4B2.md).
+
+### Model providers (synthetic-verified)
+
+The prompts and output contracts are provider-neutral. Besides the default OpenAI Responses
+API, `CAREER_RADAR_PROVIDER=openrouter` routes the same three operations through OpenRouter's
+Chat Completions endpoint with strict JSON-schema output and `require_parameters` routing; the
+adapter re-validates every response and fails closed on refusals, truncation or schema
+mismatch. `modelVersion` records `openrouter/<model>@<upstream provider>`, so a result proves only
+that endpoint. `pnpm measure:live --provider openrouter` measures that path after the same
+approval flow. No provider was called for this slice. [Details](docs/PROVIDERS.md).
 
 ## Documentation references
 

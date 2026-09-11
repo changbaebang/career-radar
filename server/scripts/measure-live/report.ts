@@ -3,6 +3,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { z } from "zod";
 import { RECOMMEND_DEADLINE_MS } from "../../src/domain/jobs/search.js";
+import { OPENROUTER_BASE_URL } from "../../src/ai/openrouter.js";
+import { providerDestination } from "../../src/ai/provider.js";
 import { HARD_MAX_MODEL_CALLS, type Options } from "./gate.js";
 import type { RunState, SearchContext } from "./run.js";
 import { expectedJobId, measurementProfile, measurementResumeText } from "./synthetic-inputs.js";
@@ -60,12 +62,12 @@ export const LiveMeasurementReportSchema = z.object({
   mode: z.enum(["live", "dry-run"]), status: z.enum(["complete", "incomplete"]), interrupted: z.boolean(), exitCode: count,
   generatedAt: iso, startedAt: iso, finishedAt: iso.optional(),
   code: z.object({ codeSha: z.string(), dirty: z.boolean(), hashes: z.object({ analyzer: z.string(), search: z.string(), policy: z.string(), schema: z.string() }).strict() }).strict(),
-  provider: z.object({ api: z.enum(["openai-responses", "synthetic-no-model"]), requestedModel: z.string(), responseModels: z.array(z.string()), promptVersion: z.string(),
+  provider: z.object({ api: z.enum(["openai-responses", "openrouter-chat-completions", "synthetic-no-model"]), requestedModel: z.string(), responseModels: z.array(z.string()), promptVersion: z.string(),
     defaultModel: z.string(), openaiSdkVersion: z.string(), nodeVersion: z.string(), store: z.literal(false), maxRetries: z.literal(0), logLevel: z.literal("off"),
-    baseUrl: z.literal(HARNESS_BASE_URL) }).strict(),
+    baseUrl: z.enum([HARNESS_BASE_URL, OPENROUTER_BASE_URL]) }).strict(),
   approvals: z.object({ network: z.boolean(), modelCost: z.boolean(), confirmedVia: z.enum(["stdin-tty", "stdin-pipe", "none"]), confirmedAt: iso.optional(),
     maxModelCalls: count, hardMaxModelCalls: z.literal(HARD_MAX_MODEL_CALLS), plannedUpperBound: count, planBreakdown: z.record(z.string(), count) }).strict(),
-  inputs: z.object({ profileHash: z.string(), profileRoles: count, profileSkills: count, resumeTextHash: z.string().optional(), boardToken: z.string(),
+  inputs: z.object({ provider: z.enum(["openai", "openrouter"]), profileHash: z.string(), profileRoles: count, profileSkills: count, resumeTextHash: z.string().optional(), boardToken: z.string(),
     titleKeywords: z.string().optional(), location: z.string().optional(), limit: count, candidateIds: z.array(z.string()), deadlineMs: count,
     defaultDeadlineMs: z.literal(RECOMMEND_DEADLINE_MS), forcedAbortMs: count.optional(), retryMode: z.enum(["failed-only", "all", "none"]),
     settleWaitMs: count, scenario: z.string().optional() }).strict(),
@@ -105,6 +107,7 @@ export function searchSection(context: SearchContext): LiveMeasurementReport["se
 
 export function reportInputs(options: Options, selectedIds: string[], mode: "live" | "dry-run"): ReportInputs {
   return {
+    provider: options.provider,
     profileHash: createHash("sha256").update(JSON.stringify(measurementProfile)).digest("hex"), profileRoles: measurementProfile.roles.length, profileSkills: measurementProfile.skills.length,
     ...(options.includeProfileExtraction ? { resumeTextHash: createHash("sha256").update(measurementResumeText).digest("hex") } : {}),
     boardToken: options.boardToken, ...(options.titleKeywords ? { titleKeywords: options.titleKeywords } : {}), ...(options.location ? { location: options.location } : {}),
@@ -129,9 +132,10 @@ export function buildReport(args: { mode: "live" | "dry-run"; state: RunState | 
     status: state && !args.interrupted && args.exitCode === 0 ? "complete" as const : "incomplete" as const, interrupted: args.interrupted, exitCode: args.exitCode,
     generatedAt: args.generatedAt, startedAt: args.startedAt, ...(args.finishedAt ? { finishedAt: args.finishedAt } : {}),
     code: { codeSha: args.provenance.codeSha, dirty: args.provenance.dirty, hashes: args.provenance.hashes },
-    provider: { api: args.mode === "live" ? "openai-responses" as const : "synthetic-no-model" as const, requestedModel: args.provenance.requestedModel, responseModels,
+    provider: { api: args.mode !== "live" ? "synthetic-no-model" as const : args.inputs.provider === "openrouter" ? "openrouter-chat-completions" as const : "openai-responses" as const,
+      requestedModel: args.provenance.requestedModel, responseModels,
       promptVersion: args.provenance.promptVersion, defaultModel: args.provenance.defaultModel, openaiSdkVersion: args.provenance.openaiSdkVersion,
-      nodeVersion: args.provenance.nodeVersion, store: false as const, maxRetries: HARNESS_TRANSPORT.maxRetries, logLevel: HARNESS_TRANSPORT.logLevel, baseUrl: HARNESS_BASE_URL },
+      nodeVersion: args.provenance.nodeVersion, store: false as const, maxRetries: HARNESS_TRANSPORT.maxRetries, logLevel: HARNESS_TRANSPORT.logLevel, baseUrl: providerDestination(args.inputs.provider) },
     approvals: { ...args.approvals, hardMaxModelCalls: HARD_MAX_MODEL_CALLS as typeof HARD_MAX_MODEL_CALLS },
     inputs: args.inputs,
     search: args.searchCandidates ?? { searchId: "n/a", provider: "n/a", sourceUrl: "https://boards-api.greenhouse.io/", retrievedAt: args.startedAt, expiresAt: args.startedAt,
@@ -170,7 +174,7 @@ export function renderMarkdown(report: LiveMeasurementReport): string {
       : "**Dry run** with a synthetic provider and fake analyzer. No network, no model calls; timings are not model latencies.", "",
     `- Code: ${report.code.codeSha}; dirty worktree: ${report.code.dirty}`,
     `- Hashes: analyzer ${report.code.hashes.analyzer.slice(0, 12)} · search ${report.code.hashes.search.slice(0, 12)} · policy ${report.code.hashes.policy.slice(0, 12)} · schema ${report.code.hashes.schema.slice(0, 12)}`,
-    `- Model requested: ${report.provider.requestedModel}; responded: ${report.provider.responseModels.join(", ") || "n/a"}; prompt ${report.provider.promptVersion}; SDK ${report.provider.openaiSdkVersion}; Node ${report.provider.nodeVersion}`,
+    `- Provider: ${report.inputs.provider} (${report.provider.api}); model requested: ${report.provider.requestedModel}; responded: ${report.provider.responseModels.join(", ") || "n/a"}; prompt ${report.provider.promptVersion}; SDK ${report.provider.openaiSdkVersion}; Node ${report.provider.nodeVersion}`,
     `- SDK transport: base URL ${report.provider.baseUrl}; retries ${report.provider.maxRetries}; SDK log ${report.provider.logLevel}`,
     `- Approvals: network ${report.approvals.network}, model cost ${report.approvals.modelCost} (${report.approvals.confirmedVia}); cap ${report.approvals.maxModelCalls} of hard ${report.approvals.hardMaxModelCalls}; planned upper bound ${report.approvals.plannedUpperBound}`,
     `- Status: ${report.status}; interrupted: ${report.interrupted}; exit ${report.exitCode}`, "",
@@ -201,7 +205,7 @@ export function renderMarkdown(report: LiveMeasurementReport): string {
 
 export function renderIssueComment(report: LiveMeasurementReport): string {
   const lines = [
-    `Live measurement (${report.mode}) — code ${report.code.codeSha.slice(0, 7)}${report.code.dirty ? " (dirty)" : ""}, model ${report.provider.requestedModel}, prompt ${report.provider.promptVersion}, status ${report.status}`,
+    `Live measurement (${report.mode}) — code ${report.code.codeSha.slice(0, 7)}${report.code.dirty ? " (dirty)" : ""}, provider ${report.inputs.provider}, model ${report.provider.requestedModel}, prompt ${report.provider.promptVersion}, status ${report.status}`,
     "", "| run | deadline ms | total ms | calls | completed / failed / not attempted | aborted | cache hits / assess reruns |", "| --- | --- | --- | --- | --- | --- | --- |",
     ...report.runs.map((r) => r.skipped ? `| ${r.runId} | skipped (${r.skipped}) | | | | | |`
       : `| ${r.runId} | ${r.deadlineMs} | ${r.totalDurationMs} | ${r.totals.modelCalls} | ${r.totals.completed} / ${r.totals.failed} / ${r.totals.notAttempted} | ${r.aborted} | ${r.totals.extractionCacheHits} / ${r.totals.assessReruns} |`),
