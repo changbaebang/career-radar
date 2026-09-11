@@ -36,7 +36,7 @@ export type Options = {
 };
 
 export type GateEnv = {
-  CI?: string; GITHUB_ACTIONS?: string; VITEST?: string; NODE_ENV?: string; CAREER_RADAR_DB_PATH?: string;
+  CI?: string; GITHUB_ACTIONS?: string; VITEST?: string; NODE_ENV?: string; CAREER_RADAR_DB_PATH?: string; OPENAI_BASE_URL?: string;
 };
 
 // Every refusal is a fixed string so the CLI never echoes argv, env values or file contents.
@@ -46,6 +46,7 @@ export const REFUSALS = {
   dryRunOnlyFlags: "--scenario/--no-save are dry-run only.",
   ciEnvironment: "Refused: approval flags are not accepted under CI/test environments.",
   databasePathSet: "Refused: unset CAREER_RADAR_DB_PATH; the harness never opens the application database.",
+  baseUrlSet: "Refused: unset OPENAI_BASE_URL (shell or .env.local); the harness only sends to https://api.openai.com/v1.",
   capAboveCeiling: `--max-model-calls exceeds the hard ceiling of ${HARD_MAX_MODEL_CALLS}.`,
   planAboveCap: "Planned model calls exceed --max-model-calls.",
   wallTime: "Planned run exceeds the 30-minute search snapshot TTL; lower --deadline-ms/--settle-wait-ms.",
@@ -96,6 +97,7 @@ export function parseArgs(argv: string[]): Options {
     const arg = argv[i];
     const next = () => { const v = argv[++i]; if (v === undefined || v.startsWith("--")) throw new Error(REFUSALS.unknownOption); return v; };
     switch (arg) {
+      case "--": break; // pnpm forwards a user-typed "--" verbatim; there are no positional arguments to separate
       case "--help": options.help = true; break;
       case "--approve-network": options.approveNetwork = true; break;
       case "--approve-model-cost": options.approveModelCost = true; break;
@@ -166,6 +168,7 @@ export function resolveMode(options: Options, env: GateEnv, candidateCount: numb
   if (approval && (options.scenario !== undefined || !options.save)) return refuse(REFUSALS.dryRunOnlyFlags);
   if (approval && (env.CI || env.GITHUB_ACTIONS || env.VITEST || env.NODE_ENV === "test")) return refuse(REFUSALS.ciEnvironment);
   if (approval && env.CAREER_RADAR_DB_PATH) return refuse(REFUSALS.databasePathSet);
+  if (mode === "live" && env.OPENAI_BASE_URL) return refuse(REFUSALS.baseUrlSet);
   if (cap > HARD_MAX_MODEL_CALLS) return refuse(REFUSALS.capAboveCeiling);
   if (plan.upperBound > cap) return refuse(REFUSALS.planAboveCap);
   if (plannedMaxWallMs(options) > MAX_PLANNED_WALL_MS) return refuse(REFUSALS.wallTime);

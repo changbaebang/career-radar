@@ -15,7 +15,7 @@ describe("measure:live report", () => {
     const report = dryRunReport(run);
     expect(LiveMeasurementReportSchema.strict().parse(report)).toEqual(report);
     expect(report).toMatchObject({ reportKind: "live-batch-measurement", reportVersion: 1, mode: "dry-run", status: "complete",
-      provider: { api: "synthetic-no-model", store: false, batchMaxRetries: 0 }, billing: { monetaryCostConfirmed: false, billedAmount: null },
+      provider: { api: "synthetic-no-model", store: false, maxRetries: 0, logLevel: "off", baseUrl: "https://api.openai.com/v1" }, billing: { monetaryCostConfirmed: false, billedAmount: null },
       decision: { recommendedDeadlineMs: null }, budgetObservation: { defaultDeadlineMs: 90_000, finishedWithinDeadline: true, sampleSize: 5, runsRequiredBeforeDecision: 3 } });
     expect(report.search.candidates).toHaveLength(5);
     expect(report.search.candidates[0]).toMatchObject({ descriptionSha256: expect.stringMatching(/^[0-9a-f]{64}$/), descriptionLength: expect.any(Number) });

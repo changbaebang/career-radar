@@ -10,6 +10,9 @@ import { expectedJobId, measurementProfile, measurementResumeText } from "./synt
 export const HARNESS_VERSION = "measure-live-v1";
 export const REPORT_VERSION = 1;
 export const ISSUE_URL = "https://github.com/changbaebang/career-radar/issues/4";
+// The SDK default; the gate refuses a live run while OPENAI_BASE_URL is set, so this is the only destination.
+export const HARNESS_BASE_URL = "https://api.openai.com/v1";
+export const HARNESS_TRANSPORT = { maxRetries: 0, logLevel: "off" } as const;
 
 const iso = z.string().datetime();
 const count = z.number().int().nonnegative();
@@ -29,7 +32,7 @@ const assessmentSummary = z.object({ verdict: z.string(), confidence: z.string()
 const candidate = z.object({
   candidateId: z.string(), jobId: z.string(), storeHadJobBefore: z.boolean(), extractCalled: z.boolean(), assessCalled: z.boolean(),
   category: z.enum(["extracted_and_assessed", "extraction_cache_hit_assessed", "extraction_only_then_failed", "not_attempted", "assess_rerun_of_completed", "cap_refused"]),
-  outcome: z.enum(["completed", "failed", "not_attempted"]), classificationConflict: z.boolean(), cacheConsistent: z.boolean(), assessmentId: z.string().optional(),
+  outcome: z.enum(["completed", "failed", "not_attempted", "interrupted"]), classificationConflict: z.boolean(), cacheConsistent: z.boolean(), assessmentId: z.string().optional(),
   extraction: operation.shape.extraction, draft: assessmentSummary.optional(), final: assessmentSummary.optional(),
   policy: z.object({ verdictChanged: z.boolean(), confidenceChanged: z.boolean(), removedUngroundedMatches: count, promotedBlockers: count, policyReplayMatches: z.boolean() }).strict().optional(),
 }).strict();
@@ -38,7 +41,7 @@ const whatIf = z.object({ cumulativeMs: z.array(z.number()), neededMs: z.object(
     "180000": z.union([z.boolean(), z.literal("unknown")]), unbounded: z.union([z.boolean(), z.literal("unknown")]) }).strict(), note: z.string() }).strict();
 const run = z.object({
   runId: z.enum(["A-production-deadline", "B-retry", "C-forced-abort"]), skipped: z.enum(["retry_disabled", "nothing_to_retry", "board_changed"]).optional(),
-  deadlineMs: count, selectedIds: z.array(z.string()), startedAt: iso, totalDurationMs: count, recommendOutcome: z.enum(["returned", "threw", "skipped"]),
+  deadlineMs: count, selectedIds: z.array(z.string()), startedAt: iso, totalDurationMs: count, recommendOutcome: z.enum(["returned", "threw", "skipped", "interrupted"]),
   errorClass: z.string().optional(), aborted: z.boolean(),
   abort: z.object({ abortAtOffsetMs: z.number(), abortToBatchReturnMs: z.number(), inFlightOp: z.object({ seq: count, operation: z.string(), candidateId: z.string() }).strict().optional(),
     abortToSettleMs: z.number().optional(), settledAfterBatchReturn: z.boolean().optional() }).strict().optional(),
@@ -58,7 +61,8 @@ export const LiveMeasurementReportSchema = z.object({
   generatedAt: iso, startedAt: iso, finishedAt: iso.optional(),
   code: z.object({ codeSha: z.string(), dirty: z.boolean(), hashes: z.object({ analyzer: z.string(), search: z.string(), policy: z.string(), schema: z.string() }).strict() }).strict(),
   provider: z.object({ api: z.enum(["openai-responses", "synthetic-no-model"]), requestedModel: z.string(), responseModels: z.array(z.string()), promptVersion: z.string(),
-    defaultModel: z.string(), openaiSdkVersion: z.string(), nodeVersion: z.string(), store: z.literal(false), batchMaxRetries: z.literal(0) }).strict(),
+    defaultModel: z.string(), openaiSdkVersion: z.string(), nodeVersion: z.string(), store: z.literal(false), maxRetries: z.literal(0), logLevel: z.literal("off"),
+    baseUrl: z.literal(HARNESS_BASE_URL) }).strict(),
   approvals: z.object({ network: z.boolean(), modelCost: z.boolean(), confirmedVia: z.enum(["stdin-tty", "stdin-pipe", "none"]), confirmedAt: iso.optional(),
     maxModelCalls: count, hardMaxModelCalls: z.literal(HARD_MAX_MODEL_CALLS), plannedUpperBound: count, planBreakdown: z.record(z.string(), count) }).strict(),
   inputs: z.object({ profileHash: z.string(), profileRoles: count, profileSkills: count, resumeTextHash: z.string().optional(), boardToken: z.string(),
@@ -127,7 +131,7 @@ export function buildReport(args: { mode: "live" | "dry-run"; state: RunState | 
     code: { codeSha: args.provenance.codeSha, dirty: args.provenance.dirty, hashes: args.provenance.hashes },
     provider: { api: args.mode === "live" ? "openai-responses" as const : "synthetic-no-model" as const, requestedModel: args.provenance.requestedModel, responseModels,
       promptVersion: args.provenance.promptVersion, defaultModel: args.provenance.defaultModel, openaiSdkVersion: args.provenance.openaiSdkVersion,
-      nodeVersion: args.provenance.nodeVersion, store: false as const, batchMaxRetries: 0 as const },
+      nodeVersion: args.provenance.nodeVersion, store: false as const, maxRetries: HARNESS_TRANSPORT.maxRetries, logLevel: HARNESS_TRANSPORT.logLevel, baseUrl: HARNESS_BASE_URL },
     approvals: { ...args.approvals, hardMaxModelCalls: HARD_MAX_MODEL_CALLS as typeof HARD_MAX_MODEL_CALLS },
     inputs: args.inputs,
     search: args.searchCandidates ?? { searchId: "n/a", provider: "n/a", sourceUrl: "https://boards-api.greenhouse.io/", retrievedAt: args.startedAt, expiresAt: args.startedAt,
@@ -139,7 +143,7 @@ export function buildReport(args: { mode: "live" | "dry-run"; state: RunState | 
       note: "Token counters are API-reported usage, not a bill. Fill billedAmount only from the billing dashboard. Call-count differences are integers, never percentage comparisons." },
     budgetObservation: {
       deadlineMs: args.inputs.deadlineMs, defaultDeadlineMs: RECOMMEND_DEADLINE_MS as typeof RECOMMEND_DEADLINE_MS,
-      finishedWithinDeadline: runA && runA.recommendOutcome !== "skipped" ? !runA.aborted : "n/a" as const,
+      finishedWithinDeadline: runA && (runA.recommendOutcome === "returned" || runA.recommendOutcome === "threw") ? !runA.aborted : "n/a" as const,
       totalDurationMs: runA?.totalDurationMs ?? 0, headroomMs: runA?.totals.headroomMs ?? args.inputs.deadlineMs,
       perOperationMs: { extractJob: (runA?.operations ?? []).filter((op) => op.operation === "extractJob" && op.durationMs !== undefined).map((op) => Math.round(op.durationMs!)),
         assess: (runA?.operations ?? []).filter((op) => op.operation === "assess" && op.durationMs !== undefined).map((op) => Math.round(op.durationMs!)) },
@@ -151,7 +155,7 @@ export function buildReport(args: { mode: "live" | "dry-run"; state: RunState | 
         "docs/MILESTONE_3.md (Follow-up gate)", "docs/DECISIONS.md (ADR-0011)", "docs/MILESTONE_4.md (§9)"],
       relatedTests: ["server/tests/discovery.test.ts", "server/tests/analyzer-abort.test.ts", "server/tests/measure-live-*.test.ts"] },
     excluded: EXCLUDED,
-    ...(args.interrupted ? { interruptionNote: "An in-flight request may still be billed with its usage unrecorded." } : {}),
+    ...(args.interrupted ? { interruptionNote: "Every call recorded before the interrupt is included, the batch in progress as recommendOutcome \"interrupted\". An in-flight request may still be billed with its usage unrecorded." } : {}),
   };
   return LiveMeasurementReportSchema.parse(report);
 }
@@ -167,6 +171,7 @@ export function renderMarkdown(report: LiveMeasurementReport): string {
     `- Code: ${report.code.codeSha}; dirty worktree: ${report.code.dirty}`,
     `- Hashes: analyzer ${report.code.hashes.analyzer.slice(0, 12)} · search ${report.code.hashes.search.slice(0, 12)} · policy ${report.code.hashes.policy.slice(0, 12)} · schema ${report.code.hashes.schema.slice(0, 12)}`,
     `- Model requested: ${report.provider.requestedModel}; responded: ${report.provider.responseModels.join(", ") || "n/a"}; prompt ${report.provider.promptVersion}; SDK ${report.provider.openaiSdkVersion}; Node ${report.provider.nodeVersion}`,
+    `- SDK transport: base URL ${report.provider.baseUrl}; retries ${report.provider.maxRetries}; SDK log ${report.provider.logLevel}`,
     `- Approvals: network ${report.approvals.network}, model cost ${report.approvals.modelCost} (${report.approvals.confirmedVia}); cap ${report.approvals.maxModelCalls} of hard ${report.approvals.hardMaxModelCalls}; planned upper bound ${report.approvals.plannedUpperBound}`,
     `- Status: ${report.status}; interrupted: ${report.interrupted}; exit ${report.exitCode}`, "",
     "## Search candidates (public metadata only)", "", "| Candidate | Title | Location | Updated | Description chars | Job id |", "| --- | --- | --- | --- | --- | --- |",

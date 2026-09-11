@@ -71,6 +71,7 @@ export type ProfileExtraction = { profile: CandidateProfile; warnings: string[] 
 export type JobExtraction = { job: JobPosting; warnings: string[] };
 
 export type AnalyzerOperation = "extractProfile" | "extractJob" | "assess";
+export type AnalyzerTransport = { maxRetries?: number; logLevel?: "off" | "error" | "warn" | "info" | "debug" };
 // Telemetry projection of one Responses API call. Deliberately excludes the request input, the
 // instructions and the parsed/raw output so a consumer can log it without handling personal data.
 export type AnalyzerResponseEvent = {
@@ -106,12 +107,13 @@ export class OpenAICareerAnalyzer implements CareerAnalyzer {
   readonly #model: string;
   readonly #onResponse?: (event: AnalyzerResponseEvent) => void;
 
-  constructor(options: { apiKey?: string; model?: string; onResponse?: (event: AnalyzerResponseEvent) => void } = {}) {
+  // transport: SDK client options the measurement harness pins (retries off, logging off). The server never sets them.
+  constructor(options: { apiKey?: string; model?: string; onResponse?: (event: AnalyzerResponseEvent) => void; transport?: AnalyzerTransport } = {}) {
     const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
     if (!apiKey?.trim()) {
       throw new Error("Set OPENAI_API_KEY in .env.local or the server environment before analyzing a resume or job.");
     }
-    this.#client = new OpenAI({ apiKey });
+    this.#client = new OpenAI({ apiKey, ...(options.transport ?? {}) });
     this.#model = options.model ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
     this.#onResponse = options.onResponse;
   }

@@ -26,6 +26,18 @@ describe("measure:live gate (argv decides the mode, the environment can only ref
       expect(resolveMode(parseArgs([]), env, 5).refusal).toBeUndefined();
     });
 
+  it("refuses a live run while OPENAI_BASE_URL is set, and only a live run", () => {
+    const env: GateEnv = { OPENAI_BASE_URL: "https://synthetic-review.invalid/v1" };
+    expect(resolveMode(parseArgs(["--approve-network", "--approve-model-cost"]), env, 5).refusal).toBe(REFUSALS.baseUrlSet);
+    expect(resolveMode(parseArgs(["--approve-network"]), env, 5).refusal).toBeUndefined();
+    expect(resolveMode(parseArgs([]), env, 5).refusal).toBeUndefined();
+  });
+
+  it("tolerates the bare -- that pnpm forwards from the root script", () => {
+    expect(parseArgs(["--"])).toMatchObject({ save: true });
+    expect(parseArgs(["--", "--no-save", "--scenario", "fail-at-3"])).toMatchObject({ save: false, scenario: "fail-at-3" });
+  });
+
   it("cannot be promoted to live by the environment", () => {
     const env = { CI: "", NODE_ENV: "production", CAREER_RADAR_DB_PATH: "" } as GateEnv;
     expect(resolveMode(parseArgs([]), env, 5).mode).toBe("dry-run");

@@ -9,6 +9,7 @@ import { abortLatency, accountCache, assessmentSummary, classifyCandidateOutcome
   type AssessmentSummary, type CacheCategory, type CandidateOutcome, type WhatIf } from "./timeline.js";
 
 export type RunId = "A-production-deadline" | "B-retry" | "C-forced-abort";
+export type RunOutcome = "returned" | "threw" | "skipped" | "interrupted";
 
 // JobDiscovery keeps provider hits private; the harness needs them to map calls to candidates.
 export function recordingProvider(inner: JobSearchProvider): JobSearchProvider & { last?: ProviderSearchResult } {
@@ -45,7 +46,7 @@ export type CandidateRow = {
 
 export type RunRecord = {
   runId: RunId; skipped?: "retry_disabled" | "nothing_to_retry" | "board_changed"; deadlineMs: number; selectedIds: string[];
-  startedAt: string; totalDurationMs: number; recommendOutcome: "returned" | "threw" | "skipped"; errorClass?: string; aborted: boolean;
+  startedAt: string; totalDurationMs: number; recommendOutcome: RunOutcome; errorClass?: string; aborted: boolean;
   abort?: ReturnType<typeof abortLatency>; operations: OperationRecord[]; candidates: CandidateRow[];
   failuresReported: Array<{ candidateId: string; kind: "failed" | "not_attempted" }>;
   warnings: { search: number; run: number; extractionDelta: number };
@@ -55,37 +56,43 @@ export type RunRecord = {
   whatIf: WhatIf;
 };
 
-export type RunState = {
-  search: SearchContext; profileExtraction?: OperationRecord; runs: RunRecord[];
-  reconciliation: { hookJoinedOps: number; measuredOps: number; joinMismatches: number; mappingErrors: number; cacheInconsistencies: number; classificationConflicts: number; unsettledOps: number; errors: string[] };
+export type Reconciliation = { hookJoinedOps: number; measuredOps: number; joinMismatches: number; mappingErrors: number; cacheInconsistencies: number;
+  classificationConflicts: number; unsettledOps: number; errors: string[] };
+
+export type RunState = { search: SearchContext; profileExtraction?: OperationRecord; runs: RunRecord[]; reconciliation: Reconciliation };
+
+// Everything known about a batch before recommend() returns, so an interrupted batch can still be summarized.
+export type ActiveRun = {
+  runId: RunId; deadlineMs: number; selectedIds: string[]; hits: SearchHit[]; startedAt: string; batchStartedPerf: number;
+  previouslyCompleted: Set<string>; searchWarnings: number; storeHadJobBefore: Map<string, boolean>; result?: JobRecommendations;
 };
 
 export type RunDeps = {
   provider: JobSearchProvider & { last?: ProviderSearchResult }; measured: MeasuredAnalyzer; store: CareerStore; profile: CandidateProfile;
   clock: Clock; now: () => Date; discoveryFactory: (deadlineMs: number) => JobDiscovery; log: (line: string) => void; resumeText?: string;
-  onRunFinished?: (run: RunRecord) => void;
+  onRunStarted?: (active: ActiveRun) => void; onRunFinished?: (run: RunRecord) => void;
 };
 
 const NOT_ATTEMPTED_PREFIX = "Not attempted";
 
-async function executeRun(runId: RunId, deadlineMs: number, discovery: JobDiscovery, searchId: string, hits: SearchHit[], selectedIds: string[],
-  previouslyCompleted: Set<string>, searchWarnings: number, deps: RunDeps, options: Options): Promise<RunRecord> {
-  const { measured, store, profile, clock } = deps;
+function startRun(runId: RunId, deadlineMs: number, hits: SearchHit[], selectedIds: string[], previouslyCompleted: Set<string>, searchWarnings: number, deps: RunDeps): ActiveRun {
   const hitById = new Map(hits.map((h) => [h.candidate.candidateId, h]));
-  const storeHadJobBefore = new Map(selectedIds.map((id) => [id, store.getJob(expectedJobId(hitById.get(id)!)) !== undefined]));
-  measured.beginRun(runId);
-  const startedAt = deps.now().toISOString();
-  const batchStartedPerf = clock();
-  let result: JobRecommendations | undefined; let errorClass: string | undefined;
-  try {
-    result = await discovery.recommend({ searchId, candidateProfileId: profile.id, candidateIds: selectedIds, realisticCount: 5, stretchCount: 0, includePass: true }, store, () => measured);
-  } catch (error) {
-    errorClass = typeof (error as { name?: unknown })?.name === "string" ? (error as { name: string }).name : "Error";
-  }
-  const recommendResolvedPerf = clock();
-  await measured.settle(options.settleWaitMs);
+  const storeHadJobBefore = new Map(selectedIds.map((id) => [id, deps.store.getJob(expectedJobId(hitById.get(id)!)) !== undefined]));
+  deps.measured.beginRun(runId);
+  const active: ActiveRun = { runId, deadlineMs, selectedIds, hits, startedAt: deps.now().toISOString(), batchStartedPerf: deps.clock(), previouslyCompleted, searchWarnings, storeHadJobBefore };
+  deps.onRunStarted?.(active);
+  return active;
+}
+
+// Builds the run record from the operations recorded so far. Used at completion and, with
+// recommendOutcome "interrupted", from the SIGINT handler while the batch is still in flight.
+export function summarizeRun(active: ActiveRun, deps: Pick<RunDeps, "measured" | "store" | "profile">, recommendOutcome: RunOutcome, errorClass: string | undefined,
+  recommendResolvedPerf: number): RunRecord {
+  const { measured, store, profile } = deps;
+  const { runId, deadlineMs, selectedIds, previouslyCompleted, searchWarnings, storeHadJobBefore, result } = active;
+  const hitById = new Map(active.hits.map((h) => [h.candidate.candidateId, h]));
   const ops = measured.runRecords(runId);
-  const outcomes = classifyCandidateOutcomes(result, ops, selectedIds);
+  const outcomes = classifyCandidateOutcomes(result, ops, selectedIds, recommendOutcome === "interrupted" && result === undefined);
   const itemById = new Map([...(result?.realistic ?? []), ...(result?.stretch ?? []), ...(result?.pass ?? [])].map((i) => [i.candidate.candidateId, i]));
   const candidates: CandidateRow[] = outcomes.map(({ candidateId, outcome, classificationConflict }) => {
     const hit = hitById.get(candidateId)!;
@@ -108,13 +115,13 @@ async function executeRun(runId: RunId, deadlineMs: number, discovery: JobDiscov
     return row;
   });
   const abortedPerf = measured.runAbortedAt(runId);
-  const abort = abortLatency(ops, abortedPerf, batchStartedPerf, recommendResolvedPerf);
+  const abort = abortLatency(ops, abortedPerf, active.batchStartedPerf, recommendResolvedPerf);
   const durations = ops.filter((op) => op.durationMs !== undefined && op.status !== "cap_refused").map((op) => op.durationMs!);
   const sumCallMs = Math.round(durations.reduce((n, d) => n + d, 0));
-  const totalDurationMs = Math.round(recommendResolvedPerf - batchStartedPerf);
+  const totalDurationMs = Math.round(recommendResolvedPerf - active.batchStartedPerf);
   const usage = sumUsage(ops);
-  const run: RunRecord = {
-    runId, deadlineMs, selectedIds, startedAt, totalDurationMs, recommendOutcome: errorClass ? "threw" : "returned",
+  return {
+    runId, deadlineMs, selectedIds, startedAt: active.startedAt, totalDurationMs, recommendOutcome,
     ...(errorClass ? { errorClass } : {}), aborted: abortedPerf !== undefined, ...(abort ? { abort } : {}), operations: ops, candidates,
     failuresReported: (result?.failures ?? []).map((f) => ({ candidateId: f.candidateId, kind: f.message.startsWith(NOT_ATTEMPTED_PREFIX) ? "not_attempted" as const : "failed" as const })),
     warnings: { search: searchWarnings, run: result?.warnings.length ?? 0, extractionDelta: Math.max(0, (result?.warnings.length ?? 0) - searchWarnings - 2) },
@@ -132,8 +139,38 @@ async function executeRun(runId: RunId, deadlineMs: number, discovery: JobDiscov
     },
     whatIf: whatIf(ops),
   };
+}
+
+async function executeRun(runId: RunId, deadlineMs: number, discovery: JobDiscovery, searchId: string, hits: SearchHit[], selectedIds: string[],
+  previouslyCompleted: Set<string>, searchWarnings: number, deps: RunDeps, options: Options): Promise<RunRecord> {
+  const active = startRun(runId, deadlineMs, hits, selectedIds, previouslyCompleted, searchWarnings, deps);
+  let errorClass: string | undefined;
+  try {
+    active.result = await discovery.recommend({ searchId, candidateProfileId: deps.profile.id, candidateIds: selectedIds, realisticCount: 5, stretchCount: 0, includePass: true }, deps.store, () => deps.measured);
+  } catch (error) {
+    errorClass = typeof (error as { name?: unknown })?.name === "string" ? (error as { name: string }).name : "Error";
+  }
+  const recommendResolvedPerf = deps.clock();
+  await deps.measured.settle(options.settleWaitMs);
+  const run = summarizeRun(active, deps, errorClass ? "threw" : "returned", errorClass, recommendResolvedPerf);
   deps.onRunFinished?.(run);
   return run;
+}
+
+export function reconcile(records: OperationRecord[], runs: RunRecord[]): Reconciliation {
+  const candidates = runs.flatMap((r) => r.candidates);
+  const reconciliation: Reconciliation = {
+    hookJoinedOps: records.filter((op) => op.sdkDurationMs !== undefined).length, measuredOps: records.filter((op) => op.status !== "cap_refused").length,
+    joinMismatches: records.filter((op) => op.joinMismatch).length, mappingErrors: records.filter((op) => op.mappingError && op.operation !== "extractProfile").length,
+    cacheInconsistencies: candidates.filter((c) => !c.cacheConsistent).length, classificationConflicts: candidates.filter((c) => c.classificationConflict).length,
+    unsettledOps: records.filter((op) => op.status === "unsettled").length, errors: [],
+  };
+  if (reconciliation.joinMismatches) reconciliation.errors.push("hook events joined to a different operation than measured");
+  if (reconciliation.mappingErrors) reconciliation.errors.push("an analyzer call could not be mapped to a candidate");
+  if (reconciliation.cacheInconsistencies) reconciliation.errors.push("extraction call did not match the store probe");
+  if (reconciliation.classificationConflicts) reconciliation.errors.push("candidate outcome disagrees with the reported failure list");
+  if (reconciliation.unsettledOps) reconciliation.errors.push("an abandoned call never settled within the settle wait");
+  return reconciliation;
 }
 
 export async function runMeasurement(deps: RunDeps, context: SearchContext, options: Options): Promise<RunState> {
@@ -175,27 +212,15 @@ export async function runMeasurement(deps: RunDeps, context: SearchContext, opti
     }
     discoveryC.close();
   }
-  const ops = measured.records;
-  const measuredOps = ops.filter((op) => op.status !== "cap_refused").length;
-  const reconciliation: RunState["reconciliation"] = {
-    hookJoinedOps: ops.filter((op) => op.sdkDurationMs !== undefined).length, measuredOps,
-    joinMismatches: ops.filter((op) => op.joinMismatch).length, mappingErrors: ops.filter((op) => op.mappingError && op.operation !== "extractProfile").length,
-    cacheInconsistencies: runs.flatMap((r) => r.candidates).filter((c) => !c.cacheConsistent).length,
-    classificationConflicts: runs.flatMap((r) => r.candidates).filter((c) => c.classificationConflict).length,
-    unsettledOps: ops.filter((op) => op.status === "unsettled").length, errors: [],
-  };
-  if (reconciliation.joinMismatches) reconciliation.errors.push("hook events joined to a different operation than measured");
-  if (reconciliation.mappingErrors) reconciliation.errors.push("an analyzer call could not be mapped to a candidate");
-  if (reconciliation.cacheInconsistencies) reconciliation.errors.push("extraction call did not match the store probe");
-  if (reconciliation.classificationConflicts) reconciliation.errors.push("candidate outcome disagrees with the reported failure list");
-  if (reconciliation.unsettledOps) reconciliation.errors.push("an abandoned call never settled within the settle wait");
-  return { search: context, ...(profileExtraction ? { profileExtraction } : {}), runs, reconciliation };
+  return { search: context, ...(profileExtraction ? { profileExtraction } : {}), runs, reconciliation: reconcile(measured.records, runs) };
 }
 
 function skippedRun(runId: RunId, deadlineMs: number, skipped: NonNullable<RunRecord["skipped"]>, deps: RunDeps): RunRecord {
-  return { runId, skipped, deadlineMs, selectedIds: [], startedAt: deps.now().toISOString(), totalDurationMs: 0, recommendOutcome: "skipped", aborted: false,
+  const run: RunRecord = { runId, skipped, deadlineMs, selectedIds: [], startedAt: deps.now().toISOString(), totalDurationMs: 0, recommendOutcome: "skipped", aborted: false,
     operations: [], candidates: [], failuresReported: [], warnings: { search: 0, run: 0, extractionDelta: 0 },
     totals: { modelCalls: 0, extractCalls: 0, assessCalls: 0, extractionCacheHits: 0, extractionReruns: 0, assessReruns: 0, completed: 0, failed: 0, notAttempted: 0,
       sumCallMs: 0, maxCallMs: 0, overheadMs: 0, headroomMs: deadlineMs, usage: null, usageCoverage: { reported: 0, total: 0 }, usageUnknownOps: 0 },
     whatIf: whatIf([]) };
+  deps.onRunFinished?.(run);
+  return run;
 }

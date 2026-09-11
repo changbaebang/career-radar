@@ -5,11 +5,20 @@ import type { OperationRecord, Usage } from "./measured-analyzer.js";
 
 // Pure helpers over recorded operations. Nothing here performs I/O.
 
-export type CandidateOutcome = "completed" | "failed" | "not_attempted";
+export type CandidateOutcome = "completed" | "failed" | "not_attempted" | "interrupted";
 export type CacheCategory = "extracted_and_assessed" | "extraction_cache_hit_assessed" | "extraction_only_then_failed"
   | "not_attempted" | "assess_rerun_of_completed" | "cap_refused";
 
-export function classifyCandidateOutcomes(result: JobRecommendations | undefined, ops: OperationRecord[], ids: string[]) {
+export function classifyCandidateOutcomes(result: JobRecommendations | undefined, ops: OperationRecord[], ids: string[], interrupted = false) {
+  if (interrupted) {
+    // No batch result exists yet: read the outcome from the recorded calls alone.
+    return ids.map((candidateId) => {
+      const mine = ops.filter((op) => op.candidateId === candidateId);
+      const outcome: CandidateOutcome = mine.some((op) => op.operation === "assess" && op.status === "ok") ? "completed"
+        : mine.some((op) => op.status === "error") ? "failed" : mine.length ? "interrupted" : "not_attempted";
+      return { candidateId, outcome, classificationConflict: false };
+    });
+  }
   const completed = new Set([...(result?.realistic ?? []), ...(result?.stretch ?? []), ...(result?.pass ?? [])].map((i) => i.candidate.candidateId));
   const failures = new Map((result?.failures ?? []).map((f) => [f.candidateId, f.message]));
   return ids.map((candidateId) => {

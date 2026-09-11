@@ -11,6 +11,7 @@ A single run is evidence, not a decision. The report says so, and the decision f
 - **Hard ceiling of 40 model calls per invocation.** The per-run cap defaults to the planned upper bound (two calls per candidate per batch, plus one optional profile extraction) and can only be lowered with `--max-model-calls`. The wrapper refuses the 41st call before it reaches the SDK.
 - **No application data.** The harness never opens `data/career-radar.db`; it uses a temporary SQLite file (or `inspection/harness.db` with `--inspect`) and a synthetic, invented profile. The job descriptions are public Greenhouse postings fetched through the same SSRF-safe provider the server uses.
 - **Reports hold counters, hashes and identifiers only.** No job description text, no resume text, no extracted requirement strings, no assessment prose, no key, no model request or response bodies. A redaction check runs over the serialized report before anything is written; report directories are `0o700`, files `0o600`, and `evals/reports/` is git-ignored.
+- **SDK transport pinned.** Every harness request, including the optional profile extraction, is made with SDK retries off (one attempt per counted call) and SDK logging off, so `OPENAI_LOG=debug` cannot print request bodies. A live run is refused while `OPENAI_BASE_URL` is set in the shell or in `.env.local`, so requests can only go to `https://api.openai.com/v1`; the report records these three settings.
 - **No money figures.** `billing.monetaryCostConfirmed` is always `false`; token counters are API-reported usage, not a bill. Call-count differences between runs are integers, never percentages.
 
 ## Modes
@@ -32,7 +33,7 @@ pnpm measure:live --approve-network                 # free: search + plan, no ke
 pnpm measure:live --approve-network --approve-model-cost   # live: type the printed cap to proceed
 ```
 
-Flags: `--board-token` (default `greenhouse`), `--title-keywords`, `--location`, `--limit 1..10`, `--candidate-ids a,b,c` (at most 5), `--deadline-ms` (default 90000, max 600000), `--retry-mode failed-only|all|none`, `--forced-abort-ms` (adds run C, must be below the deadline), `--include-profile-extraction` (+1 call), `--max-model-calls`, `--settle-wait-ms` (default 30000), `--output DIR` (must not exist; relative to the current directory like `pnpm eval`), `--inspect` (keeps drafts and the SQLite file under `inspection/`), `--no-save` and `--scenario` (dry run only), `--help`.
+Flags: `--board-token` (default `greenhouse`), `--title-keywords`, `--location`, `--limit 1..10`, `--candidate-ids a,b,c` (at most 5), `--deadline-ms` (default 90000, max 600000), `--retry-mode failed-only|all|none`, `--forced-abort-ms` (adds run C, must be below the deadline), `--include-profile-extraction` (+1 call), `--max-model-calls`, `--settle-wait-ms` (default 30000), `--output DIR` (must not exist; relative to the current directory like `pnpm eval`; `pnpm measure:live -- --output DIR` also works, the forwarded `--` is ignored), `--inspect` (keeps drafts and the SQLite file under `inspection/`), `--no-save` and `--scenario` (dry run only), `--help`.
 
 ## A live run, step by step (owner)
 
@@ -40,7 +41,7 @@ Flags: `--board-token` (default `greenhouse`), `--title-keywords`, `--location`,
 2. Run `pnpm measure:live --approve-network --approve-model-cost`. The free Greenhouse search runs first and the plan is printed: search id and expiry, each selected candidate with title, location and description length, the model and prompt version, the runs (A at the production deadline, B retry, optional C forced abort), the model-call upper bound and the cap.
 3. Type the cap number exactly and press Enter. Anything else declines.
 4. Run A executes the batch at `--deadline-ms`; run B retries failed and not-attempted candidates (or all, or none); run C, if requested, forces an abort at `--forced-abort-ms` to time abort propagation against a real in-flight request. After each batch the harness waits up to `--settle-wait-ms` for a request the batch abandoned at the deadline so its real duration is known.
-5. Ctrl-C writes a partial report (exit 130). An in-flight request may still be billed with its usage unrecorded; the report says so.
+5. Ctrl-C writes a partial report (exit 130) that includes every call recorded so far: finished batches as usual and the batch in progress with `recommendOutcome: "interrupted"`, its completed calls and the in-flight one as `unsettled`. That in-flight request may still be billed with its usage unrecorded; the report says so.
 6. Read `report.md`, paste `issue-comment.md` into issue #4, and confirm the cost for the run window in the OpenAI usage dashboard. Repeat on other days or boards until three approved runs exist, then fill the decision section and update every place the budget is stated (`report.links.budgetStatedIn`).
 
 Exit codes: `0` complete, `1` finished but the reconciliation found an inconsistency (report status `incomplete`; read `reconciliation.errors`), `2` refused or invalid, `3` confirmation declined (zero calls), `130` interrupted.

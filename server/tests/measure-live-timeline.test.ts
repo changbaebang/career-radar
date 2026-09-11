@@ -29,6 +29,12 @@ describe("measure:live timeline helpers", () => {
     expect(classifyCandidateOutcomes(undefined, ops, ["c1", "c3"]).map((c) => c.outcome)).toEqual(["failed", "not_attempted"]);
   });
 
+  it("classifies an interrupted batch from the recorded calls alone", () => {
+    const ops = [op({ operation: "extractJob", candidateId: "c1" }), op({ candidateId: "c1" }), op({ operation: "extractJob", candidateId: "c2", status: "unsettled", settledPerf: undefined, durationMs: undefined }),
+      op({ operation: "extractJob", candidateId: "c3" }), op({ candidateId: "c3", status: "error" })];
+    expect(classifyCandidateOutcomes(undefined, ops, ["c1", "c2", "c3", "c4"], true).map((c) => c.outcome)).toEqual(["completed", "interrupted", "failed", "not_attempted"]);
+  });
+
   it("accounts extraction cache hits against the store probe and names the category", () => {
     const both = [op({ operation: "extractJob", candidateId: "c1" }), op({ candidateId: "c1" })];
     expect(accountCache(both, "c1", false, "completed", false)).toEqual({ extractCalled: true, assessCalled: true, category: "extracted_and_assessed", consistent: true });

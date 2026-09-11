@@ -14,14 +14,19 @@ import { GreenhouseJobSearchProvider, type JobSearchProvider } from "../../src/i
 import { FakeCareerAnalyzer } from "./fake-analyzer.js";
 import { HELP, REFUSALS, confirmationAccepted, parseArgs, plannedMaxWallMs, resolveMode, type GateEnv, type Options } from "./gate.js";
 import { MeasuredAnalyzer } from "./measured-analyzer.js";
-import { ISSUE_URL, assertRedacted, buildReport, createReportDirectory, renderIssueComment, renderMarkdown, reportInputs, searchSection, writeReport, type Approvals, type Provenance } from "./report.js";
-import { performSearch, recordingProvider, runMeasurement, type RunDeps, type RunRecord, type RunState } from "./run.js";
+import { HARNESS_TRANSPORT, ISSUE_URL, assertRedacted, buildReport, createReportDirectory, renderIssueComment, renderMarkdown, reportInputs, searchSection, writeReport, type Approvals, type Provenance } from "./report.js";
+import { performSearch, reconcile, recordingProvider, runMeasurement, summarizeRun, type ActiveRun, type RunDeps, type RunRecord, type RunState } from "./run.js";
 import { createFixtureProvider, measurementProfile, measurementResumeText } from "./synthetic-inputs.js";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 
-// Read before anything else: an env file loaded later must not be able to grant approval.
-const gateEnv: GateEnv = { CI: process.env.CI, GITHUB_ACTIONS: process.env.GITHUB_ACTIONS, VITEST: process.env.VITEST, NODE_ENV: process.env.NODE_ENV, CAREER_RADAR_DB_PATH: process.env.CAREER_RADAR_DB_PATH };
+// Read before anything else: an env file loaded later must not be able to grant approval. It is
+// snapshotted again after .env.local is loaded, because that file can only add refusals too.
+function snapshotGateEnv(): GateEnv {
+  return { CI: process.env.CI, GITHUB_ACTIONS: process.env.GITHUB_ACTIONS, VITEST: process.env.VITEST, NODE_ENV: process.env.NODE_ENV,
+    CAREER_RADAR_DB_PATH: process.env.CAREER_RADAR_DB_PATH, OPENAI_BASE_URL: process.env.OPENAI_BASE_URL };
+}
+const gateEnv = snapshotGateEnv();
 
 const ALLOWED_MESSAGES = new Set<string>([...Object.values(REFUSALS), "Selected candidate IDs are not present in the search result.",
   "The search returned no candidates to measure.", "Set OPENAI_API_KEY in .env.local before a live run.", "Declined; 0 model calls made.", "Report redaction failed."]);
@@ -88,7 +93,8 @@ async function main(): Promise<number> {
       `  prompt version: ${PROMPT_VERSION}`,
       `  runs: A-production-deadline (${options.deadlineMs} ms) → B-retry (${options.retryMode})${options.forcedAbortMs !== undefined ? ` → C-forced-abort (${options.forcedAbortMs} ms)` : ""}${options.includeProfileExtraction ? " + profile extraction" : ""}`,
       `  model-call upper bound: ${plan.upperBound}   cap: ${plan.cap}   settle wait: ${options.settleWaitMs} ms`,
-      "  These public job descriptions and the synthetic profile will be transmitted to api.openai.com.",
+      "  These public job descriptions and the synthetic profile will be transmitted to https://api.openai.com/v1 only",
+      "  (OPENAI_BASE_URL must be unset; SDK retries and SDK logging are pinned off for every harness request).",
       "  No dollar estimate is computed; confirm cost in the OpenAI usage dashboard for the run window.",
       `Type the cap number (${plan.cap}) to approve at most ${plan.cap} paid Responses API calls:`,
     ].join("\n"));
@@ -101,10 +107,12 @@ async function main(): Promise<number> {
     if (!confirmationAccepted(line, plan.cap)) { console.error("Declined; 0 model calls made."); return 3; }
     approvals = { ...approvals, confirmedVia: process.stdin.isTTY ? "stdin-tty" : "stdin-pipe", confirmedAt: new Date().toISOString() };
     loadLocalEnv();
+    const loaded = resolveMode(options, snapshotGateEnv(), context.selectedIds.length);
+    if (loaded.refusal) throw new Error(loaded.refusal);
     if (!process.env.OPENAI_API_KEY?.trim()) throw new Error("Set OPENAI_API_KEY in .env.local before a live run.");
     requestedModel = process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
     forbidden.push(process.env.OPENAI_API_KEY);
-    const analyzer = new OpenAICareerAnalyzer({ onResponse: (event) => hookTarget.current?.onResponseEvent(event) });
+    const analyzer = new OpenAICareerAnalyzer({ onResponse: (event) => hookTarget.current?.onResponseEvent(event), transport: { ...HARNESS_TRANSPORT } });
     delete process.env.OPENAI_API_KEY;
     inner = analyzer;
   } else {
@@ -125,8 +133,21 @@ async function main(): Promise<number> {
 
   let state: RunState | undefined; let interrupted = false; let exitCode = 0;
   const finishedRuns: RunRecord[] = [];
+  let activeRun: ActiveRun | undefined;
+  const deps: RunDeps = { provider, measured, store, profile: measurementProfile, clock, now: () => new Date(), discoveryFactory, log,
+    ...(options.includeProfileExtraction ? { resumeText: measurementResumeText } : {}),
+    onRunStarted: (active) => { activeRun = active; }, onRunFinished: (run) => { finishedRuns.push(run); activeRun = undefined; } };
+  // Before runMeasurement() resolves (an interrupt), the state is rebuilt from every call recorded so far.
+  const snapshotState = (): RunState | undefined => {
+    if (state) return state;
+    const runs = [...finishedRuns];
+    if (activeRun) runs.push(summarizeRun(activeRun, deps, "interrupted", undefined, clock()));
+    const profileExtraction = measured.runRecords("profile-extraction")[0];
+    if (runs.length === 0 && !profileExtraction) return undefined;
+    return { search: context, ...(profileExtraction ? { profileExtraction } : {}), runs, reconciliation: reconcile(measured.records, runs) };
+  };
   const emit = (final: boolean) => {
-    const report = buildReport({ mode, state: state ?? (finishedRuns.length ? { search: context, runs: finishedRuns, reconciliation: { hookJoinedOps: 0, measuredOps: 0, joinMismatches: 0, mappingErrors: 0, cacheInconsistencies: 0, classificationConflicts: 0, unsettledOps: 0, errors: [] } } : undefined),
+    const report = buildReport({ mode, state: snapshotState(),
       startedAt, ...(final ? { finishedAt: new Date().toISOString() } : {}), generatedAt: new Date().toISOString(), provenance: prov, approvals, inputs, interrupted, exitCode, searchCandidates: searchSection(context) });
     const markdown = renderMarkdown(report); const comment = renderIssueComment(report);
     const forbiddenValues = [...forbidden, ...draftProse(measured)];
@@ -138,8 +159,6 @@ async function main(): Promise<number> {
   process.once("SIGINT", stop); process.once("SIGTERM", stop);
 
   try {
-    const deps: RunDeps = { provider, measured, store, profile: measurementProfile, clock, now: () => new Date(), discoveryFactory, log,
-      ...(options.includeProfileExtraction ? { resumeText: measurementResumeText } : {}), onRunFinished: (r) => finishedRuns.push(r) };
     state = await runMeasurement(deps, context, options);
     if (state.reconciliation.errors.length) exitCode = 1;
     if (inspection) {

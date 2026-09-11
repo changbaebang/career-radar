@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
@@ -9,6 +9,7 @@ import { REFUSALS } from "../scripts/measure-live/gate.js";
 import { SYNTHETIC_EVIDENCE_SENTINEL, SYNTHETIC_JD_SENTINEL, measurementResumeText } from "../scripts/measure-live/synthetic-inputs.js";
 
 const serverDirectory = fileURLToPath(new URL("../", import.meta.url));
+const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const script = fileURLToPath(new URL("../scripts/measure-live/cli.ts", import.meta.url));
 const directories: string[] = [];
 function temporary() {
@@ -18,6 +19,12 @@ function temporary() {
 function cli(args: string[], env: Record<string, string> = {}) {
   const tsx = createRequire(import.meta.url).resolve("tsx");
   return spawnSync(process.execPath, ["--import", tsx, script, ...args], { cwd: serverDirectory, encoding: "utf8", env: { ...process.env, ...env }, timeout: 120_000 });
+}
+// The documented entry point: the root package script (which builds shared first), run through pnpm itself.
+function rootScript(args: string[]) {
+  const execPath = process.env.npm_execpath;
+  const [command, prefix] = execPath && /\.c?js$/.test(execPath) ? [process.execPath, [execPath]] : ["pnpm", [] as string[]];
+  return spawnSync(command, [...prefix, "measure:live", ...args], { cwd: repositoryRoot, encoding: "utf8", env: { ...process.env }, timeout: 180_000 });
 }
 const forbidden = [SYNTHETIC_JD_SENTINEL, SYNTHETIC_EVIDENCE_SENTINEL, "Lead a React team", measurementResumeText.slice(0, 40)];
 afterEach(() => { for (const path of directories.splice(0)) rmSync(path, { recursive: true, force: true }); });
@@ -61,7 +68,7 @@ describe("measure:live CLI (dry run only; approvals are refused under the test r
     expect(readFileSync(join(output, "report.json"), "utf8")).not.toContain(SYNTHETIC_EVIDENCE_SENTINEL);
   });
 
-  it.each([[{ CI: "1" }], [{ GITHUB_ACTIONS: "true" }], [{ CAREER_RADAR_DB_PATH: "/tmp/app.db" }]])("refuses live approvals under %j before any search or key access", (env) => {
+  it.each([[{ CI: "1" }], [{ GITHUB_ACTIONS: "true" }], [{ CAREER_RADAR_DB_PATH: "/tmp/app.db" }], [{ OPENAI_BASE_URL: "https://synthetic-review.invalid/v1" }]])("refuses live approvals under %j before any search or key access", (env) => {
     const run = cli(["--approve-network", "--approve-model-cost"], env);
     expect(run.status).toBe(2);
     expect(run.stderr.trim()).toMatch(/^Refused/);
@@ -79,6 +86,43 @@ describe("measure:live CLI (dry run only; approvals are refused under the test r
     const run = cli(args);
     expect(run.status).toBe(2);
     expect(run.stderr.trim()).toBe(message);
+  });
+
+  it("the documented root command reaches the CLI: --help, default execution and option pass-through", () => {
+    const help = rootScript(["--help"]);
+    expect(help.status, help.stderr).toBe(0);
+    expect(help.stdout).toContain("environment variables can refuse, never grant");
+    const run = rootScript(["--scenario", "fail-at-3", "--no-save"]);
+    expect(run.status, run.stderr).toBe(0);
+    const summary = JSON.parse(run.stdout.slice(run.stdout.indexOf("{"), run.stdout.lastIndexOf("}") + 1));
+    expect(summary).toMatchObject({ mode: "dry-run", status: "complete", modelCalls: 11 });
+    expect(summary.runs[0].totals).toMatchObject({ modelCalls: 6, completed: 2, failed: 1, notAttempted: 2 });
+  });
+
+  it("writes a partial report holding every call of the batch in progress when interrupted", async () => {
+    const output = join(temporary(), "run");
+    const tsx = createRequire(import.meta.url).resolve("tsx");
+    const child = spawn(process.execPath, ["--import", tsx, script, "--scenario", "stall", "--deadline-ms", "5000", "--settle-wait-ms", "100", "--output", output],
+      { cwd: serverDirectory, stdio: ["ignore", "pipe", "pipe"] });
+    let stderr = "";
+    await new Promise<void>((resolve, reject) => {
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk: string) => { stderr += chunk; if (stderr.includes("Run A:")) resolve(); });
+      child.once("exit", () => reject(new Error(`exited before run A started: ${stderr}`)));
+    });
+    await new Promise((resolve) => setTimeout(resolve, 400)); // candidate 1 extracted and assessed; candidate 2's extraction is stalled
+    child.kill("SIGINT");
+    const code = await new Promise<number | null>((resolve) => child.once("exit", resolve));
+    expect(code).toBe(130);
+    const report = JSON.parse(readFileSync(join(output, "report.json"), "utf8"));
+    expect(report).toMatchObject({ status: "incomplete", interrupted: true, exitCode: 130 });
+    expect(report.runs).toHaveLength(1);
+    expect(report.runs[0]).toMatchObject({ runId: "A-production-deadline", recommendOutcome: "interrupted", totals: { modelCalls: 3, completed: 1 } });
+    expect(report.runs[0].operations.map((op: { operation: string; status: string }) => [op.operation, op.status])).toEqual([["extractJob", "ok"], ["assess", "ok"], ["extractJob", "unsettled"]]);
+    expect(report.runs[0].candidates.map((c: { outcome: string }) => c.outcome)).toEqual(["completed", "interrupted", "not_attempted", "not_attempted", "not_attempted"]);
+    expect(report.reconciliation).toMatchObject({ measuredOps: 3, unsettledOps: 1 });
+    expect(report.interruptionNote).toContain("batch in progress");
+    for (const name of ["report.json", "report.md", "issue-comment.md"]) for (const fragment of forbidden) expect(readFileSync(join(output, name), "utf8")).not.toContain(fragment);
   });
 
   it("prints help and exits 0", () => {
