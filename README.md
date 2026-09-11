@@ -154,8 +154,8 @@ Reports are separate files and are not removed by `pnpm db:reset`.
 ### M4-C stage-aware feedback
 
 Record explicitly reported stages and optional occurrence dates with `application_update`.
-Use `historyMode: "append"` for new progression; `"replace"` (default) supersedes the
-**whole prior outcome history** for aggregation on a correction. Notes-only edits retain
+`historyMode` defaults to `"append"` (a new progression); pass `"replace"` only for an
+explicit correction — it supersedes the **whole prior outcome history** for aggregation. Notes-only edits retain
 history. Stage clearing retracts previous reach; unknown stages/dates are not inferred.
 `pipeline_summary` shows stage reach, current coverage and last-update exclusions without
 changing fit verdicts or claiming probabilities. [Contract and examples](docs/MILESTONE_4C.md).

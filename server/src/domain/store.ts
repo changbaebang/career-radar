@@ -9,7 +9,7 @@ import {
   type ApplicationSaveInput, type ApplicationUpdateInput, type PipelineInput, type PipelineSummary,
 } from "@career-radar/shared";
 import { migrate } from "../infra/db/migrations.js";
-import { outcomeEvent, readOutcomeEvent, summarizeStages, updateOutcome } from "./outcomes.js";
+import { outcomeEvent, readOutcomeEvent, summarizeStages, updateOutcome, withOutcomeDefaults } from "./outcomes.js";
 
 export function hashSource(value: string): string {
   return createHash("sha256").update(value.trim()).digest("hex");
@@ -105,7 +105,9 @@ export class CareerStore {
       if (!raw) throw new Error("Application not found. Call pipeline_summary to find the saved application ID.");
       const previous = ApplicationSchema.parse(raw);
       const next = ApplicationSchema.parse(updateOutcome(previous, parsed));
-      if (JSON.stringify(previous) === JSON.stringify(next)) return previous;
+      // Compare against the legacy row read through the same defaults so an identical report on an
+      // old record stays a no-op: no event, no updatedAt change, no move inside the last-updated window.
+      if (JSON.stringify(withOutcomeDefaults(previous)) === JSON.stringify(next)) return previous;
       next.updatedAt = this.now().toISOString();
       if (status === "applied" && !next.appliedAt) next.appliedAt = next.updatedAt;
       this.#db.prepare("UPDATE applications SET data = ? WHERE id = ?").run(JSON.stringify(next), applicationId);

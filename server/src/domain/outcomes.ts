@@ -16,6 +16,13 @@ function normalizeStage(text: string): OutcomeStage {
   return parsed.success ? parsed.data : Object.hasOwn(aliases, token) ? aliases[token]! : "unknown";
 }
 
+// Legacy rows lack the M4-C fields. Reading them through these defaults lets callers compare a
+// stored record with an updated one without the backfilled keys counting as a change.
+export function withOutcomeDefaults(app: Application): Application {
+  return { ...app, normalizedOutcomeStage: app.normalizedOutcomeStage ?? "unknown",
+    outcomeProvenance: app.outcomeProvenance ?? "legacy_mapping", outcomeRevision: app.outcomeRevision ?? 0 };
+}
+
 export function updateOutcome(previous: Application, input: ApplicationUpdateInput): Application {
   const clearing = input.normalizedOutcomeStage === null || input.stage?.trim() === "";
   const inferred = input.stage === undefined ? undefined : normalizeStage(input.stage);
@@ -39,7 +46,9 @@ export function updateOutcome(previous: Application, input: ApplicationUpdateInp
   const suppliedOutcome = changedFact || changedDate || nextText !== previous.outcomeStage ||
     (input.historyMode === "replace" && previous.outcomeHistoryMode === "append") ||
     (previous.outcomeProvenance !== "user_report" && (input.stage !== undefined || input.normalizedOutcomeStage !== undefined));
-  const replace = input.historyMode !== "append" || clearing;
+  // Omitted historyMode means a new progression. Replacement is destructive for aggregation and
+  // must be requested explicitly; clearing a stage is an explicit retraction and always replaces.
+  const replace = input.historyMode === "replace" || clearing;
   return {
     ...previous, status: input.status,
     ...(input.notes !== undefined ? { notes: input.notes } : {}),

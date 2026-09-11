@@ -44,6 +44,30 @@ describe("M4-C synthetic outcome analytics, not fit/model evals", () => {
     expect(db.prepare("SELECT data FROM assessments ORDER BY id").all()).toEqual(snapshots);
   });
 
+  it("defaults to append: ordinary progression without historyMode keeps every reported stage", () => {
+    const { store, save } = setup(); const a = save("a");
+    store.updateApplication({ applicationId: a.id, status: "applied" });
+    store.updateApplication({ applicationId: a.id, status: "interview", normalizedOutcomeStage: "technical_interview" });
+    const rejected = store.updateApplication({ applicationId: a.id, status: "rejected", normalizedOutcomeStage: "final_interview" });
+    expect(rejected.outcomeRevision).toBe(0);
+    const reach = store.pipelineSummary().stageSummary!.stageReach;
+    expect(reach.find((s) => s.stage === "technical_interview")?.count).toBe(1);
+    expect(reach.find((s) => s.stage === "final_interview")?.count).toBe(1);
+  });
+
+  it("keeps an identical report on a legacy v1 row a true no-op", () => {
+    const { store, save, db } = setup(); const a = save("a");
+    const { normalizedOutcomeStage: _s, outcomeProvenance: _p, outcomeRevision: _r, ...legacy } = a;
+    void _s; void _p; void _r;
+    const raw = JSON.stringify({ ...legacy, status: "applied", updatedAt: "2026-09-01T00:00:00.000Z" });
+    db.prepare("UPDATE applications SET data = ? WHERE id = ?").run(raw, a.id);
+    const events = count(db);
+    const result = store.updateApplication({ applicationId: a.id, status: "applied" });
+    expect(count(db)).toBe(events);
+    expect(result.updatedAt).toBe("2026-09-01T00:00:00.000Z");
+    expect(db.prepare("SELECT data FROM applications WHERE id = ?").get(a.id)?.data).toBe(raw);
+  });
+
   it("H: append preserves reported history, duplicates do not add events or inflate counts", () => {
     const { store, save, db } = setup(); const a = save("a");
     const first = { applicationId: a.id, status: "interview" as const, stage: "recruiter screen", historyMode: "append" as const };

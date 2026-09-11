@@ -73,7 +73,7 @@ app.get("/", (req, res) => {
       <div id="root"></div><script>window.openai={toolOutput:${serialized}};</script><script>${bundle}</script></body></html>`);
 });
 app.post("/demo/interview", (_req, res) => {
-  store.updateApplication({ applicationId: firstApplicationId, status: "interview", stage: "technical", historyMode: "append" });
+  store.updateApplication({ applicationId: firstApplicationId, status: "interview", stage: "technical" }); // omitted historyMode = append
   res.redirect(303, "/");
 });
 app.post("/demo/correct", (_req, res) => {

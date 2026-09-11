@@ -34,7 +34,7 @@ summary read-only. Existing React widget + MCP bridge retained, not rescaffolded
   Null clears it. Omission preserves it for the same status/stage, but a different
   status/stage resets it to unknown. Future times are rejected. No intermediate dates.
 - `historyMode: append` keeps independently reported progression in the same revision.
-- `historyMode: replace` (default for old callers) starts a new revision on changed
+- `historyMode: replace` (explicit only; omitted means `append`) starts a new revision on changed
   outcome facts; an explicit replace after append can also retract old history while
   keeping current facts. **All earlier outcome facts are superseded**, not one event.
   Clarify this scope with the user; targeted event editing is deferred. To re-establish
