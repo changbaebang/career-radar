@@ -69,6 +69,23 @@ const AssessmentDraftSchema = z.object({
 
 export type ProfileExtraction = { profile: CandidateProfile; warnings: string[] };
 export type JobExtraction = { job: JobPosting; warnings: string[] };
+
+export type AnalyzerOperation = "extractProfile" | "extractJob" | "assess";
+// Telemetry projection of one Responses API call. Deliberately excludes the request input, the
+// instructions and the parsed/raw output so a consumer can log it without handling personal data.
+export type AnalyzerResponseEvent = {
+  operation: AnalyzerOperation; requestedModel: string; durationMs: number; outcome: "ok" | "error";
+  responseId?: string; responseModel?: string; requestId?: string;
+  responseStatus?: string; incompleteReason?: string;
+  usage?: { inputTokens: number; outputTokens: number; totalTokens: number; cachedInputTokens?: number; reasoningTokens?: number };
+  error?: { name: string; status?: number; code?: string; requestId?: string };
+};
+type ObservedResponse = {
+  id?: string; model?: string; status?: string; _request_id?: string | null;
+  incomplete_details?: { reason?: string } | null;
+  usage?: { input_tokens: number; output_tokens: number; total_tokens: number;
+    input_tokens_details?: { cached_tokens?: number }; output_tokens_details?: { reasoning_tokens?: number } };
+};
 export interface CareerAnalyzer {
   extractProfile(resumeText: string, profileId?: string): Promise<ProfileExtraction>;
   extractJob(description: string, signal?: AbortSignal): Promise<JobExtraction>;
@@ -87,18 +104,63 @@ function omitNull(value: Record<string, unknown>): Record<string, unknown> {
 export class OpenAICareerAnalyzer implements CareerAnalyzer {
   readonly #client: OpenAI;
   readonly #model: string;
+  readonly #onResponse?: (event: AnalyzerResponseEvent) => void;
 
-  constructor(options: { apiKey?: string; model?: string } = {}) {
+  constructor(options: { apiKey?: string; model?: string; onResponse?: (event: AnalyzerResponseEvent) => void } = {}) {
     const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
     if (!apiKey?.trim()) {
       throw new Error("Set OPENAI_API_KEY in .env.local or the server environment before analyzing a resume or job.");
     }
     this.#client = new OpenAI({ apiKey });
     this.#model = options.model ?? process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
+    this.#onResponse = options.onResponse;
+  }
+
+  // Without a hook this is a plain pass-through: request arguments and results are untouched.
+  async #observe<T extends ObservedResponse>(operation: AnalyzerOperation, call: () => Promise<T>): Promise<T> {
+    if (!this.#onResponse) return call();
+    const startedAt = performance.now();
+    try {
+      const response = await call();
+      this.#emit(operation, startedAt, response);
+      return response;
+    } catch (error) {
+      this.#emit(operation, startedAt, undefined, error);
+      throw error;
+    }
+  }
+
+  #emit(operation: AnalyzerOperation, startedAt: number, response?: ObservedResponse, error?: unknown): void {
+    const event: AnalyzerResponseEvent = {
+      operation, requestedModel: this.#model, durationMs: performance.now() - startedAt, outcome: error === undefined ? "ok" : "error",
+    };
+    if (response) {
+      if (response.id) event.responseId = response.id;
+      if (response.model) event.responseModel = response.model;
+      if (typeof response._request_id === "string") event.requestId = response._request_id;
+      if (response.status) event.responseStatus = response.status;
+      if (response.incomplete_details?.reason) event.incompleteReason = response.incomplete_details.reason;
+      if (response.usage) {
+        event.usage = { inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens, totalTokens: response.usage.total_tokens };
+        const cached = response.usage.input_tokens_details?.cached_tokens;
+        const reasoning = response.usage.output_tokens_details?.reasoning_tokens;
+        if (cached !== undefined) event.usage.cachedInputTokens = cached;
+        if (reasoning !== undefined) event.usage.reasoningTokens = reasoning;
+      }
+    }
+    if (error !== undefined) {
+      // Only the error class and transport identifiers: an SDK error message can carry a response body.
+      const detail = error as { name?: string; status?: number; code?: string | null; requestID?: string | null } | null;
+      event.error = { name: typeof detail?.name === "string" ? detail.name : "Error" };
+      if (typeof detail?.status === "number") event.error.status = detail.status;
+      if (typeof detail?.code === "string") event.error.code = detail.code;
+      if (typeof detail?.requestID === "string") event.error.requestId = detail.requestID;
+    }
+    try { this.#onResponse?.(event); } catch { /* a telemetry consumer must never break analysis */ }
   }
 
   async extractProfile(resumeText: string, profileId?: string): Promise<ProfileExtraction> {
-    const response = await this.#client.responses.parse({
+    const response = await this.#observe("extractProfile", () => this.#client.responses.parse({
       model: this.#model, store: false,
       instructions: [
         "Extract only facts explicitly present in the resume.",
@@ -109,7 +171,7 @@ export class OpenAICareerAnalyzer implements CareerAnalyzer {
       ].join(" "),
       input: `<resume>\n${resumeText}\n</resume>`,
       text: { format: zodTextFormat(CandidateExtractionSchema, "candidate_profile") },
-    });
+    }));
     const parsed = requireParsed(response.output_parsed, "candidate profile");
     const constraints = omitNull(parsed.constraints);
     const profile = CandidateProfileSchema.parse({
@@ -124,7 +186,7 @@ export class OpenAICareerAnalyzer implements CareerAnalyzer {
   }
 
   async extractJob(description: string, signal?: AbortSignal): Promise<JobExtraction> {
-    const response = await this.#client.responses.parse({
+    const response = await this.#observe("extractJob", () => this.#client.responses.parse({
       model: this.#model, store: false,
       instructions: [
         "Normalize only the supplied job description.",
@@ -136,7 +198,7 @@ export class OpenAICareerAnalyzer implements CareerAnalyzer {
       ].join(" "),
       input: `<job-description>\n${description}\n</job-description>`,
       text: { format: zodTextFormat(JobExtractionSchema, "job_posting") },
-    }, { signal, ...(signal ? { maxRetries: 0 } : {}) });
+    }, { signal, ...(signal ? { maxRetries: 0 } : {}) }));
     const parsed = requireParsed(response.output_parsed, "job posting");
     const jobId = stableId("job", description);
     const withIds = (items: typeof parsed.required, kind: "required" | "preferred") =>
@@ -153,7 +215,7 @@ export class OpenAICareerAnalyzer implements CareerAnalyzer {
   }
 
   async assess(profile: CandidateProfile, job: JobPosting, signal?: AbortSignal): Promise<FitAssessment> {
-    const response = await this.#client.responses.parse({
+    const response = await this.#observe("assess", () => this.#client.responses.parse({
       model: this.#model, store: false,
       instructions: [
         "Assess fit using only the supplied structured candidate and job.",
@@ -170,7 +232,7 @@ export class OpenAICareerAnalyzer implements CareerAnalyzer {
       ].join(" "),
       input: JSON.stringify({ candidateProfile: profile, jobPosting: job }),
       text: { format: zodTextFormat(AssessmentDraftSchema, "fit_assessment") },
-    }, { signal, ...(signal ? { maxRetries: 0 } : {}) });
+    }, { signal, ...(signal ? { maxRetries: 0 } : {}) }));
     const parsed = requireParsed(response.output_parsed, "fit assessment");
     const normalizeGap = (gap: (typeof parsed.gaps)[number]) => omitNull(gap);
     return FitAssessmentSchema.parse({

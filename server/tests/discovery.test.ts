@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { JobDiscovery, groupRecommendations } from "../src/domain/jobs/search.js";
+import { JobDiscovery, RECOMMEND_DEADLINE_MS, groupRecommendations } from "../src/domain/jobs/search.js";
 import { CareerStore } from "../src/domain/store.js";
 import { syntheticJob, syntheticProfile } from "./fixtures.js";
 import { discoveryResult, groundedAssessment, recommendedItem } from "./discovery-fixtures.js";
@@ -134,6 +134,27 @@ describe("bounded search snapshots and recommendations", () => {
     expect(result.failures).toHaveLength(3);
     expect(result.available.realistic).toBe(0);
     expect(analyzer.assess).not.toHaveBeenCalled();
+  });
+
+  it("keeps the production deadline as the default and lets the measurement harness configure a shorter one", async () => {
+    vi.useFakeTimers();
+    const { store, provider } = await setup();
+    expect(RECOMMEND_DEADLINE_MS).toBe(90_000);
+    const short = new JobDiscovery(provider, undefined, { deadlineMs: 1_000 });
+    cleanup.push(() => short.close());
+    const search = await short.search({ boardToken: "synthetic" });
+    const analyzer = {
+      extractProfile: vi.fn(),
+      extractJob: vi.fn((_description: string, signal?: AbortSignal) => new Promise<never>((_, reject) => signal?.addEventListener("abort", () => reject(new Error("synthetic abort"))))),
+      assess: vi.fn(),
+    };
+    const pending = short.recommend({ searchId: search.searchId, candidateProfileId: syntheticProfile.id, candidateIds: ["synthetic_1", "synthetic_2"], realisticCount: 2, stretchCount: 0 }, store, () => analyzer);
+    await vi.advanceTimersByTimeAsync(1_000);
+    const result = await pending;
+    expect(result.failures).toHaveLength(2);
+    expect(analyzer.extractJob).toHaveBeenCalledTimes(1);
+    expect(analyzer.assess).not.toHaveBeenCalled();
+    for (const invalid of [0, -1, 1.5]) expect(() => new JobDiscovery(provider, undefined, { deadlineMs: invalid })).toThrow("positive integer");
   });
 
   it("does not share search IDs across app instances", async () => {
