@@ -9,6 +9,9 @@ import { applyAssessmentPolicy } from "../assessment/policy.js";
 import { CareerStore, stableId } from "../store.js";
 
 const TTL_MS = 30 * 60_000;
+// Production batch deadline. Measurement tooling may pass a different value per instance; the
+// HTTP app and MCP tools always use this default.
+export const RECOMMEND_DEADLINE_MS = 90_000;
 type SearchSnapshot = { result: JobSearchResult; hits: SearchHit[]; timer: ReturnType<typeof setTimeout> };
 
 export function groupRecommendations(
@@ -34,8 +37,14 @@ export function groupRecommendations(
 // One instance per HTTP app, not per MCP request. The cache holds public jobs only.
 export class JobDiscovery {
   readonly #searches = new Map<string, SearchSnapshot>();
+  readonly #deadlineMs: number;
   #busy = false;
-  constructor(private readonly provider: JobSearchProvider, private readonly now: () => Date = () => new Date()) {}
+  constructor(private readonly provider: JobSearchProvider, private readonly now: () => Date = () => new Date(),
+    options: { deadlineMs?: number } = {}) {
+    const deadlineMs = options.deadlineMs ?? RECOMMEND_DEADLINE_MS;
+    if (!Number.isInteger(deadlineMs) || deadlineMs <= 0) throw new Error("deadlineMs must be a positive integer.");
+    this.#deadlineMs = deadlineMs;
+  }
 
   async search(raw: unknown): Promise<JobSearchResult> {
     const input = JobSearchInputSchema.parse(raw);
@@ -80,7 +89,7 @@ export class JobDiscovery {
     if (this.#busy) throw new Error("A recommendation batch is already running. Wait for it before retrying.");
     this.#busy = true;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 90_000);
+    const timer = setTimeout(() => controller.abort(), this.#deadlineMs);
     const aborted = new Promise<never>((_resolve, reject) => {
       controller.signal.addEventListener("abort", () => reject(new Error("Recommendation deadline exceeded.")), { once: true });
     });

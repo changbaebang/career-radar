@@ -3,6 +3,8 @@
 This runner executes **synthetic deterministic policy contracts**, not a model.
 It neither loads `.env` nor reads the application database. No network/model calls,
 private input import, screening context, stage analytics, or model-mode switch is implemented.
+The live measurement harness (`pnpm measure:live`, see `docs/LIVE_MEASUREMENT.md`) is a separate
+tool: its reports also land under ignored `evals/reports/` but describe live batch timings, never policy cases.
 
 ## Run and compare
 
