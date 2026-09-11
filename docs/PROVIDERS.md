@@ -32,6 +32,13 @@ usage and quality measured on one provider do not verify another.
   responses (`finish_reason` other than `stop`), non-JSON content and schema mismatches fail
   closed with fixed messages that never echo the content. Pick a model whose supported parameters
   list `structured_outputs` ([OpenRouter docs](https://openrouter.ai/docs/guides/features/structured-outputs)).
+- **Errors are sanitized on both adapters.** An SDK HTTP or transport error is replaced by a fixed
+  message that keeps only the error class, HTTP status, provider error code and request ID, because
+  a provider's error body can echo request input or internal diagnostics into an MCP response.
+  Cancellation keeps its own error identity.
+- **No `store` parameter exists on this endpoint.** The OpenAI adapter sends `store: false`; the
+  OpenRouter request has no equivalent, so the live report records `store: "n/a"`. Retention follows
+  your OpenRouter provider-routing and data settings, not this request.
 - **Retries and logging** follow the same transport options as the OpenAI adapter: batch calls send
   `maxRetries: 0`, and the live harness pins retries and SDK logging off for every request.
 - **Free is not private.** The resume text and the public job descriptions leave the machine on
@@ -39,8 +46,9 @@ usage and quality measured on one provider do not verify another.
   review that provider's data policy and your OpenRouter privacy settings before a live run. The
   request carries the `X-OpenRouter-Title: Career Radar` attribution header and nothing else about
   the user.
-- **Telemetry** maps `prompt_tokens`/`completion_tokens` to the same `onResponse` event shape, so
-  `pnpm measure:live --provider openrouter` records usage counters the same way. Cost is still not
+- **Telemetry** maps `prompt_tokens`/`completion_tokens` to the same `onResponse` event shape and adds
+  `upstreamProvider` (the endpoint OpenRouter routed to, or `unknown`), so
+  `pnpm measure:live --provider openrouter` records per-call usage and upstream provider the same way. Cost is still not
   computed; confirm it in the OpenRouter dashboard.
 
 ## What this does not establish

@@ -23,7 +23,7 @@ const operation = z.object({
   seq: count, runId: z.string(), operation: z.enum(["extractProfile", "extractJob", "assess"]), candidateId: z.string(), mappingError: z.boolean(),
   startedPerf: z.number(), settledPerf: z.number().optional(), durationMs: z.number().optional(),
   status: z.enum(["ok", "error", "aborted", "unsettled", "cap_refused"]), errorClass: z.string().optional(), httpStatus: z.number().optional(),
-  errorCode: z.string().optional(), requestId: z.string().optional(), responseId: z.string().optional(), responseModel: z.string().optional(),
+  errorCode: z.string().optional(), requestId: z.string().optional(), responseId: z.string().optional(), responseModel: z.string().optional(), upstreamProvider: z.string().optional(),
   responseStatus: z.string().optional(), incompleteReason: z.string().optional(), usage: usage.optional(), sdkDurationMs: z.number().optional(),
   joinMismatch: z.boolean(), settledAfterBatchReturn: z.boolean(), abortToSettleMs: z.number().optional(), waitedMs: z.number().optional(),
   extraction: z.object({ requiredCount: count, preferredCount: count, coreRequiredCount: count, responsibilitiesCount: count, technologiesCount: count,
@@ -62,8 +62,10 @@ export const LiveMeasurementReportSchema = z.object({
   mode: z.enum(["live", "dry-run"]), status: z.enum(["complete", "incomplete"]), interrupted: z.boolean(), exitCode: count,
   generatedAt: iso, startedAt: iso, finishedAt: iso.optional(),
   code: z.object({ codeSha: z.string(), dirty: z.boolean(), hashes: z.object({ analyzer: z.string(), search: z.string(), policy: z.string(), schema: z.string() }).strict() }).strict(),
-  provider: z.object({ api: z.enum(["openai-responses", "openrouter-chat-completions", "synthetic-no-model"]), requestedModel: z.string(), responseModels: z.array(z.string()), promptVersion: z.string(),
-    defaultModel: z.string(), openaiSdkVersion: z.string(), nodeVersion: z.string(), store: z.literal(false), maxRetries: z.literal(0), logLevel: z.literal("off"),
+  provider: z.object({ api: z.enum(["openai-responses", "openrouter-chat-completions", "synthetic-no-model"]), requestedModel: z.string(), responseModels: z.array(z.string()),
+    upstreamProviders: z.array(z.string()), promptVersion: z.string(), defaultModel: z.string(), openaiSdkVersion: z.string(), nodeVersion: z.string(),
+    // "n/a": the endpoint has no store parameter; retention follows the provider's own routing/data settings.
+    store: z.union([z.literal(false), z.literal("n/a")]), maxRetries: z.literal(0), logLevel: z.literal("off"),
     baseUrl: z.enum([HARNESS_BASE_URL, OPENROUTER_BASE_URL]) }).strict(),
   approvals: z.object({ network: z.boolean(), modelCost: z.boolean(), confirmedVia: z.enum(["stdin-tty", "stdin-pipe", "none"]), confirmedAt: iso.optional(),
     maxModelCalls: count, hardMaxModelCalls: z.literal(HARD_MAX_MODEL_CALLS), plannedUpperBound: count, planBreakdown: z.record(z.string(), count) }).strict(),
@@ -126,16 +128,19 @@ export function buildReport(args: { mode: "live" | "dry-run"; state: RunState | 
   provenance: Provenance; approvals: Approvals; inputs: ReportInputs; interrupted: boolean; exitCode: number; searchCandidates?: LiveMeasurementReport["search"] }): LiveMeasurementReport {
   const { state } = args;
   const runA = state?.runs.find((r) => r.runId === "A-production-deadline");
-  const responseModels = [...new Set((state?.runs.flatMap((r) => r.operations) ?? []).map((op) => op.responseModel).filter((m): m is string => m !== undefined))];
+  const operations = state?.runs.flatMap((r) => r.operations) ?? [];
+  const responseModels = [...new Set(operations.map((op) => op.responseModel).filter((m): m is string => m !== undefined))];
+  const upstreamProviders = [...new Set(operations.map((op) => op.upstreamProvider).filter((p): p is string => p !== undefined))];
   const report = {
     reportKind: "live-batch-measurement" as const, reportVersion: REPORT_VERSION, harnessVersion: HARNESS_VERSION, mode: args.mode,
     status: state && !args.interrupted && args.exitCode === 0 ? "complete" as const : "incomplete" as const, interrupted: args.interrupted, exitCode: args.exitCode,
     generatedAt: args.generatedAt, startedAt: args.startedAt, ...(args.finishedAt ? { finishedAt: args.finishedAt } : {}),
     code: { codeSha: args.provenance.codeSha, dirty: args.provenance.dirty, hashes: args.provenance.hashes },
     provider: { api: args.mode !== "live" ? "synthetic-no-model" as const : args.inputs.provider === "openrouter" ? "openrouter-chat-completions" as const : "openai-responses" as const,
-      requestedModel: args.provenance.requestedModel, responseModels,
+      requestedModel: args.provenance.requestedModel, responseModels, upstreamProviders,
       promptVersion: args.provenance.promptVersion, defaultModel: args.provenance.defaultModel, openaiSdkVersion: args.provenance.openaiSdkVersion,
-      nodeVersion: args.provenance.nodeVersion, store: false as const, maxRetries: HARNESS_TRANSPORT.maxRetries, logLevel: HARNESS_TRANSPORT.logLevel, baseUrl: providerDestination(args.inputs.provider) },
+      nodeVersion: args.provenance.nodeVersion, store: args.inputs.provider === "openrouter" ? "n/a" as const : false as const,
+      maxRetries: HARNESS_TRANSPORT.maxRetries, logLevel: HARNESS_TRANSPORT.logLevel, baseUrl: providerDestination(args.inputs.provider) },
     approvals: { ...args.approvals, hardMaxModelCalls: HARD_MAX_MODEL_CALLS as typeof HARD_MAX_MODEL_CALLS },
     inputs: args.inputs,
     search: args.searchCandidates ?? { searchId: "n/a", provider: "n/a", sourceUrl: "https://boards-api.greenhouse.io/", retrievedAt: args.startedAt, expiresAt: args.startedAt,
@@ -170,12 +175,13 @@ const ms = (value: number | undefined) => value === undefined ? "" : String(Math
 export function renderMarkdown(report: LiveMeasurementReport): string {
   const lines: string[] = [
     "# Career Radar live batch measurement", "",
-    report.mode === "live" ? "Live Responses API run on a synthetic profile and public job descriptions. Single run: **not a budget decision** (3 approved runs required)."
+    report.mode === "live" ? `Live ${report.provider.api} run on a synthetic profile and public job descriptions. Single run: **not a budget decision** (3 approved runs required).`
       : "**Dry run** with a synthetic provider and fake analyzer. No network, no model calls; timings are not model latencies.", "",
     `- Code: ${report.code.codeSha}; dirty worktree: ${report.code.dirty}`,
     `- Hashes: analyzer ${report.code.hashes.analyzer.slice(0, 12)} · search ${report.code.hashes.search.slice(0, 12)} · policy ${report.code.hashes.policy.slice(0, 12)} · schema ${report.code.hashes.schema.slice(0, 12)}`,
     `- Provider: ${report.inputs.provider} (${report.provider.api}); model requested: ${report.provider.requestedModel}; responded: ${report.provider.responseModels.join(", ") || "n/a"}; prompt ${report.provider.promptVersion}; SDK ${report.provider.openaiSdkVersion}; Node ${report.provider.nodeVersion}`,
-    `- SDK transport: base URL ${report.provider.baseUrl}; retries ${report.provider.maxRetries}; SDK log ${report.provider.logLevel}`,
+    `- SDK transport: base URL ${report.provider.baseUrl}; retries ${report.provider.maxRetries}; SDK log ${report.provider.logLevel}; store ${report.provider.store === "n/a" ? "n/a (no store parameter on this endpoint; retention follows the provider's routing/data settings, not this request)" : String(report.provider.store)}`,
+    `- Upstream providers observed: ${report.provider.upstreamProviders.join(", ") || "n/a"}`,
     `- Approvals: network ${report.approvals.network}, model cost ${report.approvals.modelCost} (${report.approvals.confirmedVia}); cap ${report.approvals.maxModelCalls} of hard ${report.approvals.hardMaxModelCalls}; planned upper bound ${report.approvals.plannedUpperBound}`,
     `- Status: ${report.status}; interrupted: ${report.interrupted}; exit ${report.exitCode}`, "",
     "## Search candidates (public metadata only)", "", "| Candidate | Title | Location | Updated | Description chars | Job id |", "| --- | --- | --- | --- | --- | --- |",
@@ -185,8 +191,8 @@ export function renderMarkdown(report: LiveMeasurementReport): string {
     lines.push(`## ${r.runId}`, "");
     if (r.skipped) { lines.push(`Skipped: ${r.skipped}.`, ""); continue; }
     lines.push(`Deadline ${r.deadlineMs} ms · total ${r.totalDurationMs} ms · headroom ${r.totals.headroomMs} ms · recommend ${r.recommendOutcome}${r.errorClass ? ` (${r.errorClass})` : ""} · aborted ${r.aborted}`, "",
-      "### Operations", "", "| seq | op | candidate | start offset ms | duration ms | status | error class | in | cached | out | reasoning | request id |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-      ...r.operations.map((op) => `| ${op.seq} | ${op.operation} | ${cell(op.candidateId)} | ${ms(op.startedPerf - (r.operations[0]?.startedPerf ?? op.startedPerf))} | ${ms(op.durationMs)} | ${op.status} | ${cell(op.errorClass)} | ${op.usage?.inputTokens ?? ""} | ${op.usage?.cachedInputTokens ?? ""} | ${op.usage?.outputTokens ?? ""} | ${op.usage?.reasoningTokens ?? ""} | ${cell(op.requestId)} |`), "",
+      "### Operations", "", "| seq | op | candidate | start offset ms | duration ms | status | error class | in | cached | out | reasoning | request id | upstream |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+      ...r.operations.map((op) => `| ${op.seq} | ${op.operation} | ${cell(op.candidateId)} | ${ms(op.startedPerf - (r.operations[0]?.startedPerf ?? op.startedPerf))} | ${ms(op.durationMs)} | ${op.status} | ${cell(op.errorClass)} | ${op.usage?.inputTokens ?? ""} | ${op.usage?.cachedInputTokens ?? ""} | ${op.usage?.outputTokens ?? ""} | ${op.usage?.reasoningTokens ?? ""} | ${cell(op.requestId)} | ${cell(op.upstreamProvider)} |`), "",
       "### Candidates", "", "| candidate | outcome | category | store had job | extract | assess | verdict draft→final | blockers draft→final | replay |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
       ...r.candidates.map((c) => `| ${cell(c.candidateId)} | ${c.outcome} | ${c.category} | ${c.storeHadJobBefore} | ${c.extractCalled} | ${c.assessCalled} | ${c.draft?.verdict ?? ""}→${c.final?.verdict ?? ""} | ${c.draft?.hardBlockers ?? ""}→${c.final?.hardBlockers ?? ""} | ${c.policy?.policyReplayMatches ?? ""} |`), "",
       "### Abort propagation", "", r.abort ? `Deadline fired at +${r.abort.abortAtOffsetMs} ms; recommend() returned ${r.abort.abortToBatchReturnMs} ms later${r.abort.inFlightOp ? `; in-flight ${r.abort.inFlightOp.operation} for ${cell(r.abort.inFlightOp.candidateId)} settled ${r.abort.abortToSettleMs === undefined ? "never (unsettled)" : `${ms(r.abort.abortToSettleMs)} ms after the abort`}` : ""}.` : "No abort fired.", "",
@@ -205,7 +211,7 @@ export function renderMarkdown(report: LiveMeasurementReport): string {
 
 export function renderIssueComment(report: LiveMeasurementReport): string {
   const lines = [
-    `Live measurement (${report.mode}) — code ${report.code.codeSha.slice(0, 7)}${report.code.dirty ? " (dirty)" : ""}, provider ${report.inputs.provider}, model ${report.provider.requestedModel}, prompt ${report.provider.promptVersion}, status ${report.status}`,
+    `Live measurement (${report.mode}) — code ${report.code.codeSha.slice(0, 7)}${report.code.dirty ? " (dirty)" : ""}, provider ${report.inputs.provider}${report.provider.upstreamProviders.length ? ` (upstream ${report.provider.upstreamProviders.join(", ")})` : ""}, model ${report.provider.requestedModel}, prompt ${report.provider.promptVersion}, status ${report.status}`,
     "", "| run | deadline ms | total ms | calls | completed / failed / not attempted | aborted | cache hits / assess reruns |", "| --- | --- | --- | --- | --- | --- | --- |",
     ...report.runs.map((r) => r.skipped ? `| ${r.runId} | skipped (${r.skipped}) | | | | | |`
       : `| ${r.runId} | ${r.deadlineMs} | ${r.totalDurationMs} | ${r.totals.modelCalls} | ${r.totals.completed} / ${r.totals.failed} / ${r.totals.notAttempted} | ${r.aborted} | ${r.totals.extractionCacheHits} / ${r.totals.assessReruns} |`),

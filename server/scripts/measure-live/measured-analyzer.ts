@@ -12,7 +12,7 @@ export type OperationRecord = {
   seq: number; runId: string; operation: AnalyzerOperation; candidateId: string; mappingError: boolean;
   startedPerf: number; settledPerf?: number; durationMs?: number; status: OperationStatus;
   errorClass?: string; httpStatus?: number; errorCode?: string; requestId?: string;
-  responseId?: string; responseModel?: string; responseStatus?: string; incompleteReason?: string;
+  responseId?: string; responseModel?: string; upstreamProvider?: string; responseStatus?: string; incompleteReason?: string;
   usage?: Usage; sdkDurationMs?: number; joinMismatch: boolean;
   settledAfterBatchReturn: boolean; abortToSettleMs?: number; waitedMs?: number;
   extraction?: { requiredCount: number; preferredCount: number; coreRequiredCount: number; responsibilitiesCount: number;
@@ -77,6 +77,7 @@ export class MeasuredAnalyzer implements CareerAnalyzer {
     record.sdkDurationMs = event.durationMs;
     if (event.responseId) record.responseId = event.responseId;
     if (event.responseModel) record.responseModel = event.responseModel;
+    if (event.upstreamProvider) record.upstreamProvider = event.upstreamProvider;
     if (event.requestId) record.requestId = event.requestId;
     if (event.responseStatus) record.responseStatus = event.responseStatus;
     if (event.incompleteReason) record.incompleteReason = event.incompleteReason;

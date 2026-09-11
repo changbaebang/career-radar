@@ -1,3 +1,5 @@
+import { sanitizeProviderError } from "./errors.js";
+
 export type AnalyzerOperation = "extractProfile" | "extractJob" | "assess";
 // SDK client options the measurement harness pins (retries off, logging off). The server never sets them.
 export type AnalyzerTransport = { maxRetries?: number; logLevel?: "off" | "error" | "warn" | "info" | "debug" };
@@ -7,24 +9,27 @@ export type AnalyzerTransport = { maxRetries?: number; logLevel?: "off" | "error
 export type AnalyzerResponseEvent = {
   operation: AnalyzerOperation; requestedModel: string; durationMs: number; outcome: "ok" | "error";
   responseId?: string; responseModel?: string; requestId?: string;
+  // Routed providers (OpenRouter) name the endpoint that actually served the model; "unknown" when omitted.
+  upstreamProvider?: string;
   responseStatus?: string; incompleteReason?: string;
   usage?: { inputTokens: number; outputTokens: number; totalTokens: number; cachedInputTokens?: number; reasoningTokens?: number };
   error?: { name: string; status?: number; code?: string; requestId?: string };
 };
-export type ResponseProjection = Pick<AnalyzerResponseEvent, "responseId" | "responseModel" | "requestId" | "responseStatus" | "incompleteReason" | "usage">;
+export type ResponseProjection = Pick<AnalyzerResponseEvent, "responseId" | "responseModel" | "requestId" | "upstreamProvider" | "responseStatus" | "incompleteReason" | "usage">;
 export type ResponseHook = (event: AnalyzerResponseEvent) => void;
 
-// Without a hook this is a plain pass-through: request arguments and results are untouched.
-export async function observeCall<T>(hook: ResponseHook | undefined, operation: AnalyzerOperation, requestedModel: string,
+// Request arguments and results are untouched. SDK errors are replaced by ProviderRequestError so a
+// provider's error body never reaches an MCP response; cancellation and adapter errors pass through.
+export async function observeCall<T>(hook: ResponseHook | undefined, operation: AnalyzerOperation, requestedModel: string, provider: string,
   call: () => Promise<T>, project: (response: T) => ResponseProjection): Promise<T> {
-  if (!hook) return call();
   const startedAt = performance.now();
   try {
     const response = await call();
-    emit(hook, { operation, requestedModel, durationMs: performance.now() - startedAt, outcome: "ok", ...project(response) });
+    if (hook) emit(hook, { operation, requestedModel, durationMs: performance.now() - startedAt, outcome: "ok", ...project(response) });
     return response;
-  } catch (error) {
-    emit(hook, { operation, requestedModel, durationMs: performance.now() - startedAt, outcome: "error", error: projectError(error) });
+  } catch (raw) {
+    const error = sanitizeProviderError(raw, provider);
+    if (hook) emit(hook, { operation, requestedModel, durationMs: performance.now() - startedAt, outcome: "error", error: projectError(error) });
     throw error;
   }
 }

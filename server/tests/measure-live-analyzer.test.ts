@@ -84,9 +84,9 @@ describe("MeasuredAnalyzer (records timings and identifiers, never text)", () =>
     const measured = new MeasuredAnalyzer(new FakeCareerAnalyzer("ok", 5), { cap: 10, hits: found });
     const first = measured.extractJob(expectedDescription(found[0]!));
     measured.onResponseEvent({ operation: "extractJob", requestedModel: "m", durationMs: 3, outcome: "ok", responseId: "resp_1", responseModel: "m-2026", requestId: "req_1",
-      responseStatus: "completed", usage: { inputTokens: 10, outputTokens: 4, totalTokens: 14, cachedInputTokens: 2 } });
+      upstreamProvider: "SyntheticUpstreamA", responseStatus: "completed", usage: { inputTokens: 10, outputTokens: 4, totalTokens: 14, cachedInputTokens: 2 } });
     await first;
-    expect(measured.records[0]).toMatchObject({ sdkDurationMs: 3, responseId: "resp_1", responseModel: "m-2026", requestId: "req_1", responseStatus: "completed",
+    expect(measured.records[0]).toMatchObject({ sdkDurationMs: 3, responseId: "resp_1", responseModel: "m-2026", requestId: "req_1", upstreamProvider: "SyntheticUpstreamA", responseStatus: "completed",
       usage: { inputTokens: 10, outputTokens: 4, totalTokens: 14, cachedInputTokens: 2 }, joinMismatch: false });
     // An event that arrives before its record is queued for the next call of that operation only.
     measured.onResponseEvent({ operation: "assess", requestedModel: "m", durationMs: 7, outcome: "error", error: { name: "APIConnectionError", status: 502, code: "bad_gateway" } });

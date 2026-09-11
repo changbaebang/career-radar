@@ -46,10 +46,14 @@ describe("measure:live report", () => {
 
   it("records the provider and its fixed destination, per provider", async () => {
     const run = await dryRun();
-    expect(dryRunReport(run)).toMatchObject({ inputs: { provider: "openai" }, provider: { api: "synthetic-no-model", baseUrl: "https://api.openai.com/v1" } });
+    expect(dryRunReport(run)).toMatchObject({ inputs: { provider: "openai" }, provider: { api: "synthetic-no-model", baseUrl: "https://api.openai.com/v1", store: false, upstreamProviders: [] } });
     const routed = dryRunReport(run, { mode: "live", inputs: { ...reportInputs(run.options, run.context.selectedIds, "live"), provider: "openrouter" } });
-    expect(routed).toMatchObject({ inputs: { provider: "openrouter" }, provider: { api: "openrouter-chat-completions", baseUrl: OPENROUTER_BASE_URL } });
-    expect(renderMarkdown(routed)).toContain("Provider: openrouter (openrouter-chat-completions)");
+    expect(routed).toMatchObject({ inputs: { provider: "openrouter" }, provider: { api: "openrouter-chat-completions", baseUrl: OPENROUTER_BASE_URL, store: "n/a" } });
+    const markdown = renderMarkdown(routed);
+    expect(markdown).toContain("Live openrouter-chat-completions run");
+    expect(markdown).not.toContain("Responses API run");
+    expect(markdown).toContain("store n/a (no store parameter on this endpoint");
+    expect(markdown).toContain("Provider: openrouter (openrouter-chat-completions)");
     expect(renderIssueComment(routed)).toContain("provider openrouter");
   });
 

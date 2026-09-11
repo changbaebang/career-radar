@@ -116,7 +116,7 @@ describe("OpenRouterCareerAnalyzer (real SDK, stubbed fetch, no network)", () =>
     stubFetch(() => completion(assessmentDraft));
     await analyzer({ onResponse: (event) => events.push(event) }).assess(syntheticProfile, syntheticJob);
     expect(events).toEqual([{ operation: "assess", requestedModel: "synthetic/free-model", durationMs: expect.any(Number), outcome: "ok",
-      responseId: "gen-synthetic", responseModel: "synthetic/free-model", requestId: "req_synthetic", responseStatus: "stop",
+      responseId: "gen-synthetic", responseModel: "synthetic/free-model", requestId: "req_synthetic", upstreamProvider: "SyntheticUpstream", responseStatus: "stop",
       usage: { inputTokens: 12, outputTokens: 7, totalTokens: 19, cachedInputTokens: 3, reasoningTokens: 2 } }]);
     stubFetch(() => new Response('{"error":{"message":"synthetic 500"}}', { status: 500, headers: { "content-type": "application/json", "retry-after-ms": "1" } }));
     await expect(analyzer().assess(syntheticProfile, syntheticJob, new AbortController().signal)).rejects.toThrow();
@@ -124,6 +124,29 @@ describe("OpenRouterCareerAnalyzer (real SDK, stubbed fetch, no network)", () =>
     stubFetch(() => new Response('{"error":{"message":"synthetic 500"}}', { status: 500, headers: { "content-type": "application/json", "retry-after-ms": "1" } }));
     await expect(analyzer({ transport: { maxRetries: 0, logLevel: "off" } }).extractProfile("Synthetic resume text.")).rejects.toThrow();
     expect(requests).toHaveLength(1); // harness transport: no retries even without a signal
+  });
+
+  it("replaces SDK HTTP errors with a fixed message that keeps class, status, code and request id, and lets cancellation through", async () => {
+    stubFetch(() => new Response('{"error":{"message":"SECRET-ERROR-BODY echoing the resume","code":"bad_request"}}', { status: 400, headers: { "content-type": "application/json", "x-request-id": "req_failed" } }));
+    const events: AnalyzerResponseEvent[] = [];
+    let caught: unknown;
+    try { await analyzer({ onResponse: (event) => events.push(event) }).extractProfile("SECRET resume text"); } catch (error) { caught = error; }
+    expect(caught).toMatchObject({ name: "BadRequestError", status: 400, code: "bad_request", requestID: "req_failed", message: "OpenRouter request failed (HTTP 400). Check the key, model and network; the provider's message is not shown." });
+    expect(String((caught as Error).message)).not.toContain("SECRET");
+    expect(events[0]).toMatchObject({ outcome: "error", error: { name: "BadRequestError", status: 400, code: "bad_request", requestId: "req_failed" } });
+    const controller = new AbortController(); controller.abort();
+    stubFetch(() => completion(assessmentDraft));
+    let aborted: unknown;
+    try { await analyzer().assess(syntheticProfile, syntheticJob, controller.signal); } catch (error) { aborted = error; }
+    expect((aborted as Error).constructor.name).toBe("APIUserAbortError");
+    expect(requests).toHaveLength(0);
+  });
+
+  it("records the upstream provider as unknown when the response omits it", async () => {
+    const events: AnalyzerResponseEvent[] = [];
+    stubFetch(() => completion(assessmentDraft, { provider: undefined }));
+    await analyzer({ onResponse: (event) => events.push(event) }).assess(syntheticProfile, syntheticJob);
+    expect(events[0]!.upstreamProvider).toBe("unknown");
   });
 
   it("refuses to start without a key or a model and never reads OPENAI variables", () => {

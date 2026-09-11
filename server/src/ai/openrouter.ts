@@ -36,6 +36,7 @@ function projectChat(response: ChatResponse): ResponseProjection {
   if (response.id) projection.responseId = response.id;
   if (response.model) projection.responseModel = response.model;
   if (typeof response._request_id === "string") projection.requestId = response._request_id;
+  projection.upstreamProvider = typeof response.provider === "string" && response.provider ? response.provider : "unknown";
   const finish = response.choices[0]?.finish_reason;
   if (finish) projection.responseStatus = finish;
   if (response.usage) {
@@ -65,7 +66,7 @@ export class OpenRouterCareerAnalyzer implements CareerAnalyzer {
   }
 
   async #complete<S extends z.ZodTypeAny>(operation: AnalyzerOperation, schema: S, instructions: string, input: string, signal?: AbortSignal): Promise<{ draft: z.infer<S>; response: ChatResponse }> {
-    const response = await observeCall(this.#onResponse, operation, this.#model, () => this.#client.chat.completions.create({
+    const response = await observeCall(this.#onResponse, operation, this.#model, "OpenRouter", () => this.#client.chat.completions.create({
       model: this.#model,
       messages: [{ role: "system", content: instructions }, { role: "user", content: input }],
       response_format: zodResponseFormat(schema, OUTPUT_NAMES[operation]),

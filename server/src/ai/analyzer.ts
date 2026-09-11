@@ -65,7 +65,7 @@ export class OpenAICareerAnalyzer implements CareerAnalyzer {
   }
 
   #observe<T extends ObservedResponse>(operation: AnalyzerOperation, call: () => Promise<T>): Promise<T> {
-    return observeCall(this.#onResponse, operation, this.#model, call, projectResponse);
+    return observeCall(this.#onResponse, operation, this.#model, "OpenAI", call, projectResponse);
   }
 
   async extractProfile(resumeText: string, profileId?: string): Promise<ProfileExtraction> {

@@ -47,6 +47,14 @@ describe("harness transport options on the real SDK (fetch stubbed, no network)"
     expect(info).not.toHaveBeenCalled();
   });
 
+  it("replaces an SDK HTTP error body with a fixed message on the OpenAI adapter too", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response('{"error":{"message":"SECRET-ERROR-BODY","code":"invalid_api_key"}}', { status: 401, headers: { "content-type": "application/json", "x-request-id": "req_401" } })));
+    let caught: unknown;
+    try { await new OpenAICareerAnalyzer({ apiKey: key, transport: { maxRetries: 0, logLevel: "off" } }).extractJob("SECRET-JD"); } catch (error) { caught = error; }
+    expect(caught).toMatchObject({ name: "AuthenticationError", status: 401, code: "invalid_api_key", requestID: "req_401" });
+    expect((caught as Error).message).toBe("OpenAI request failed (HTTP 401). Check the key, model and network; the provider's message is not shown.");
+  });
+
   it("follows OPENAI_BASE_URL when it is set, which is why the harness refuses a live run under it", async () => {
     vi.stubEnv("OPENAI_BASE_URL", "https://synthetic-review.invalid/v1");
     stubFetch();
