@@ -99,6 +99,11 @@ export type RecommendedJob = z.infer<typeof RecommendedJobSchema>;
 export type JobRecommendations = z.infer<typeof JobRecommendationsSchema>;
 
 export const ApplicationStatusSchema = z.enum(["discovered", "saved", "applied", "interview", "rejected", "withdrawn", "offer"]);
+export const OutcomeStageSchema = z.enum([
+  "resume_screen", "recruiter_screen", "coding_test", "technical_interview",
+  "hiring_manager_interview", "final_interview", "offer", "unknown",
+]);
+export type OutcomeStage = z.infer<typeof OutcomeStageSchema>;
 export const ApplicationSchema = z.object({
   id: z.string().min(1), jobId: z.string().min(1), candidateProfileId: z.string().min(1),
   assessmentId: z.string().min(1), status: ApplicationStatusSchema,
@@ -107,6 +112,11 @@ export const ApplicationSchema = z.object({
   createdAt: z.string().datetime(), updatedAt: z.string().datetime(),
   appliedAt: z.string().datetime().optional(),
   outcomeStage: z.string().max(200).optional(), notes: z.string().max(2000).optional(),
+  normalizedOutcomeStage: OutcomeStageSchema.optional(),
+  occurredAt: z.string().datetime().optional(),
+  outcomeProvenance: z.enum(["user_report", "legacy_mapping"]).optional(),
+  outcomeRevision: z.number().int().nonnegative().optional(),
+  outcomeHistoryMode: z.enum(["append", "replace"]).optional(),
 }).strict();
 export const ApplicationResultSchema = z.object({ application: ApplicationSchema }).strict();
 export const ApplicationSaveInputSchema = z.object({
@@ -115,6 +125,9 @@ export const ApplicationSaveInputSchema = z.object({
 export const ApplicationUpdateInputSchema = z.object({
   applicationId: z.string().min(1).max(100), status: ApplicationStatusSchema,
   stage: z.string().max(200).optional(), notes: z.string().max(2000).optional(),
+  normalizedOutcomeStage: OutcomeStageSchema.nullable().optional(),
+  occurredAt: z.string().datetime().nullable().optional(),
+  historyMode: z.enum(["append", "replace"]).optional(),
 }).strict();
 export const PipelineInputSchema = z.object({
   from: z.string().datetime().optional(), to: z.string().datetime().optional(),
@@ -125,6 +138,20 @@ export const PipelineSummarySchema = z.object({
   byRoleFamily: z.array(z.object({ roleFamily: z.string(), count: z.number().int().nonnegative() })),
   verdictOutcomes: z.array(z.object({ verdict: VerdictSchema, status: ApplicationStatusSchema, count: z.number().int().nonnegative() })),
   applications: z.array(ApplicationSchema), observations: z.array(z.string()),
+  stageSummary: z.object({
+    version: z.literal(1), windowBasis: z.literal("last_updated"),
+    from: z.string().datetime().optional(), to: z.string().datetime().optional(),
+    total: z.number().int().nonnegative(), excludedByWindow: z.number().int().nonnegative(),
+    pending: z.number().int().nonnegative(), withdrawn: z.number().int().nonnegative(),
+    knownStage: z.number().int().nonnegative(), unknownStage: z.number().int().nonnegative(),
+    knownOccurrenceDate: z.number().int().nonnegative(), unknownOccurrenceDate: z.number().int().nonnegative(),
+    resumeScreenRejected: z.number().int().nonnegative(),
+    unknownStageRejected: z.number().int().nonnegative(),
+    recordedProgression: z.number().int().nonnegative(),
+    stageReach: z.array(z.object({ stage: OutcomeStageSchema, count: z.number().int().nonnegative() }).strict()),
+    verdictStages: z.array(z.object({ verdict: VerdictSchema, stage: OutcomeStageSchema, count: z.number().int().nonnegative() }).strict()),
+    roleProgression: z.array(z.object({ roleFamily: z.string(), total: z.number().int().nonnegative(), progressed: z.number().int().nonnegative(), unknownStage: z.number().int().nonnegative() }).strict()),
+  }).strict().optional(),
 }).strict();
 export type Application = z.infer<typeof ApplicationSchema>;
 export type ApplicationSaveInput = z.input<typeof ApplicationSaveInputSchema>;

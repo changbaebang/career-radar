@@ -201,6 +201,19 @@ describe("Career Radar HTTP and MCP server", () => {
     expect(retried.structuredContent).toEqual(changed.structuredContent);
     const summary = await client.callTool({ name: "pipeline_summary", arguments: {} });
     expect(summary.structuredContent).toMatchObject({ total: 1, applications: [{ status: "interview" }] });
+    const correction = await client.callTool({ name: "application_update", arguments: {
+      applicationId: savedData.application.id, status: "rejected", normalizedOutcomeStage: "resume_screen",
+      historyMode: "replace", occurredAt: null,
+    } });
+    expect(correction.structuredContent).toMatchObject({ application: {
+      status: "rejected", normalizedOutcomeStage: "resume_screen", outcomeStage: "", verdictAtDecision: "REALISTIC",
+    } });
+    const correctedSummary = await client.callTool({ name: "pipeline_summary", arguments: {} });
+    expect(correctedSummary.structuredContent).toMatchObject({ stageSummary: { total: 1, resumeScreenRejected: 1, recordedProgression: 0 } });
+    const conflict = await client.callTool({ name: "application_update", arguments: {
+      applicationId: savedData.application.id, status: "interview", normalizedOutcomeStage: "offer",
+    } });
+    expect(conflict.isError).toBe(true);
     store.clear();
     store.close();
   });

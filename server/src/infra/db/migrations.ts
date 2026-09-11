@@ -23,6 +23,9 @@ const migrations = [String.raw`
     application_id TEXT NOT NULL REFERENCES applications(id),
     data TEXT NOT NULL
   );
+`, String.raw`
+  -- M4-C uses versioned JSON in the existing history store; no destructive backfill.
+  CREATE INDEX application_events_application_id ON application_events(application_id, id);
 `];
 
 export function migrate(db: DatabaseSync): void {

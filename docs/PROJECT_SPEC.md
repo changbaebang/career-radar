@@ -112,7 +112,7 @@ Keep resume/JD fit separate from stage-aware application outcomes. Rejection mus
 
 Minimum experience is not target seniority. Evaluate documented responsibility and scope rather than inferring overqualification from years or age. A leadership-to-IC transition is not an automatic penalty and candidate intent must not be invented. Do not use age, graduation year, gender, school prestige, or other protected/sensitive demographic proxies in fit or response scoring.
 
-The proposed M4 screening context and normalized stages are defined in [MILESTONE_4.md](MILESTONE_4.md). They are not current runtime fields. Real personal application history stays local; public cases must be independently authored synthetic counterparts rather than lightly renamed personal histories.
+The M4 screening context proposal and implemented M4-C normalized stages are defined in [MILESTONE_4.md](MILESTONE_4.md). Screening context is not a runtime field yet. Real personal application history stays local; public cases must be independently authored synthetic counterparts rather than lightly renamed personal histories.
 
 ---
 

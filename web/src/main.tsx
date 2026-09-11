@@ -172,12 +172,24 @@ function PipelineCard({ summary }: { summary: PipelineSummary }) {
       <div className="meta">{summary.byStatus.filter((item) => item.count > 0).map((item) => (
         <span className="pill secondary" key={item.status}>{item.status} · {item.count}</span>
       ))}</div>
+      {summary.stageSummary && <>
+        <h2>Recorded stage progression</h2>
+        <p className="message">{summary.stageSummary.recordedProgression} of {summary.stageSummary.total} recorded applications have post-screen progression. Descriptive counts, not a success rate.</p>
+        <p className="message">{summary.stageSummary.pending} pending · {summary.stageSummary.withdrawn} withdrawn · {summary.stageSummary.unknownStage} current stages unknown · {summary.stageSummary.unknownOccurrenceDate} current occurrence dates unknown</p>
+        <p className="message">{summary.stageSummary.resumeScreenRejected} resume-screen rejections · {summary.stageSummary.unknownStageRejected} rejections with unknown stage</p>
+        <ul>{summary.stageSummary.stageReach.filter((item) => item.count > 0).map((item) => (
+          <li key={item.stage}>{item.stage.replaceAll("_", " ")} · {item.count}</li>
+        ))}</ul>
+        {summary.stageSummary.stageReach.every((item) => item.count === 0) && <p className="message">No named stage is recorded in active history yet.</p>}
+        <p className="message">Window: last updated{!summary.stageSummary.from && !summary.stageSummary.to ? " (all time)" : ""}{summary.stageSummary.from ? ` from ${summary.stageSummary.from}` : ""}{summary.stageSummary.to ? ` to ${summary.stageSummary.to}` : ""}. {summary.stageSummary.excludedByWindow} excluded. No intermediate stages or dates inferred.</p>
+      </>}
       <h2>Recent applications</h2>
       {summary.total === 0 ? <p className="message">No saved applications yet. Assess a job, then ask to save it.</p> : (
         <ul>{summary.applications.slice(0, 10).map((application) => (
           <li key={application.id}><span><strong>{application.company} — {application.title}</strong><br />
             {application.verdictAtDecision} · {application.status}
             {application.outcomeStage ? ` · ${application.outcomeStage}` : ""}
+            {!application.outcomeStage && application.normalizedOutcomeStage && application.normalizedOutcomeStage !== "unknown" ? ` · ${application.normalizedOutcomeStage.replaceAll("_", " ")}` : ""}
           </span></li>
         ))}</ul>
       )}
