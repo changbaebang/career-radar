@@ -127,7 +127,7 @@ Secure MCP Tunnel은 개발 및 비공개 연결용이며 공개 Plugin 제출�
 - Zod로 검증하는 OpenAI Responses API structured output
 - 근거 연결과 hard blocker를 확인하는 결정론적 후처리
 - Job Assessment Card를 포함한 MCP Apps UI 리소스
-- 합성 데이터 기반 정책 eval fixture 16개 (결정론적 안전 정책 회귀 케이스 포함)
+- 기존 16개를 보존한 합성 정책 계약 28개, 버전별 로컬 JSON/Markdown 보고서와 기준 결과 비교
 - lint, typecheck, build, 단위 테스트 스크립트
 
 아직 구현되지 않음:
@@ -139,6 +139,18 @@ Secure MCP Tunnel은 개발 및 비공개 연결용이며 공개 Plugin 제출�
 전체 마일스톤은 [프로젝트 명세](docs/PROJECT_SPEC.md)를 참고하세요.
 
 `pnpm typecheck`는 서버·위젯뿐 아니라 테스트와 eval fixture도 검사합니다. `pnpm eval`은 모델 호출 없이 후처리 정책만 검증하므로 결과를 모델 정확도로 해석하면 안 됩니다. 근거 일치 검사도 구조화된 프로필을 기준으로 하며 원본 이력서의 추출 정확도까지 보장하지 않습니다.
+
+### M4-A 평가 도구
+
+`pnpm eval`은 Git에서 제외된 `evals/reports/` 아래에 실행별 보고서를 저장합니다.
+저장 없이 검사하려면 `--no-save`, 이전 실행과 비교하려면
+`--baseline evals/reports/<run>/report.json`을 사용하세요. 입력·기대값이 같은
+사례만 비교하며, 분자/분모·빈 분모의 N/A·실행 오류/건너뜀·필수조건 ID와
+데이터셋/정책/스키마/코드 버전을 기록합니다.
+28개 사례의 사람에 의한 적합도 라벨 검토는 모두 대기 상태입니다. 정책 테스트
+통과가 사람 검토 완료나 새 screening 기능·모델 품질 검증을 의미하지 않습니다.
+[평가 사용법](evals/README.md)과 [검토 양식](evals/REVIEW_TEMPLATE.md)을 참고하세요.
+보고서는 DB와 별도 파일이므로 `pnpm db:reset`으로 지워지지 않습니다.
 
 ## 참고 문서
 

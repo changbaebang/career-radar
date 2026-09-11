@@ -1,6 +1,6 @@
 # Milestone 4 — Evaluation and stage-aware feedback
 
-**Status:** proposed implementation plan, not implemented. Baseline: `0aeb5e4` (M3 merged). Scope: private, single-owner use. This planning PR changes documentation only; it does not add schemas, migrations, fixtures, model calls, or new UI.
+**Status:** M4-A evaluation tooling implemented for review; screening context and stage-aware feedback remain proposed. Original planning baseline: `0aeb5e4` (M3); implementation base: `c286587` (planning PR #7 merged). Scope: private, single-owner use. [M4-A implementation notes](MILESTONE_4A.md) separate policy-contract verification from pending human fit-label review. No M4 model calls, application schemas, migrations, or new UI have been added.
 
 ## 1. Product question and evidence boundary
 

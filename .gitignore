@@ -9,3 +9,4 @@ data/*
 !data/.gitkeep
 *.db
 *.db-*
+evals/reports/

@@ -127,7 +127,7 @@ Implemented:
 - OpenAI Responses API structured outputs validated with Zod
 - deterministic evidence-grounding and hard-blocker post-processing
 - MCP Apps UI resource with a Job Assessment Card
-- sixteen synthetic policy eval fixtures, including regression cases for the deterministic safety policy
+- 28 synthetic policy contracts (the original 16 retained), with versioned local JSON/Markdown reports and baseline comparison
 - lint, typecheck, build, and unit-test scripts
 
 Not implemented yet:
@@ -139,6 +139,17 @@ Not implemented yet:
 See [docs/PROJECT_SPEC.md](docs/PROJECT_SPEC.md) for the milestone plan.
 
 `pnpm typecheck` includes tests and eval fixtures as well as server/widget code. `pnpm eval` checks only deterministic policy behavior without calling a model; its metrics are not model accuracy. Evidence matching uses the structured profile and does not guarantee extraction accuracy against the original resume.
+
+### M4-A evaluation tooling
+
+`pnpm eval` saves a unique run under ignored `evals/reports/`. Use `--no-save` for
+checks only, or `--baseline evals/reports/<run>/report.json` to compare unchanged
+case contracts. Reports show counts/denominators, N/A for empty denominators,
+errors/skips, required-blocker IDs and dataset/policy/schema/code versions.
+All 28 human fit-label reviews remain pending; passing policy contracts does not
+complete that review or demonstrate new screening/model behavior. See the
+[evaluation guide](evals/README.md) and [human-review template](evals/REVIEW_TEMPLATE.md).
+Reports are separate files and are not removed by `pnpm db:reset`.
 
 ## Documentation references
 
