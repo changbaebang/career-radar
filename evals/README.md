@@ -90,6 +90,10 @@ accepting a human review or fixing prose keeps the case comparable and lists it 
 cases are not presented as regressions or improvements. Prompt/model label changes
 within a fixture change its contract hash.
 
+`datasetChanged` alone does not mean a case changed: it compares the whole-dataset hash,
+which also moves when the canonical key ordering changes (as it did when `canonical` was
+shared with assessment input identity). Trust the per-case `compared`/`modified` lists.
+
 Different code/policy hashes are permitted and disclosed: this is how a policy
 change is tested against unchanged contracts. A previously passing comparable case
 becoming failed/error/skipped is a regression. Do not compare aggregate rates across

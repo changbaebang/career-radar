@@ -110,8 +110,8 @@ identity/profile copies. No raw resume or additional file artifact is stored.
 
 Run: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm eval --no-save`, `pnpm build`.
 
-Current implementation check: 189 tests (shared 7 + server 182), including 27 new
-screening-contract tests and 5 identity/storage tests; 28/28 existing policy cases,
+Current implementation check (`0f4bf07`): 191 tests (shared 7 + server 184), including 28
+screening-contract tests and 6 identity/storage tests; 28/28 existing policy cases,
 `modelCalls: 0`, human fit-label review still pending for all 28. A–C authored scope/
 intent pairs and D–F variants of existing policy fixtures exercise reference contracts,
 not model detection. Existing 16 original fixtures and M1 policy are unchanged.
@@ -122,6 +122,12 @@ with diagnostics, unchanged base fit, old/new strict payloads, same-source/diffe
 structure identity, captured input versus overwrite, legacy snapshot loading and
 reset. MCP integration checks descriptors/results still omit the new context and
 identity fields. Existing dependencies reused; no lockfile/dependency change.
+
+Side effect of sharing `canonical` with the eval harness: key ordering changed from
+`localeCompare` to code-point order, so the eval `datasetHash` differs from reports saved
+before this change and a comparison reports `datasetChanged: true`. Per-case contract
+hashes are unaffected (their keys sort identically under both rules): all 28 cases stay
+comparable with `modified` and `regressions` empty. Generate a fresh baseline after merging.
 
 No new browser smoke: rendering/bridge behavior is unchanged. No real ChatGPT host,
 live provider or personal-data test. App-specific self-review uses the local Radar
