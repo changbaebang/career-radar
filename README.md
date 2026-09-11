@@ -151,6 +151,17 @@ complete that review or demonstrate new screening/model behavior. See the
 [evaluation guide](evals/README.md) and [human-review template](evals/REVIEW_TEMPLATE.md).
 Reports are separate files and are not removed by `pnpm db:reset`.
 
+### M4-C stage-aware feedback
+
+Record explicitly reported stages and optional occurrence dates with `application_update`.
+Use `historyMode: "append"` for new progression; `"replace"` (default) supersedes the
+**whole prior outcome history** for aggregation on a correction. Notes-only edits retain
+history. Stage clearing retracts previous reach; unknown stages/dates are not inferred.
+`pipeline_summary` shows stage reach, current coverage and last-update exclusions without
+changing fit verdicts or claiming probabilities. [Contract and examples](docs/MILESTONE_4C.md).
+Widget URI is v4: refresh ChatGPT descriptors before testing. Local synthetic checks do
+not establish actual host/model behavior. No API calls are required for this slice.
+
 ## Documentation references
 
 - [Plugin quickstart](https://developers.openai.com/plugins/build/app-quickstart)

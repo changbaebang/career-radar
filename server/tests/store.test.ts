@@ -40,7 +40,7 @@ describe("SQLite CareerStore", () => {
     expect(reopened.getJob(job.id)).toEqual(job);
     expect(reopened.pipelineSummary().applications).toEqual([updated]);
     const db = new DatabaseSync(path); cleanup.push(() => db.close());
-    expect(db.prepare("PRAGMA user_version").get()?.user_version).toBe(1);
+    expect(db.prepare("PRAGMA user_version").get()?.user_version).toBe(2);
     expect(db.prepare("SELECT COUNT(*) AS n FROM application_events").get()?.n).toBe(2);
     expect(JSON.parse(String(db.prepare("SELECT data FROM assessments").get()?.data)).assessment).toEqual(assessment);
   });

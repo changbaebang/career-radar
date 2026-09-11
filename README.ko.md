@@ -152,6 +152,19 @@ Secure MCP Tunnel은 개발 및 비공개 연결용이며 공개 Plugin 제출�
 [평가 사용법](evals/README.md)과 [검토 양식](evals/REVIEW_TEMPLATE.md)을 참고하세요.
 보고서는 DB와 별도 파일이므로 `pnpm db:reset`으로 지워지지 않습니다.
 
+### M4-C 단계별 지원 결과
+
+`application_update`로 사용자가 알려준 단계와 발생 시점을 기록합니다.
+새 진행은 `historyMode: "append"`, 정정은 `"replace"`(기본값)입니다. 정정은
+특정 이벤트 하나가 아니라 **이전 결과 이력 전체를 집계에서 제외**하므로 범위를
+확인하고 사용하세요. 메모만 수정하면 이력은 유지합니다. 단계를 비우면 이전
+진행 집계도 철회하며, 모르는 단계·날짜는 추정하지 않습니다.
+`pipeline_summary`는 단계별 진행과 현재 기록의 알려진/모르는 정보, 수정 시점
+필터의 제외 건수를 보여줍니다. 기존 적합도 판정은 바꾸지 않습니다.
+[사용 계약과 예시](docs/MILESTONE_4C.md)를 참고하세요. 위젯 URI는 v4이므로
+ChatGPT에서 도구 정보를 새로고침해야 합니다. 이 단계는 API 호출 없이 검증하며
+실제 ChatGPT 호스트·모델 검증은 별도입니다.
+
 ## 참고 문서
 
 - [Plugin 빠른 시작](https://developers.openai.com/plugins/build/app-quickstart)

@@ -24,7 +24,7 @@ import { registerPipelineTools } from "./pipeline-tools.js";
 import { registerSearchTools } from "./search-tools.js";
 import type { JobDiscovery } from "../domain/jobs/search.js";
 
-export const CAREER_RADAR_WIDGET_URI = "ui://career-radar/widget-v3.html";
+export const CAREER_RADAR_WIDGET_URI = "ui://career-radar/widget-v4.html";
 
 // Both are required on purpose: an MCP server is created per request, so a per-call default store
 // would forget every profile between profile_upsert and job_assess. createHttpApp owns the shared

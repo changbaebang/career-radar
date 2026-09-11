@@ -69,10 +69,15 @@ app.get("/", (req, res) => {
       <a href="/">지원 현황</a> · <a href="/?view=assessment&example=0">REALISTIC</a> · <a href="/?view=assessment&example=1">STRETCH</a> · <a href="/?view=assessment&example=2">PASS</a>
       · <a href="/?view=recommendations">추천과 부족한 개수</a> · <a href="/?view=failure">분석 실패 예시</a>
       <form method="post" action="/demo/interview"><button style="margin-top:10px;padding:8px 12px">첫 번째 지원을 면접으로 변경</button></form></div>
+      <form method="post" action="/demo/correct"><button style="margin:0 0 12px;padding:8px 12px">면접 기록을 서류 탈락으로 정정</button></form>
       <div id="root"></div><script>window.openai={toolOutput:${serialized}};</script><script>${bundle}</script></body></html>`);
 });
 app.post("/demo/interview", (_req, res) => {
-  store.updateApplication({ applicationId: firstApplicationId, status: "interview", stage: "technical" });
+  store.updateApplication({ applicationId: firstApplicationId, status: "interview", stage: "technical", historyMode: "append" });
+  res.redirect(303, "/");
+});
+app.post("/demo/correct", (_req, res) => {
+  store.updateApplication({ applicationId: firstApplicationId, status: "rejected", normalizedOutcomeStage: "resume_screen", historyMode: "replace" });
   res.redirect(303, "/");
 });
 const port = Number(process.env.DEMO_PORT ?? 8001);

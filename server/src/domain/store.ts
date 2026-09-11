@@ -9,6 +9,7 @@ import {
   type ApplicationSaveInput, type ApplicationUpdateInput, type PipelineInput, type PipelineSummary,
 } from "@career-radar/shared";
 import { migrate } from "../infra/db/migrations.js";
+import { outcomeEvent, readOutcomeEvent, summarizeStages, updateOutcome } from "./outcomes.js";
 
 export function hashSource(value: string): string {
   return createHash("sha256").update(value.trim()).digest("hex");
@@ -65,11 +66,10 @@ export class CareerStore {
     try { const result = work(); this.#db.exec("COMMIT"); return result; }
     catch (error) { this.#db.exec("ROLLBACK"); throw error; }
   }
-  // The event history records status transitions. Free-text notes are deliberately left out so
-  // that clearing notes on the application actually removes them from the database.
+  // Only typed outcome facts enter history; no notes, free text, profile or job copies.
   private event(application: Application): void {
     this.#db.prepare("INSERT INTO application_events (application_id, data) VALUES (?, ?)")
-      .run(application.id, JSON.stringify({ ...application, notes: undefined }));
+      .run(application.id, JSON.stringify(outcomeEvent(application)));
   }
   saveApplication(input: ApplicationSaveInput): Application {
     const { assessmentId, status } = ApplicationSaveInputSchema.parse(input);
@@ -87,6 +87,7 @@ export class CareerStore {
         assessmentId, status, verdictAtDecision: snapshot.assessment.verdict,
         roleFamily: snapshot.job.roleFamily, company: snapshot.job.company, title: snapshot.job.title,
         createdAt: timestamp, updatedAt: timestamp,
+        normalizedOutcomeStage: "unknown", outcomeProvenance: "user_report", outcomeRevision: 0,
         ...(status === "applied" ? { appliedAt: timestamp } : {}),
       });
       this.#db.prepare("INSERT INTO applications VALUES (?, ?, ?, ?, ?)")
@@ -96,14 +97,14 @@ export class CareerStore {
     });
   }
   updateApplication(input: ApplicationUpdateInput): Application {
-    const { applicationId, status, stage, notes } = ApplicationUpdateInputSchema.parse(input);
+    const parsed = ApplicationUpdateInputSchema.parse(input);
+    const { applicationId, status } = parsed;
+    if (parsed.occurredAt && Date.parse(parsed.occurredAt) > this.now().getTime()) throw new Error("occurredAt cannot be in the future.");
     return this.transaction(() => {
       const raw = this.read("applications", applicationId);
       if (!raw) throw new Error("Application not found. Call pipeline_summary to find the saved application ID.");
       const previous = ApplicationSchema.parse(raw);
-      const next = ApplicationSchema.parse({ ...previous, status,
-        ...(stage !== undefined ? { outcomeStage: stage } : {}), ...(notes !== undefined ? { notes } : {}),
-      });
+      const next = ApplicationSchema.parse(updateOutcome(previous, parsed));
       if (JSON.stringify(previous) === JSON.stringify(next)) return previous;
       next.updatedAt = this.now().toISOString();
       if (status === "applied" && !next.appliedAt) next.appliedAt = next.updatedAt;
@@ -115,8 +116,9 @@ export class CareerStore {
   pipelineSummary(input: PipelineInput = {}): PipelineSummary {
     const { from, to } = PipelineInputSchema.parse(input);
     if (from && to && Date.parse(from) > Date.parse(to)) throw new Error("from must be before or equal to to.");
-    const applications = this.#db.prepare("SELECT data FROM applications ORDER BY id").all()
-      .map((row) => ApplicationSchema.parse(JSON.parse(String(row.data))))
+    const all = this.#db.prepare("SELECT data FROM applications ORDER BY id").all()
+      .map((row) => ApplicationSchema.parse(JSON.parse(String(row.data))));
+    const applications = all
       .filter((app) => (!from || Date.parse(app.updatedAt) >= Date.parse(from)) && (!to || Date.parse(app.updatedAt) <= Date.parse(to)))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id));
     const byStatus = ApplicationStatusSchema.options.map((status) => ({ status, count: applications.filter((a) => a.status === status).length }));
@@ -125,10 +127,15 @@ export class CareerStore {
     const verdictOutcomes = VerdictSchema.options.flatMap((verdict) => ApplicationStatusSchema.options.map((status) => ({
       verdict, status, count: applications.filter((a) => a.verdictAtDecision === verdict && a.status === status).length,
     })));
+    const events = this.#db.prepare("SELECT data FROM application_events ORDER BY id").all()
+      .map((row) => readOutcomeEvent(JSON.parse(String(row.data))));
     return PipelineSummarySchema.parse({ total: applications.length, byStatus, byRoleFamily, verdictOutcomes,
+      stageSummary: summarizeStages(applications, events, all.length - applications.length, { from, to }),
       applications: applications.slice(0, 100),
       observations: ["Descriptive counts of current recorded statuses, not hiring probabilities or proof of skill gaps.",
         "Dates filter last update time (inclusive), not application cohorts. Small, self-selected samples cannot establish market trends.",
+        "Stage reach counts distinct application IDs in active history, not inferred intermediate stages. Replace supersedes prior history; append retains reported progression.",
+        "Stage/date coverage describes current outcomes. Pending includes discovered, saved, applied and interview; withdrawal is separate. Progression may overlap pending/withdrawn. No rates or direct-role/transition classifications are inferred.",
         ...(applications.length > 100 ? ["Only the 100 most recently updated application details are shown; counts include all matching records."] : [])],
     });
   }

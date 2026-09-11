@@ -17,7 +17,7 @@ export function registerPipelineTools(server: McpServer, store: CareerStore, res
 
   registerAppTool(server, "application_update", {
     title: "Update an application outcome",
-    description: "Use this when the user explicitly reports or corrects an application status, interview stage, rejection, withdrawal, or offer. Find IDs via pipeline_summary. Omitted stage/notes are preserved; an empty string clears them. Never infer an outcome.",
+    description: "Use this when the user explicitly reports or corrects an application outcome. Find IDs via pipeline_summary. Use historyMode append for a new progression; replace (default) supersedes ALL earlier outcome history for this application on a changed outcome. Use replace only for an explicit correction/retraction, and clarify its whole-history scope. Notes-only edits do not replace history. Omitted stage/notes are preserved; empty stage or null normalizedOutcomeStage clears both stage projections and supersedes earlier history even in append mode. Normalize only the user's stated stage; never infer one from rejection. occurredAt is the reported occurrence time, not recording time: null clears, omission preserves for the same status/stage but resets to unknown when either changes. Never infer an outcome or date.",
     inputSchema: ApplicationUpdateInputSchema.shape, outputSchema: ApplicationResultSchema.shape,
     _meta: { securitySchemes: [{ type: "noauth" }] },
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
@@ -28,7 +28,7 @@ export function registerPipelineTools(server: McpServer, store: CareerStore, res
 
   registerAppTool(server, "pipeline_summary", {
     title: "Review the application pipeline",
-    description: "Use this when the user wants saved application IDs, current status counts, or a descriptive verdict/outcome summary. Optional UTC dates filter last updated time inclusively, not an applied-date cohort. Results show at most 100 recent records; counts include all matching applications. Do not infer hiring probabilities or causal skill gaps.",
+    description: "Use this when the user wants saved application IDs, current outcomes, or correction-safe stage progression. Optional UTC dates filter last updated time inclusively, not occurrence time or an applied-date cohort. Stage reach counts distinct application IDs in active history; verdict/stage and date coverage use current outcomes. Results show at most 100 recent records; counts include all matching applications and report window exclusions, pending, withdrawn and unknowns. Do not infer intermediate stages, probabilities, transition intent or causal skill gaps.",
     inputSchema: PipelineInputSchema.shape, outputSchema: PipelineSummarySchema.shape,
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { resourceUri }, "openai/outputTemplate": resourceUri },
