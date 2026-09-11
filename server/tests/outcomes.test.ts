@@ -24,7 +24,7 @@ function setup() {
   function save(id: string) {
     const job = { ...syntheticJob, id };
     store.upsertJob(job);
-    return store.saveApplication({ assessmentId: store.saveAssessment(syntheticProfile.id, job, assessment) });
+    return store.saveApplication({ assessmentId: store.saveAssessment(syntheticProfile, job, assessment) });
   }
   return { store, db, path, save };
 }

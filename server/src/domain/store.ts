@@ -4,11 +4,12 @@ import { z } from "zod";
 import {
   CandidateProfileSchema, JobPostingSchema, FitAssessmentSchema, ApplicationSchema,
   ApplicationSaveInputSchema, ApplicationUpdateInputSchema, PipelineInputSchema, PipelineSummarySchema,
-  ApplicationStatusSchema, VerdictSchema,
+  ApplicationStatusSchema, VerdictSchema, AssessmentInputIdentitySchema,
   type CandidateProfile, type JobPosting, type FitAssessment, type Application,
   type ApplicationSaveInput, type ApplicationUpdateInput, type PipelineInput, type PipelineSummary,
 } from "@career-radar/shared";
 import { migrate } from "../infra/db/migrations.js";
+import { assessmentInputIdentity } from "./assessment/input-identity.js";
 import { outcomeEvent, readOutcomeEvent, summarizeStages, updateOutcome, withOutcomeDefaults } from "./outcomes.js";
 
 export function hashSource(value: string): string {
@@ -21,6 +22,7 @@ export function stableId(prefix: "profile" | "job", source: string): string {
 const SnapshotSchema = z.object({
   id: z.string(), profileId: z.string(), job: JobPostingSchema,
   assessment: FitAssessmentSchema, createdAt: z.string().datetime(),
+  inputIdentity: AssessmentInputIdentitySchema.optional(),
 });
 
 export class CareerStore {
@@ -55,8 +57,11 @@ export class CareerStore {
     const value = this.read("jobs", id);
     return value === undefined ? undefined : JobPostingSchema.parse(value);
   }
-  saveAssessment(profileId: string, job: JobPosting, assessment: FitAssessment): string {
-    const snapshot = SnapshotSchema.parse({ id: `assessment_${randomUUID()}`, profileId, job, assessment, createdAt: this.now().toISOString() });
+  saveAssessment(profile: CandidateProfile, job: JobPosting, assessment: FitAssessment): string {
+    // Use the captured assessment input, not a profile re-read after asynchronous model work.
+    const profileId = profile.id;
+    const snapshot = SnapshotSchema.parse({ id: `assessment_${randomUUID()}`, profileId, job, assessment,
+      inputIdentity: assessmentInputIdentity(profile, job), createdAt: this.now().toISOString() });
     this.#db.prepare("INSERT INTO assessments VALUES (?, ?, ?, ?)")
       .run(snapshot.id, profileId, job.id, JSON.stringify(snapshot));
     return snapshot.id;

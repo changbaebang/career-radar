@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { SearchCandidateSchema } from "./search.js";
+import { ScreeningContextV1Schema } from "./screening.js";
 export * from "./search.js";
+export * from "./screening.js";
 
 export const VerdictSchema = z.enum(["REALISTIC", "STRETCH", "PASS"]);
 export const ConfidenceSchema = z.enum(["low", "medium", "high"]);
@@ -70,6 +72,12 @@ export const FitAssessmentSchema = z.object({
 export const ProfileUpsertResultSchema = z.object({
   profile: CandidateProfileSchema, warnings: z.array(z.string().min(1)),
 }).strict();
+// Future opt-in contract: do not use this for model/MCP outputs before M4-B2.
+// Absence means not evaluated. Keep FitAssessmentSchema strict and unchanged for v4 consumers.
+export const ScreeningAssessmentSchema = FitAssessmentSchema.extend({
+  screeningContext: ScreeningContextV1Schema.optional(),
+});
+export type ScreeningAssessment = z.infer<typeof ScreeningAssessmentSchema>;
 export const JobIngestResultSchema = z.object({
   job: JobPostingSchema, warnings: z.array(z.string().min(1)),
 }).strict();

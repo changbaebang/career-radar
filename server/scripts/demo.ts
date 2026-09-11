@@ -26,7 +26,7 @@ for (const [index, verdict] of (["REALISTIC", "STRETCH", "PASS"] as const).entri
     recommendation: `Synthetic ${verdict} illustration only; not a model-generated assessment of a real person or job.`,
   };
   store.upsertJob(job);
-  const assessmentId = store.saveAssessment(syntheticProfile.id, job, result);
+  const assessmentId = store.saveAssessment(syntheticProfile, job, result);
   examples.push({ job, assessment: result, assessmentId });
   const saved = store.saveApplication({ assessmentId, status: index === 0 ? "applied" : "saved" });
   if (index === 0) firstApplicationId = saved.id;
