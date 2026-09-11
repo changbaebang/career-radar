@@ -179,8 +179,8 @@ context is validated against the exact inputs the model received: unverified ref
 become `uncertain` with neutral text, and a context outside the contract is dropped with a
 note. The widget (URI v5) shows the context separately from fit evidence and interview
 risks; absence renders as not evaluated. Whether the live model actually cites correct
-locations or keeps judgments uncertain is **not** established here: model-mode evals and the
-#4 live measurement run only after explicit cost approval. [B2 notes](docs/MILESTONE_4B2.md).
+locations or keeps judgments uncertain is **not** established here: model-mode evals are not
+implemented in the runner yet, and they and the #4 live measurement run only after explicit cost approval. [B2 notes](docs/MILESTONE_4B2.md).
 
 ## Documentation references
 

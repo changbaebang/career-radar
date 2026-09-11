@@ -56,13 +56,14 @@ describe("MeasuredAnalyzer (records timings and identifiers, never text)", () =>
     const controller = new AbortController();
     const abandoned = measured.extractJob(expectedDescription(found[1]!), controller.signal); // stalls until abort
     abandoned.catch(() => undefined);
-    await new Promise((resolve) => setTimeout(resolve, 5));
+    await new Promise((resolve) => setTimeout(resolve, 30));
     controller.abort();
     await measured.settle(1_000);
     const record = measured.records[1]!;
     expect(record).toMatchObject({ status: "aborted", settledAfterBatchReturn: true, candidateId: found[1]!.candidate.candidateId });
     expect(record.abortToSettleMs).toBeGreaterThanOrEqual(0);
-    expect(record.durationMs).toBeGreaterThanOrEqual(5);
+    // Timers may fire slightly before the requested delay on performance.now(); assert a wide margin, not the exact wait.
+    expect(record.durationMs).toBeGreaterThanOrEqual(15);
     expect(measured.runAbortedAt("A")).toBeDefined();
     expect(measured.runAbortedAt("B")).toBeUndefined();
   });
