@@ -1,6 +1,6 @@
 import type { CandidateProfile, FitAssessment, JobPosting, JobRecommendations } from "@career-radar/shared";
 import { digest } from "../../../evals/evaluate.js";
-import { applyAssessmentPolicy } from "../../src/domain/assessment/policy.js";
+import { finalizeAssessment } from "../../src/domain/assessment/pipeline.js";
 import type { OperationRecord, Usage } from "./measured-analyzer.js";
 
 // Pure helpers over recorded operations. Nothing here performs I/O.
@@ -107,9 +107,9 @@ export function assessmentSummary(a: FitAssessment): AssessmentSummary {
     interviewRisks: a.interviewRisks.length, missingInformation: a.missingInformation.length, hash: digest(a) };
 }
 
-// Criterion 1: the saved result must equal the deterministic policy applied to the captured draft.
+// Criterion 1: the saved result must equal the deterministic pipeline (policy + screening validation) applied to the captured draft.
 export function policyInspection(profile: CandidateProfile, job: JobPosting, draft: FitAssessment, final: FitAssessment) {
-  const replay = applyAssessmentPolicy(profile, job, draft);
+  const replay = finalizeAssessment(profile, job, draft);
   return {
     verdictChanged: draft.verdict !== final.verdict, confidenceChanged: draft.confidence !== final.confidence,
     removedUngroundedMatches: Math.max(0, draft.strongestMatches.length - final.strongestMatches.length),

@@ -67,16 +67,17 @@ export const FitAssessmentSchema = z.object({
   hardBlockers: z.array(GapSchema), interviewRisks: z.array(z.string().min(1)),
   recommendation: z.string().min(1), missingInformation: z.array(z.string().min(1)),
   modelVersion: z.string().min(1), promptVersion: z.string().min(1),
+  // M4-B2: located screening context produced in the same assessment call and validated against the
+  // captured inputs before storage/output. Absence means not evaluated, never low risk.
+  screeningContext: ScreeningContextV1Schema.optional(),
 }).strict();
 
 export const ProfileUpsertResultSchema = z.object({
   profile: CandidateProfileSchema, warnings: z.array(z.string().min(1)),
 }).strict();
-// Future opt-in contract: do not use this for model/MCP outputs before M4-B2.
-// Absence means not evaluated. Keep FitAssessmentSchema strict and unchanged for v4 consumers.
-export const ScreeningAssessmentSchema = FitAssessmentSchema.extend({
-  screeningContext: ScreeningContextV1Schema.optional(),
-});
+// B1 introduced this extension; since B2 the base fit schema carries the optional context, so the
+// name is retained as an alias for existing callers.
+export const ScreeningAssessmentSchema = FitAssessmentSchema;
 export type ScreeningAssessment = z.infer<typeof ScreeningAssessmentSchema>;
 export const JobIngestResultSchema = z.object({
   job: JobPostingSchema, warnings: z.array(z.string().min(1)),
@@ -168,7 +169,7 @@ export type PipelineInput = z.infer<typeof PipelineInputSchema>;
 export type PipelineSummary = z.infer<typeof PipelineSummarySchema>;
 
 export const CareerRadarStatusSchema = z.object({
-  name: z.literal("Career Radar"), milestone: z.literal("Milestone 3"),
+  name: z.literal("Career Radar"), milestone: z.literal("Milestone 4"),
   state: z.literal("ready"), message: z.string().min(1),
   checkedAt: z.string().datetime(), capabilities: z.array(z.string().min(1)).min(1),
 });

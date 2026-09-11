@@ -78,9 +78,10 @@ describe("Career Radar HTTP and MCP server", () => {
     const client = await connectClient(await startTestServer({ store, discovery, createAnalyzer }));
     closeCallbacks.push(async () => { discovery.close(); store.close(); });
     const tools = (await client.listTools()).tools;
-    // B1 adds an opt-in schema only; do not advertise new fields to the cached v4 widget/model.
-    expect(JSON.stringify(tools)).not.toContain("screeningContext");
+    // B2 advertises the optional screening context on assessment outputs (widget URI v5); identity stays internal.
+    for (const name of ["job_assess", "job_recommend"]) expect(JSON.stringify(tools.find((tool) => tool.name === name)?.outputSchema)).toContain("screeningContext");
     expect(JSON.stringify(tools)).not.toContain("inputIdentity");
+    expect(CAREER_RADAR_WIDGET_URI).toBe("ui://career-radar/widget-v5.html");
     expect(tools.find((tool) => tool.name === "job_search")).toMatchObject({ annotations: { readOnlyHint: false, openWorldHint: true } });
     expect(tools.find((tool) => tool.name === "job_search")?._meta).not.toHaveProperty("ui");
     expect(tools.find((tool) => tool.name === "job_recommend")).toMatchObject({
@@ -98,6 +99,7 @@ describe("Career Radar HTTP and MCP server", () => {
       searchId: search.searchId, candidateProfileId: syntheticProfile.id, candidateIds: [search.candidates[0]!.candidateId],
     } })).structuredContent);
     expect(result.realistic).toHaveLength(1);
+    // The synthetic analyzer produced no context: absence is "not evaluated", never synthesized.
     expect(result.realistic[0]!.assessment).not.toHaveProperty("screeningContext");
     expect(result.realistic[0]).not.toHaveProperty("inputIdentity");
     expect(result.shortfall.stretch).toBe(1);
@@ -129,7 +131,7 @@ describe("Career Radar HTTP and MCP server", () => {
     const response = await fetch(`${baseUrl}/health`);
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
-      name: "Career Radar", milestone: "Milestone 3", state: "ready",
+      name: "Career Radar", milestone: "Milestone 4", state: "ready",
     });
   });
 
@@ -171,6 +173,14 @@ describe("Career Radar HTTP and MCP server", () => {
       strongestMatches: [{ requirementId: "req_react", requirement: "Production React experience", evidence: "React", source: {}, strength: "direct" }],
       gaps: [], hardBlockers: [], interviewRisks: [], recommendation: "Apply with direct React evidence.",
       missingInformation: [], modelVersion: "fake-model", promptVersion: "fake-prompt",
+      // No role/leadership evidence exists for a scope comparison, so the validator must downgrade it;
+      // the career-story judgment cites a skill and a requirement and stays as produced.
+      screeningContext: { version: "1",
+        seniorityFit: { value: "overleveled", confidence: "high", explanation: "Synthetic unsupported scope claim.", evidence: [
+          { source: "candidate", path: "skills[0]", quote: "React" }, { source: "job", path: "required[0].text", quote: "Production React experience" }] },
+        careerStoryRisk: { value: "low", confidence: "medium", explanation: "Synthetic continuous frontend path.", evidence: [
+          { source: "candidate", path: "skills[0]", quote: "React" }, { source: "job", path: "required[0].text", quote: "Production React experience" }] },
+        screeningRisks: [], unknowns: [] },
     };
     const analyzer: CareerAnalyzer = {
       extractProfile: async () => ({ profile, warnings: [] }),
@@ -191,8 +201,11 @@ describe("Career Radar HTTP and MCP server", () => {
 
     expect(result.structuredContent).toMatchObject({
       job: { id: "job_test" },
-      assessment: { verdict: "REALISTIC", modelVersion: "fake-model" },
+      assessment: { verdict: "REALISTIC", modelVersion: "fake-model", screeningContext: {
+        seniorityFit: { value: "uncertain", confidence: "low" }, careerStoryRisk: { value: "low", confidence: "medium" },
+        unknowns: ["seniorityFit: missing scope references or invalid source/path/quote; marked uncertain."] } },
     });
+    expect(JSON.stringify(result.structuredContent)).not.toContain("Synthetic unsupported scope claim.");
     expect(store.getProfile(profile.id)).toEqual(profile);
     expect(store.getJob(job.id)).toEqual(job);
     expect(createAnalyzer).toHaveBeenCalledTimes(1);

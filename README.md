@@ -159,18 +159,28 @@ explicit correction — it supersedes the **whole prior outcome history** for ag
 history. Stage clearing retracts previous reach; unknown stages/dates are not inferred.
 `pipeline_summary` shows stage reach, current coverage and last-update exclusions without
 changing fit verdicts or claiming probabilities. [Contract and examples](docs/MILESTONE_4C.md).
-Widget URI is v4: refresh ChatGPT descriptors before testing. Local synthetic checks do
+Widget URI is now v5 (M4-B2): refresh ChatGPT descriptors before testing. Local synthetic checks do
 not establish actual host/model behavior. No API calls are required for this slice.
 
-### M4-B1 evidence contract (not yet a model/UI feature)
+### M4-B1 evidence contract
 
-The opt-in screening context schema and located-reference validator are implemented.
-Missing/invalid evidence produces uncertainty, not a verdict/ranking penalty. Current
-MCP outputs still omit this field; prompt and widget integration waits for B2 and
-the separately approved live measurement. New assessment snapshots record hashes of
-the actual structured profile/JD inputs, without adding a profile copy. Old snapshots
-stay readable and are not backfilled. Hashes do not restore missing inputs or record
-extraction-run provenance. [B1 contract and limits](docs/MILESTONE_4B1.md).
+The screening context schema and located-reference validator are implemented.
+Missing/invalid evidence produces uncertainty, not a verdict/ranking penalty. New
+assessment snapshots record hashes of the actual structured profile/JD inputs, without
+adding a profile copy. Old snapshots stay readable and are not backfilled. Hashes do
+not restore missing inputs or record extraction-run provenance. [B1 contract and limits](docs/MILESTONE_4B1.md).
+
+### M4-B2 screening context in the model path (synthetic-verified; live gated)
+
+The assessment call now also produces screening context (role scope, career-story
+clarification, cited screening risks, unknowns) in the same model operation, so batch call
+counts do not change. Prompt version is `milestone-4b2-v1`. Before storage or output the
+context is validated against the exact inputs the model received: unverified references
+become `uncertain` with neutral text, and a context outside the contract is dropped with a
+note. The widget (URI v5) shows the context separately from fit evidence and interview
+risks; absence renders as not evaluated. Whether the live model actually cites correct
+locations or keeps judgments uncertain is **not** established here: model-mode evals are not
+implemented in the runner yet, and they and the #4 live measurement run only after explicit cost approval. [B2 notes](docs/MILESTONE_4B2.md).
 
 ## Documentation references
 

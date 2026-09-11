@@ -1,4 +1,5 @@
 import type { JobRecommendations, RecommendedJob } from "@career-radar/shared";
+import { ScreeningContextSection } from "./screening";
 
 function SourceLink({ href, children }: { href: string; children: string }) {
   // Source URLs are untrusted even when the host supplied a schema-valid tool result.
@@ -27,6 +28,7 @@ function JobRow({ item }: { item: RecommendedJob }) {
     </dl>
     <p className="message">{assessment.recommendation}</p>
     {assessment.hardBlockers.length > 0 && <p className="message"><strong>Hard blockers:</strong> {assessment.hardBlockers.map((gap) => gap.requirement).join("; ")}</p>}
+    <ScreeningContextSection context={assessment.screeningContext} />
     <details>
       <summary>Evidence and decision details</summary>
       {assessment.strongestMatches.map((match, index) => <p className="message" key={index}><strong>{match.requirement}</strong><br />{match.evidence}</p>)}

@@ -12,6 +12,7 @@ import {
   type JobAssessmentResult,
 } from "@career-radar/shared";
 import { RecommendationsCard } from "./recommendations";
+import { ScreeningContextSection } from "./screening";
 
 declare global {
   interface Window {
@@ -32,6 +33,9 @@ const styles = `
   .pill { display: inline-flex; align-items: center; padding: 7px 11px; border-radius: 999px; background: #dff4e7; color: #175b38; font-size: 12px; font-weight: 800; }
   .pill[data-verdict='PASS'] { background: #f9e1df; color: #8d2d28; }
   .pill[data-verdict='STRETCH'] { background: #fff0c9; color: #7a5610; }
+  .pill[data-uncertain='true'] { background: #fff0c9; color: #7a5610; border-color: rgba(122,86,16,.25); }
+  .screening { margin-top: 18px; padding: 12px 14px; border-radius: 12px; border: 1px dashed rgba(24,82,54,.25); }
+  .screening h2 { margin-top: 0; }
   .secondary { background: rgba(255,255,255,.65); color: #405147; border: 1px solid rgba(24,82,54,.12); }
   .message, .recommendation { margin: 10px 0 0; color: #405147; font-size: 13px; line-height: 1.55; }
   .recommendation { padding: 13px 14px; border-radius: 12px; background: rgba(255,255,255,.66); }
@@ -135,6 +139,12 @@ function AssessmentCard({ result }: { result: JobAssessmentResult }) {
           <ul>{assessment.hardBlockers.map((gap) => <li key={gap.requirementId ?? gap.requirement}>{gap.requirement}</li>)}</ul>
         </section>
       )}
+
+      {assessment.missingInformation.length > 0 && (
+        <p className="message"><strong>Missing information:</strong> {assessment.missingInformation.join(" ")}</p>
+      )}
+
+      <ScreeningContextSection context={assessment.screeningContext} />
 
       <h2>Recommendation</h2>
       <p className="recommendation">{assessment.recommendation}</p>

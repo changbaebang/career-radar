@@ -157,6 +157,23 @@ describe("bounded search snapshots and recommendations", () => {
     for (const invalid of [0, -1, 1.5]) expect(() => new JobDiscovery(provider, undefined, { deadlineMs: invalid })).toThrow("positive integer");
   });
 
+  it("validates screening context against the captured inputs inside the batch and keeps the fit unchanged", async () => {
+    const { discovery, store, analyzer, createAnalyzer, input } = await setup();
+    const valid = { source: "job" as const, path: "required[0].text", quote: syntheticJob.required[0]!.text };
+    const wrong = { source: "candidate" as const, path: "roles[0].evidence[9]", quote: "Led a React platform team" };
+    const context = { version: "1" as const,
+      seniorityFit: { value: "overleveled" as const, confidence: "high" as const, explanation: "Synthetic unsupported claim.", evidence: [wrong, valid] },
+      careerStoryRisk: { value: "low" as const, confidence: "medium" as const, explanation: "Synthetic context.", evidence: [{ ...wrong, path: "roles[0].evidence[0]" }, valid] },
+      screeningRisks: [{ type: "seniority_mismatch" as const, severity: "high" as const, confidence: "high" as const, explanation: "Synthetic risk.", evidence: [wrong, valid] }], unknowns: [] };
+    analyzer.assess.mockResolvedValue({ ...groundedAssessment, screeningContext: context });
+    const result = await discovery.recommend({ ...input, candidateIds: ["synthetic_1"], realisticCount: 1, stretchCount: 0 }, store, createAnalyzer);
+    const saved = result.realistic[0]!.assessment;
+    expect(saved.verdict).toBe("REALISTIC");
+    expect(saved.screeningContext).toMatchObject({ seniorityFit: { value: "uncertain", confidence: "low" }, careerStoryRisk: { value: "low" }, screeningRisks: [] });
+    expect(saved.screeningContext!.unknowns).toHaveLength(2);
+    expect(JSON.stringify(result)).not.toContain("Synthetic unsupported claim.");
+  });
+
   it("does not share search IDs across app instances", async () => {
     const { store, createAnalyzer, input } = await setup();
     const other = new JobDiscovery({ search: async () => discoveryResult });

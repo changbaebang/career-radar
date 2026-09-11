@@ -5,7 +5,7 @@ import {
 } from "@career-radar/shared";
 import type { CareerAnalyzer } from "../../ai/analyzer.js";
 import type { JobSearchProvider, SearchHit } from "../../infra/search/greenhouse.js";
-import { applyAssessmentPolicy } from "../assessment/policy.js";
+import { finalizeAssessment } from "../assessment/pipeline.js";
 import { CareerStore, stableId } from "../store.js";
 
 const TTL_MS = 30 * 60_000;
@@ -120,7 +120,7 @@ export class JobDiscovery {
             store.upsertJob(job);
           }
           const draft = await Promise.race([analyzer.assess(profile, job, controller.signal), aborted]);
-          const assessment = applyAssessmentPolicy(profile, job, draft);
+          const assessment = finalizeAssessment(profile, job, draft);
           controller.signal.throwIfAborted();
           const assessmentId = store.saveAssessment(profile, job, assessment);
           items.push({ candidate: hit.candidate, jobId: job.id, assessmentId, assessment });

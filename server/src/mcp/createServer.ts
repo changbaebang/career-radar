@@ -17,14 +17,15 @@ import { z } from "zod";
 
 import type { CareerAnalyzer } from "../ai/analyzer.js";
 import { buildCareerRadarStatus } from "../demo.js";
-import { applyAssessmentPolicy } from "../domain/assessment/policy.js";
+import { finalizeAssessment } from "../domain/assessment/pipeline.js";
 import type { CareerStore } from "../domain/store.js";
 import { fetchJobUrl } from "../infra/fetch/job-url.js";
 import { registerPipelineTools } from "./pipeline-tools.js";
 import { registerSearchTools } from "./search-tools.js";
 import type { JobDiscovery } from "../domain/jobs/search.js";
 
-export const CAREER_RADAR_WIDGET_URI = "ui://career-radar/widget-v4.html";
+// v5: assessment outputs carry optional screeningContext (M4-B2); v4 consumers parse strictly and must be refreshed.
+export const CAREER_RADAR_WIDGET_URI = "ui://career-radar/widget-v5.html";
 
 // Both are required on purpose: an MCP server is created per request, so a per-call default store
 // would forget every profile between profile_upsert and job_assess. createHttpApp owns the shared
@@ -52,7 +53,7 @@ function readWidgetBundle(): string {
 
 export function createMcpServer(dependencies: McpDependencies): McpServer {
   const { store, createAnalyzer: getAnalyzer } = dependencies;
-  const server = new McpServer({ name: "career-radar", version: "0.3.0" });
+  const server = new McpServer({ name: "career-radar", version: "0.4.0" });
 
   registerAppTool(
     server,
@@ -169,7 +170,7 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
     {
       title: "Assess candidate-job fit",
       description:
-        "Use this when profile_upsert and job_ingest have returned IDs and the user wants an evidence-based REALISTIC, STRETCH, or PASS decision.",
+        "Use this when profile_upsert and job_ingest have returned IDs and the user wants an evidence-based REALISTIC, STRETCH, or PASS decision. The result also carries screening context (role scope and career-story clarification with cited references) that never changes the verdict; uncertain entries mean references were missing or unverified, not low risk.",
       inputSchema: {
         candidateProfileId: z.string().min(1),
         jobId: z.string().min(1),
@@ -194,7 +195,7 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
       if (!profile) throw new Error("Candidate profile was not found or has expired. Call profile_upsert again.");
       const job = store.getJob(jobId);
       if (!job) throw new Error("Job was not found or has expired. Call job_ingest again.");
-      const assessment = applyAssessmentPolicy(profile, job, await getAnalyzer().assess(profile, job));
+      const assessment = finalizeAssessment(profile, job, await getAnalyzer().assess(profile, job));
       const assessmentId = store.saveAssessment(profile, job, assessment);
       const result = JobAssessmentResultSchema.parse({ job, assessment, assessmentId });
       return {
@@ -229,7 +230,7 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
             csp: { connectDomains: [], resourceDomains: [] },
           },
           "openai/widgetDescription":
-            "Career Radar evidence-based assessments, recommendation groups with shortages and freshness, and application pipeline.",
+            "Career Radar evidence-based assessments with screening context and explicit uncertainty, recommendation groups with shortages and freshness, and the stage-aware application pipeline.",
           "openai/widgetPrefersBorder": true,
         },
       }],
