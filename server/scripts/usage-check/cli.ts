@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { DEFAULT_OPENAI_MODEL, type CareerAnalyzer } from "../../src/ai/analyzer.js";
+import { DEFAULT_OPENAI_MODEL, type AnalyzerResponseEvent, type CareerAnalyzer } from "../../src/ai/analyzer.js";
 import { createAnalyzerFromEnv, providerDestination, resolveProviderName, type ProviderName } from "../../src/ai/provider.js";
 import { loadLocalEnv } from "../../src/config.js";
 import { measurementResumeText } from "../measure-live/synthetic-inputs.js";
-import { createResultsApp, runUsageCheck, type JobInput, type UsageCheckResults } from "./run.js";
+import { DEFAULT_TOOL_TIMEOUT_MS, createResultsApp, runUsageCheck, type JobInput, type UsageCheckResults } from "./run.js";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 // pnpm runs package scripts from the package directory; INIT_CWD is where the user typed the command.
@@ -14,7 +14,7 @@ const fromCaller = (path: string) => resolve(callerDirectory, path);
 
 // Same SDK pins as the live harness: one HTTP attempt per counted call and no SDK logging, so the
 // printed call bound is the real request bound and OPENAI_LOG=debug cannot echo the resume.
-export const USAGE_TRANSPORT = { maxRetries: 0, logLevel: "off" } as const;
+export const USAGE_TRANSPORT = { maxRetries: 0, logLevel: "off", timeout: DEFAULT_TOOL_TIMEOUT_MS } as const;
 export const USAGE_ERRORS = {
   baseUrlSet: "Refused: unset OPENAI_BASE_URL (shell or .env.local); the usage check only sends to the destination it printed.",
   invalidOption: "Unknown option or missing value. Use --help.",
@@ -22,8 +22,8 @@ export const USAGE_ERRORS = {
   outputExists: "Output directory must be new.",
 } as const;
 
-export function usageAnalyzerFactory(provider: ProviderName): () => CareerAnalyzer {
-  return () => createAnalyzerFromEnv({ provider, transport: { ...USAGE_TRANSPORT } });
+export function usageAnalyzerFactory(provider: ProviderName, onResponse?: (event: AnalyzerResponseEvent) => void): () => CareerAnalyzer {
+  return () => createAnalyzerFromEnv({ provider, transport: { ...USAGE_TRANSPORT }, ...(onResponse ? { onResponse } : {}) });
 }
 
 const HELP = `pnpm usage-check [--resume FILE] --job URL|FILE [--job ...] [--approve-transmission] [--out DIR] [--port N]
@@ -35,7 +35,8 @@ what would be sent and exits 3 with zero model calls. --resume defaults to the s
 resume. --job accepts an https URL on an allowed job board or a path to a text file; relative paths are
 resolved from the directory where you ran the command. Results are written to
 data/usage-check/<timestamp>/results.json (gitignored); --replay serves a saved file without any call.
-SDK retries and SDK logging are off; a live run is refused while OPENAI_BASE_URL is set.`;
+SDK retries and SDK logging are off; a live run is refused while OPENAI_BASE_URL is set. Each tool call may take
+up to 5 minutes (the MCP client default of 60 s is too short for some free models); durations are recorded.`;
 
 type Args = { help: boolean; resume?: string; jobs: string[]; approve: boolean; out?: string; replay?: string; port: number };
 
@@ -94,10 +95,12 @@ async function main(): Promise<number> {
   if (!args.approve) { console.error("Add --approve-transmission to run. 0 model calls made."); return 3; }
   const out = args.out ? fromCaller(args.out) : join(root, "data/usage-check", new Date().toISOString().replaceAll(":", "-"));
   if (existsSync(out)) throw new Error(USAGE_ERRORS.outputExists);
-  const results = await runUsageCheck({ resumeText, jobs, createAnalyzer: usageAnalyzerFactory(provider), provider, model, log: (line) => console.error(`  ${line}`) });
+  let register: ((event: AnalyzerResponseEvent) => void) | undefined;
+  const results = await runUsageCheck({ resumeText, jobs, createAnalyzer: usageAnalyzerFactory(provider, (event) => register?.(event)), provider, model,
+    log: (line) => console.error(`  ${line}`), onResponse: (fn) => { register = fn; } });
   mkdirSync(out, { recursive: true, mode: 0o700 });
   writeFileSync(join(out, "results.json"), `${JSON.stringify(results, null, 2)}\n`, { flag: "wx", mode: 0o600 });
-  console.error(`Saved ${join(out, "results.json")} (${results.modelCalls} model calls; ${results.jobs.filter((j) => j.status === "assessed").length}/${results.jobs.length} assessed).`);
+  console.error(`Saved ${join(out, "results.json")} (${results.modelCalls} model calls; ${results.jobs.filter((j) => j.status === "assessed").length}/${results.jobs.length} assessed; profile extraction ${results.profileMs} ms).`);
   console.error("Deleting that directory removes the local results file only; what the provider retains and anything you printed or copied are separate.");
   serve(results, args.port);
   return 0;

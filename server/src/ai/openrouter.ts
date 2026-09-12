@@ -20,6 +20,7 @@ export const OPENROUTER_ERRORS = {
   noContent: "OpenRouter returned no message content.",
   refused: "OpenRouter model refused the request.",
   truncated: "OpenRouter response ended before the structured output completed.",
+  finishError: "OpenRouter's upstream endpoint reported an error finish (no completed output).",
   invalidJson: "OpenRouter returned content that is not valid JSON.",
   schemaMismatch: "OpenRouter returned JSON that does not match the requested schema; the routed endpoint may not enforce structured outputs.",
 } as const;
@@ -77,6 +78,7 @@ export class OpenRouterCareerAnalyzer implements CareerAnalyzer {
     const choice = response.choices[0];
     if (!choice) throw new Error(OPENROUTER_ERRORS.noContent);
     if (choice.message.refusal) throw new Error(OPENROUTER_ERRORS.refused);
+    if (choice.finish_reason === "error") throw new Error(OPENROUTER_ERRORS.finishError);
     if (choice.finish_reason !== "stop") throw new Error(OPENROUTER_ERRORS.truncated);
     if (typeof choice.message.content !== "string" || choice.message.content.trim() === "") throw new Error(OPENROUTER_ERRORS.noContent);
     let json: unknown;

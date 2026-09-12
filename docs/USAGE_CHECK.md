@@ -60,7 +60,10 @@ call count, then exits with code 3 and zero calls. Add the flag to run. The scri
 MCP tools (`profile_upsert`, `job_ingest`, `job_assess`) over the real HTTP transport, so the
 output is what the app produces, then serves `http://127.0.0.1:8010/`: a comparison table (a
 reading aid, not the widget) and one real widget card per posting. A posting that fails is
-reported with the fixed error message and does not stop the others.
+reported with the fixed error message and does not stop the others. Each tool call is bounded at
+5 minutes (the MCP client default of 60 seconds is too short for some free models) and the SDK
+request is bounded the same way; `results.json` records how long every call took and the per-call
+telemetry (finish status, token counters, upstream provider), never the content.
 
 Results are written to `data/usage-check/<timestamp>/results.json` (gitignored, `0o600`). It
 contains the structured profile, the postings and the assessments; deleting the directory removes

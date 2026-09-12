@@ -2,7 +2,9 @@ import { sanitizeProviderError } from "./errors.js";
 
 export type AnalyzerOperation = "extractProfile" | "extractJob" | "assess";
 // SDK client options the measurement harness pins (retries off, logging off). The server never sets them.
-export type AnalyzerTransport = { maxRetries?: number; logLevel?: "off" | "error" | "warn" | "info" | "debug" };
+// timeout: per-request wall-clock bound in ms (SDK default is 10 minutes); the usage check sets it so an
+// unresponsive free endpoint cannot keep the process alive after the tool call has already given up.
+export type AnalyzerTransport = { maxRetries?: number; logLevel?: "off" | "error" | "warn" | "info" | "debug"; timeout?: number };
 
 // Telemetry projection of one model call. Deliberately excludes the request input, the instructions
 // and the parsed/raw output so a consumer can log it without handling personal data.

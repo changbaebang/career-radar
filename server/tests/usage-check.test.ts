@@ -36,7 +36,10 @@ describe("usage check (real MCP tools over HTTP, fake analyzer, no network)", ()
     const fetchJob = vi.fn(async (url: string) => ({ text: "Gamma role fetched: own frontend delivery for customers.", sourceUrl: url, warnings: ["Synthetic fetched page"] }));
     const results = await runUsageCheck({ resumeText: "Synthetic resume text that is long enough to pass the minimum length check.", jobs,
       createAnalyzer: () => analyzer, fetchJob, provider: "openrouter", model: "synthetic/free-model", now: () => new Date("2026-09-12T00:00:00.000Z") });
-    expect(results).toMatchObject({ kind: "usage-check", provider: "openrouter", model: "synthetic/free-model", modelCalls: 7, promptVersion: groundedAssessment.promptVersion });
+    expect(results).toMatchObject({ kind: "usage-check", provider: "openrouter", model: "synthetic/free-model", modelCalls: 7, promptVersion: groundedAssessment.promptVersion, toolTimeoutMs: 300_000 });
+    expect(results.profileMs).toBeGreaterThanOrEqual(0);
+    expect(results.telemetry).toEqual([]); // the fake analyzer emits no hook events
+    expect(results.jobs.every((j) => j.status === "assessed" && j.ingestMs >= 0 && j.assessMs >= 0)).toBe(true);
     expect(results.jobs.map((j) => j.status)).toEqual(["assessed", "assessed", "assessed"]);
     expect(analyzer.extractProfile).toHaveBeenCalledTimes(1);
     expect(fetchJob).toHaveBeenCalledWith("https://jobs.lever.co/example/gamma");
@@ -63,6 +66,19 @@ describe("usage check (real MCP tools over HTTP, fake analyzer, no network)", ()
     expect(failed.status === "failed" && failed.step).toBe("job_assess");
     expect(results.modelCalls).toBe(5);
     expect(renderIndex(results)).toContain("failed at job_assess");
+  });
+
+  it("turns a tool call that outlives the per-call bound into a failed step and keeps going", async () => {
+    const analyzer = fakeAnalyzer();
+    analyzer.assess.mockImplementationOnce(() => new Promise(() => undefined)); // first assessment never settles
+    const results = await runUsageCheck({ resumeText: "Synthetic resume text that is long enough to pass the minimum length check.", jobs: jobs.slice(0, 2),
+      createAnalyzer: () => analyzer, provider: "openai", model: "gpt-synthetic", toolTimeoutMs: 300 });
+    expect(results.jobs.map((j) => j.status)).toEqual(["failed", "assessed"]);
+    const failed = results.jobs[0]!;
+    expect(failed.status === "failed" && failed.step).toBe("job_assess");
+    expect(failed.status === "failed" && failed.message).toMatch(/timed out/i);
+    expect(failed.status === "failed" && failed.assessMs).toBeGreaterThanOrEqual(250);
+    expect(renderIndex(results)).toContain("timed out");
   });
 
   it("parses arguments and requires one to five postings unless replaying", () => {
