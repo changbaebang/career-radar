@@ -158,7 +158,7 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
         structuredContent: result,
         content: [{
           type: "text" as const,
-          text: `Normalized ${result.job.company} — ${result.job.title} as ${result.job.id}.`,
+          text: `Normalized ${result.job.company ?? "(employer not stated)"} — ${result.job.title} as ${result.job.id}.`,
         }],
       };
     },
@@ -202,7 +202,7 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
         structuredContent: result,
         content: [{
           type: "text" as const,
-          text: `${job.company} — ${job.title}: ${assessment.verdict}. ${assessment.recommendation}`,
+          text: `${job.company ?? "(employer not stated)"} — ${job.title}: ${assessment.verdict}. ${assessment.recommendation}`,
         }],
       };
     },

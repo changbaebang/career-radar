@@ -90,7 +90,7 @@ export class CareerStore {
       const application = ApplicationSchema.parse({
         id: `application_${randomUUID()}`, jobId: snapshot.job.id, candidateProfileId: snapshot.profileId,
         assessmentId, status, verdictAtDecision: snapshot.assessment.verdict,
-        roleFamily: snapshot.job.roleFamily, company: snapshot.job.company, title: snapshot.job.title,
+        roleFamily: snapshot.job.roleFamily, ...(snapshot.job.company === undefined ? {} : { company: snapshot.job.company }), title: snapshot.job.title,
         createdAt: timestamp, updatedAt: timestamp,
         normalizedOutcomeStage: "unknown", outcomeProvenance: "user_report", outcomeRevision: 0,
         ...(status === "applied" ? { appliedAt: timestamp } : {}),

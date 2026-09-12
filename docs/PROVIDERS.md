@@ -9,7 +9,7 @@ is the transport and how strictly the endpoint enforces the output schema.
 | `CAREER_RADAR_PROVIDER` | Adapter | Endpoint | Model | Key |
 | --- | --- | --- | --- | --- |
 | `openai` (default) | `OpenAICareerAnalyzer` | OpenAI Responses API, `store: false` | `OPENAI_MODEL` or `gpt-5-mini` | `OPENAI_API_KEY` |
-| `openrouter` | `OpenRouterCareerAnalyzer` | `https://openrouter.ai/api/v1/chat/completions` (fixed in code) | `OPENROUTER_MODEL` (required, no default) | `OPENROUTER_API_KEY` |
+| `openrouter` | `OpenRouterCareerAnalyzer` | `https://openrouter.ai/api/v1/chat/completions` (fixed in code) | `OPENROUTER_MODEL` (required, no default); optional `OPENROUTER_REASONING_EFFORT` | `OPENROUTER_API_KEY` |
 
 Selection is explicit. An unknown value fails with a fixed message; there is no fallback from one
 provider to another and no automatic model substitution.
@@ -48,6 +48,11 @@ usage and quality measured on one provider do not verify another.
   review that provider's data policy and your OpenRouter privacy settings before a live run. The
   request carries the `X-OpenRouter-Title: Career Radar` attribution header and nothing else about
   the user.
+- **Reasoning budget (opt-in).** `OPENROUTER_REASONING_EFFORT=none|minimal|low|medium|high|xhigh|max`
+  sends OpenRouter's `reasoning.effort`. Reasoning tokens are billed as output tokens and, on the free
+  endpoints tried in the first usage check, ran to tens of thousands per call; this bounds them. The
+  value is a request parameter, so under `require_parameters` routing it also excludes endpoints that
+  do not accept it, and an unsupported value fails closed at startup. Unset by default.
 - **Telemetry** maps `prompt_tokens`/`completion_tokens` to the same `onResponse` event shape and adds
   `upstreamProvider` (the endpoint OpenRouter routed to, or `unknown`), so
   `pnpm measure:live --provider openrouter` records per-call usage and upstream provider the same way. Cost is still not

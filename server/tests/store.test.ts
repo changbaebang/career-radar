@@ -27,6 +27,16 @@ function filePath() {
 }
 
 describe("SQLite CareerStore", () => {
+  it("saves an application from a job whose employer was not stated, without inventing one", () => {
+    const store = storeAt();
+    const { company: _named, ...unnamed } = { ...job, id: "job_unnamed" }; void _named;
+    store.upsertJob(unnamed);
+    const id = store.saveAssessment(profile, unnamed, assessment);
+    const application = store.saveApplication({ assessmentId: id, status: "saved" });
+    expect(application).not.toHaveProperty("company");
+    expect(store.pipelineSummary().applications.find((a) => a.id === application.id)).not.toHaveProperty("company");
+  });
+
   it("round-trips an assessment snapshot with screening context and still reads legacy snapshots without one", () => {
     const store = storeAt();
     const context = { version: "1" as const,

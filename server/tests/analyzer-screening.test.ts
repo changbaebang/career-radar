@@ -24,7 +24,7 @@ describe("M4-B2 producer: screening context in the single assessment call", () =
   it("bumps the prompt version and returns a versioned context from the same call", async () => {
     respond(draft);
     const result = await analyzer().assess(syntheticProfile, syntheticJob);
-    expect(PROMPT_VERSION).toBe("milestone-4b2-v1");
+    expect(PROMPT_VERSION).toBe("milestone-4b2-v2");
     expect(result.promptVersion).toBe(PROMPT_VERSION);
     expect(result.verdict).toBe("REALISTIC");
     const { clarificationQuestion: _null, ...careerStoryRisk } = draftContext.careerStoryRisk; void _null;
@@ -43,6 +43,32 @@ describe("M4-B2 producer: screening context in the single assessment call", () =
     const format = JSON.stringify(request.text.format);
     expect(format).toContain("fit_assessment");
     for (const key of ["screeningContext", "seniorityFit", "careerStoryRisk", "screeningRisks", "unknowns", "clarificationQuestion"]) expect(format).toContain(key);
+  });
+
+  it("asks for a null employer and an integer 0-100 score, and rejects a 0-1 fraction as a schema mismatch", async () => {
+    respond(draft);
+    await analyzer().assess(syntheticProfile, syntheticJob);
+    const request = parse.mock.calls.at(-1)![0] as { instructions: string; text: { format: unknown } };
+    expect(request.instructions).toContain("integer from 0 to 100");
+    expect(request.instructions).toContain("never a 0-1 fraction");
+    const score = (request.text.format as { schema: { properties: { score: { anyOf: Array<{ type: string; minimum?: number; maximum?: number }> } } } }).schema.properties.score;
+    expect(score.anyOf).toEqual([{ type: "integer", minimum: 0, maximum: 100 }, { type: "null" }]);
+    respond({ ...draft, score: 65 });
+    expect((await analyzer().assess(syntheticProfile, syntheticJob)).score).toBe(65);
+    respond({ ...draft, score: 0.65 });
+    await expect(analyzer().assess(syntheticProfile, syntheticJob)).rejects.toThrow();
+  });
+
+  it("keeps an unnamed employer absent instead of letting the model fill it in", async () => {
+    const jobDraft = { company: null, title: "Frontend Engineering Lead", location: null, required: [{ text: "Lead a React team", type: "leadership", importance: "core" }],
+      preferred: [], responsibilities: [], roleFamily: "Frontend Engineering Lead", domains: [], technologies: [], seniority: null, warnings: [] };
+    respond(jobDraft);
+    const { job } = await analyzer().extractJob("Synthetic posting text without an employer name.");
+    expect(job).not.toHaveProperty("company");
+    const request = parse.mock.calls.at(-1)![0] as { instructions: string; text: { format: unknown } };
+    expect(request.instructions).toContain("set company to null; never infer it");
+    const company = (request.text.format as { schema: { properties: { company: { anyOf: Array<{ type: string }> } } } }).schema.properties.company;
+    expect(company.anyOf.map((entry) => entry.type)).toEqual(["string", "null"]);
   });
 
   it("drops a context outside the contract and keeps the fit, saying so once", async () => {

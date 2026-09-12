@@ -14,9 +14,13 @@ import { observeCall, projectUsage, type AnalyzerOperation, type AnalyzerRespons
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 // Static messages only: model output and error bodies are never echoed.
+export const OPENROUTER_REASONING_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+export type OpenRouterReasoningEffort = (typeof OPENROUTER_REASONING_EFFORTS)[number];
+
 export const OPENROUTER_ERRORS = {
   missingKey: "Set OPENROUTER_API_KEY in .env.local before using the openrouter provider.",
   missingModel: "Set OPENROUTER_MODEL in .env.local; the openrouter provider has no default model.",
+  invalidReasoning: "OPENROUTER_REASONING_EFFORT must be one of none, minimal, low, medium, high, xhigh, max.",
   noContent: "OpenRouter returned no message content.",
   refused: "OpenRouter model refused the request.",
   truncated: "OpenRouter response ended before the structured output completed.",
@@ -54,13 +58,22 @@ function projectChat(response: ChatResponse): ResponseProjection {
 export class OpenRouterCareerAnalyzer implements CareerAnalyzer {
   readonly #client: OpenAI;
   readonly #model: string;
+  readonly #reasoningEffort?: OpenRouterReasoningEffort;
   readonly #onResponse?: (event: AnalyzerResponseEvent) => void;
 
-  constructor(options: { apiKey?: string; model?: string; onResponse?: (event: AnalyzerResponseEvent) => void; transport?: AnalyzerTransport } = {}) {
+  // reasoningEffort: optional OpenRouter `reasoning.effort`. Reasoning tokens are billed as output and,
+  // on the free endpoints tried so far, can dwarf the answer; this bounds them. It is sent as a request
+  // parameter, so with require_parameters routing it also restricts routing to endpoints that accept it.
+  constructor(options: { apiKey?: string; model?: string; reasoningEffort?: string; onResponse?: (event: AnalyzerResponseEvent) => void; transport?: AnalyzerTransport } = {}) {
     const apiKey = options.apiKey ?? process.env.OPENROUTER_API_KEY;
     if (!apiKey?.trim()) throw new Error(OPENROUTER_ERRORS.missingKey);
     const model = options.model ?? process.env.OPENROUTER_MODEL;
     if (!model?.trim()) throw new Error(OPENROUTER_ERRORS.missingModel);
+    const effort = (options.reasoningEffort ?? process.env.OPENROUTER_REASONING_EFFORT)?.trim();
+    if (effort) {
+      if (!(OPENROUTER_REASONING_EFFORTS as readonly string[]).includes(effort)) throw new Error(OPENROUTER_ERRORS.invalidReasoning);
+      this.#reasoningEffort = effort as OpenRouterReasoningEffort;
+    }
     this.#client = new OpenAI({ apiKey, baseURL: OPENROUTER_BASE_URL, defaultHeaders: { "X-OpenRouter-Title": "Career Radar" }, ...(options.transport ?? {}) });
     this.#model = model;
     this.#onResponse = options.onResponse;
@@ -73,7 +86,7 @@ export class OpenRouterCareerAnalyzer implements CareerAnalyzer {
       response_format: zodResponseFormat(schema, OUTPUT_NAMES[operation]),
       // OpenRouter routing preference (not an OpenAI parameter): only endpoints that accept every
       // supplied parameter, including response_format, may serve this request.
-      ...({ provider: { require_parameters: true } } as object),
+      ...({ provider: { require_parameters: true }, ...(this.#reasoningEffort ? { reasoning: { effort: this.#reasoningEffort } } : {}) } as object),
     }, { signal, ...(signal ? { maxRetries: 0 } : {}) }) as Promise<ChatResponse>, projectChat);
     const choice = response.choices[0];
     if (!choice) throw new Error(OPENROUTER_ERRORS.noContent);

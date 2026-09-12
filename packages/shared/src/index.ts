@@ -38,8 +38,9 @@ export const RequirementSchema = z.object({
   importance: z.enum(["core", "important", "nice_to_have"]),
 }).strict();
 
+// company is absent when the posting text does not name the employer; nothing may fill it in.
 export const JobPostingSchema = z.object({
-  id: z.string().min(1), company: z.string().min(1), title: z.string().min(1),
+  id: z.string().min(1), company: z.string().min(1).optional(), title: z.string().min(1),
   location: z.string().min(1).optional(), sourceUrl: z.string().url().optional(),
   description: z.string().min(1), required: z.array(RequirementSchema),
   preferred: z.array(RequirementSchema), responsibilities: z.array(z.string().min(1)),
@@ -62,7 +63,8 @@ export const GapSchema = z.object({
 
 export const FitAssessmentSchema = z.object({
   verdict: VerdictSchema, confidence: ConfidenceSchema,
-  resumeContortion: ResumeContortionSchema, score: z.number().min(0).max(100).optional(),
+  // score, when present, is an integer on a 0-100 scale (100 = strongest evidence-backed fit); never a 0-1 fraction.
+  resumeContortion: ResumeContortionSchema, score: z.number().int().min(0).max(100).optional(),
   strongestMatches: z.array(EvidenceMatchSchema), gaps: z.array(GapSchema),
   hardBlockers: z.array(GapSchema), interviewRisks: z.array(z.string().min(1)),
   recommendation: z.string().min(1), missingInformation: z.array(z.string().min(1)),
@@ -117,7 +119,7 @@ export const ApplicationSchema = z.object({
   id: z.string().min(1), jobId: z.string().min(1), candidateProfileId: z.string().min(1),
   assessmentId: z.string().min(1), status: ApplicationStatusSchema,
   verdictAtDecision: VerdictSchema, roleFamily: z.string().min(1),
-  company: z.string().min(1), title: z.string().min(1),
+  company: z.string().min(1).optional(), title: z.string().min(1),
   createdAt: z.string().datetime(), updatedAt: z.string().datetime(),
   appliedAt: z.string().datetime().optional(),
   outcomeStage: z.string().max(200).optional(), notes: z.string().max(2000).optional(),
