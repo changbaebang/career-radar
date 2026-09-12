@@ -159,7 +159,7 @@ explicit correction — it supersedes the **whole prior outcome history** for ag
 history. Stage clearing retracts previous reach; unknown stages/dates are not inferred.
 `pipeline_summary` shows stage reach, current coverage and last-update exclusions without
 changing fit verdicts or claiming probabilities. [Contract and examples](docs/MILESTONE_4C.md).
-Widget URI is now v5 (M4-B2): refresh ChatGPT descriptors before testing. Local synthetic checks do
+Widget URI is now v6 (v5 for M4-B2, v6 once `company` became optional): refresh ChatGPT descriptors before testing. Local synthetic checks do
 not establish actual host/model behavior. No API calls are required for this slice.
 
 ### M4-B1 evidence contract
@@ -192,14 +192,19 @@ mismatch. `modelVersion` records `openrouter/<model>@<upstream provider>`, so a 
 that endpoint. `pnpm measure:live --provider openrouter` measures that path after the same
 approval flow. No provider was called for this slice. [Details](docs/PROVIDERS.md).
 
-### Usage check (next step, not a milestone)
+### Usage check (first round done)
 
 `pnpm usage-check --job <url|file> ...` puts one profile (the synthetic resume by default) and
 up to five postings through the real MCP tools with the configured provider and serves a local
 page with the widget output per posting. Without `--approve-transmission` it only prints what
 would be transmitted. The point is to read the result and answer three questions about whether it
 helps prioritize; see [USAGE_CHECK.md](docs/USAGE_CHECK.md), including why a local run still
-transmits the inputs.
+transmits the inputs. The first round (synthetic profile, three public postings, OpenRouter free
+models) led to three contract changes: a posting that does not name the employer keeps `company`
+absent instead of letting the model fill it in (widget URI v6, since the v5 widget parses strictly),
+newly generated `score` values are integers on a stated 0-100 scale while stored fractions stay
+readable, and `OPENROUTER_REASONING_EFFORT` adjusts reasoning intensity (whether it actually lowers
+reasoning tokens is unverified). Prompt version is `milestone-4b2-v2`.
 
 ## Documentation references
 

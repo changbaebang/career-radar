@@ -79,10 +79,10 @@ describe("Career Radar HTTP and MCP server", () => {
     const client = await connectClient(await startTestServer({ store, discovery, createAnalyzer }));
     closeCallbacks.push(async () => { discovery.close(); store.close(); });
     const tools = (await client.listTools()).tools;
-    // B2 advertises the optional screening context on assessment outputs (widget URI v5); identity stays internal.
+    // B2 advertises the optional screening context on assessment outputs; identity stays internal. URI is v6 since company became optional.
     for (const name of ["job_assess", "job_recommend"]) expect(JSON.stringify(tools.find((tool) => tool.name === name)?.outputSchema)).toContain("screeningContext");
     expect(JSON.stringify(tools)).not.toContain("inputIdentity");
-    expect(CAREER_RADAR_WIDGET_URI).toBe("ui://career-radar/widget-v5.html");
+    expect(CAREER_RADAR_WIDGET_URI).toBe("ui://career-radar/widget-v6.html");
     expect(tools.find((tool) => tool.name === "job_search")).toMatchObject({ annotations: { readOnlyHint: false, openWorldHint: true } });
     expect(tools.find((tool) => tool.name === "job_search")?._meta).not.toHaveProperty("ui");
     expect(tools.find((tool) => tool.name === "job_recommend")).toMatchObject({

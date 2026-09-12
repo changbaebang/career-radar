@@ -99,7 +99,7 @@ function AssessmentCard({ result }: { result: JobAssessmentResult }) {
   const { job, assessment } = result;
   return (
     <article className="card" aria-label={`Career Radar assessment for ${job.title}`}>
-      <p className="eyebrow">{job.company}</p>
+      <p className="eyebrow">{job.company ?? "Employer not stated in the posting"}</p>
       <h1>{job.title}</h1>
       <div className="meta">
         <span className="pill" data-verdict={assessment.verdict}>{assessment.verdict}</span>
@@ -196,7 +196,7 @@ function PipelineCard({ summary }: { summary: PipelineSummary }) {
       <h2>Recent applications</h2>
       {summary.total === 0 ? <p className="message">No saved applications yet. Assess a job, then ask to save it.</p> : (
         <ul>{summary.applications.slice(0, 10).map((application) => (
-          <li key={application.id}><span><strong>{application.company} — {application.title}</strong><br />
+          <li key={application.id}><span><strong>{application.company ?? "Employer not stated"} — {application.title}</strong><br />
             {application.verdictAtDecision} · {application.status}
             {application.outcomeStage ? ` · ${application.outcomeStage}` : ""}
             {!application.outcomeStage && application.normalizedOutcomeStage && application.normalizedOutcomeStage !== "unknown" ? ` · ${application.normalizedOutcomeStage.replaceAll("_", " ")}` : ""}

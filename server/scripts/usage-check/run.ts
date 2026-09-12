@@ -159,7 +159,7 @@ export function renderIndex(results: UsageCheckResults): string {
   const rows = results.jobs.map((job, index) => {
     if (job.status === "failed") return `<tr><td>${index + 1}</td><td>${escape(job.label)}</td><td colspan="7">failed at ${job.step} (${job.ingestMs ?? 0}${job.assessMs !== undefined ? ` + ${job.assessMs}` : ""} ms): ${escape(job.message)}</td></tr>`;
     const a = job.assessment.assessment; const c = a.screeningContext;
-    return `<tr><td>${index + 1}</td><td><a href="/?view=assessment&job=${index}">${escape(job.assessment.job.company)} — ${escape(job.assessment.job.title)}</a></td>
+    return `<tr><td>${index + 1}</td><td><a href="/?view=assessment&job=${index}">${escape(job.assessment.job.company ?? "(employer not stated)")} — ${escape(job.assessment.job.title)}</a></td>
       <td><strong>${a.verdict}</strong></td><td>${a.confidence}</td><td>${a.hardBlockers.length}</td>
       <td>${c ? `${escape(c.seniorityFit.value)} / ${escape(c.careerStoryRisk.value)}` : "not evaluated"}</td>
       <td>${c?.careerStoryRisk.clarificationQuestion ? escape(c.careerStoryRisk.clarificationQuestion) : ""}</td>

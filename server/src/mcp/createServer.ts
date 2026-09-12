@@ -24,8 +24,9 @@ import { registerPipelineTools } from "./pipeline-tools.js";
 import { registerSearchTools } from "./search-tools.js";
 import type { JobDiscovery } from "../domain/jobs/search.js";
 
-// v5: assessment outputs carry optional screeningContext (M4-B2); v4 consumers parse strictly and must be refreshed.
-export const CAREER_RADAR_WIDGET_URI = "ui://career-radar/widget-v5.html";
+// v6: job.company may be absent (usage-check follow-up); the v5 widget parses strictly and would show
+// "Waiting for Career Radar…" for such results, so hosts must refresh descriptors. v5 added screeningContext.
+export const CAREER_RADAR_WIDGET_URI = "ui://career-radar/widget-v6.html";
 
 // Both are required on purpose: an MCP server is created per request, so a per-call default store
 // would forget every profile between profile_upsert and job_assess. createHttpApp owns the shared
@@ -158,7 +159,7 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
         structuredContent: result,
         content: [{
           type: "text" as const,
-          text: `Normalized ${result.job.company} — ${result.job.title} as ${result.job.id}.`,
+          text: `Normalized ${result.job.company ?? "(employer not stated)"} — ${result.job.title} as ${result.job.id}.`,
         }],
       };
     },
@@ -202,7 +203,7 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
         structuredContent: result,
         content: [{
           type: "text" as const,
-          text: `${job.company} — ${job.title}: ${assessment.verdict}. ${assessment.recommendation}`,
+          text: `${job.company ?? "(employer not stated)"} — ${job.title}: ${assessment.verdict}. ${assessment.recommendation}`,
         }],
       };
     },

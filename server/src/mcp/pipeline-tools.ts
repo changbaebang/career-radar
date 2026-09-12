@@ -12,7 +12,7 @@ export function registerPipelineTools(server: McpServer, store: CareerStore, res
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
   }, async (input) => {
     const application = store.saveApplication(input);
-    return { structuredContent: { application }, content: [{ type: "text", text: `${application.company} — ${application.title}: ${application.status}. Application ID: ${application.id}. This records a local status; no application was sent to the employer.` }] };
+    return { structuredContent: { application }, content: [{ type: "text", text: `${application.company ?? "(employer not stated)"} — ${application.title}: ${application.status}. Application ID: ${application.id}. This records a local status; no application was sent to the employer.` }] };
   });
 
   registerAppTool(server, "application_update", {
@@ -23,7 +23,7 @@ export function registerPipelineTools(server: McpServer, store: CareerStore, res
     annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, idempotentHint: true },
   }, async (input) => {
     const application = store.updateApplication(input);
-    return { structuredContent: { application }, content: [{ type: "text", text: `${application.company} — ${application.title}: recorded as ${application.status}. No employer was contacted.` }] };
+    return { structuredContent: { application }, content: [{ type: "text", text: `${application.company ?? "(employer not stated)"} — ${application.title}: recorded as ${application.status}. No employer was contacted.` }] };
   });
 
   registerAppTool(server, "pipeline_summary", {

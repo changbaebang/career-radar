@@ -150,6 +150,22 @@ describe("OpenRouterCareerAnalyzer (real SDK, stubbed fetch, no network)", () =>
     expect(events[0]!.upstreamProvider).toBe("unknown");
   });
 
+  it("sends reasoning.effort only when the opt-in knob is set, and validates its value", async () => {
+    stubFetch(() => completion(assessmentDraft));
+    await analyzer().assess(syntheticProfile, syntheticJob);
+    expect(requests[0]!.body).not.toHaveProperty("reasoning");
+    stubFetch(() => completion(assessmentDraft));
+    await analyzer({ reasoningEffort: "low" }).assess(syntheticProfile, syntheticJob);
+    expect(requests[0]!.body.reasoning).toEqual({ effort: "low" });
+    expect(requests[0]!.body.provider).toEqual({ require_parameters: true });
+    vi.stubEnv("OPENROUTER_REASONING_EFFORT", "lots");
+    expect(() => analyzer()).toThrow(OPENROUTER_ERRORS.invalidReasoning);
+    vi.stubEnv("OPENROUTER_REASONING_EFFORT", "minimal");
+    stubFetch(() => completion(assessmentDraft));
+    await analyzer().assess(syntheticProfile, syntheticJob);
+    expect(requests[0]!.body.reasoning).toEqual({ effort: "minimal" });
+  });
+
   it("refuses to start without a key or a model and never reads OPENAI variables", () => {
     vi.stubEnv("OPENROUTER_API_KEY", ""); vi.stubEnv("OPENROUTER_MODEL", "");
     vi.stubEnv("OPENAI_API_KEY", "synthetic-openai"); vi.stubEnv("OPENAI_MODEL", "gpt-synthetic");

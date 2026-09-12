@@ -161,7 +161,7 @@ Secure MCP Tunnel은 개발 및 비공개 연결용이며 공개 Plugin 제출�
 진행 집계도 철회하며, 모르는 단계·날짜는 추정하지 않습니다.
 `pipeline_summary`는 단계별 진행과 현재 기록의 알려진/모르는 정보, 수정 시점
 필터의 제외 건수를 보여줍니다. 기존 적합도 판정은 바꾸지 않습니다.
-[사용 계약과 예시](docs/MILESTONE_4C.md)를 참고하세요. 위젯 URI는 M4-B2부터 v5이므로
+[사용 계약과 예시](docs/MILESTONE_4C.md)를 참고하세요. 위젯 URI는 M4-B2에서 v5, `company`가 선택값이 된 뒤 v6이므로
 ChatGPT에서 도구 정보를 새로고침해야 합니다. 이 단계는 API 호출 없이 검증하며
 실제 ChatGPT 호스트·모델 검증은 별도입니다.
 
@@ -194,13 +194,17 @@ strict JSON 스키마 출력과 `require_parameters` 라우팅으로 보낼 수 
 `pnpm measure:live --provider openrouter`는 같은 승인 절차 뒤에 그 경로를 측정합니다. 이번
 작업에서 실제 제공자를 호출하지는 않았습니다. [상세](docs/PROVIDERS.md).
 
-### 사용 확인 — 다음 단계, 마일스톤 아님
+### 사용 확인 — 1차 완료
 
 `pnpm usage-check --job <url|file> ...`은 프로필 하나(기본은 합성 이력서)와 공고 최대 다섯 개를
 설정된 제공자로 실제 MCP 도구에 통과시키고, 공고별 위젯 출력을 로컬 페이지로 보여줍니다.
 `--approve-transmission` 없이는 전송될 내용만 출력합니다. 결과를 읽고 지원 우선순위를 정하는 데
 도움이 되는지 세 가지 질문에 답하는 것이 목적입니다. 로컬 실행도 입력을 외부로 전송하는 이유를
-포함해 [USAGE_CHECK.md](docs/USAGE_CHECK.md)를 참고하세요.
+포함해 [USAGE_CHECK.md](docs/USAGE_CHECK.md)를 참고하세요. 1차(합성 프로필, 공개 공고 세 개, OpenRouter
+무료 모델)에서 계약 세 가지를 고쳤습니다. 공고에 고용주 이름이 없으면 `company`를 비워 두고 모델이 채우지
+못하게 했고(v5 위젯은 strict 파싱이라 위젯 URI v6), 새로 생성되는 `score`는 0~100 정수이며 저장된 소수 값은
+그대로 읽습니다. `OPENROUTER_REASONING_EFFORT`는 추론 강도를 조절하는 옵션이고 실제로 추론 토큰이 줄어드는지는
+확인하지 않았습니다. 프롬프트 버전은 `milestone-4b2-v2`입니다.
 
 ## 참고 문서
 

@@ -17,8 +17,9 @@ import { hashSource, stableId } from "../domain/store.js";
 // from a parsed draft to the shared domain types. Every provider adapter must use exactly these so a
 // result's promptVersion means the same instructions regardless of which endpoint produced it.
 
-// milestone-4b2-v1: the assessment call also produces located screening context (M4-B2).
-export const PROMPT_VERSION = "milestone-4b2-v1";
+// milestone-4b2-v2: after the first usage check — an employer that the posting does not name is null,
+// never guessed, and the optional score is an integer on a stated 0-100 scale.
+export const PROMPT_VERSION = "milestone-4b2-v2";
 const nullableText = z.string().min(1).nullable();
 
 export const CandidateExtractionSchema = z.object({
@@ -45,7 +46,7 @@ const RawRequirementSchema = z.object({
 }).strict();
 
 export const JobExtractionSchema = z.object({
-  company: z.string().min(1), title: z.string().min(1), location: nullableText,
+  company: nullableText, title: z.string().min(1), location: nullableText,
   required: z.array(RawRequirementSchema), preferred: z.array(RawRequirementSchema),
   responsibilities: z.array(z.string().min(1)), roleFamily: z.string().min(1),
   domains: z.array(z.string().min(1)), technologies: z.array(z.string().min(1)),
@@ -84,7 +85,7 @@ export const AssessmentDraftSchema = z.object({
   verdict: z.enum(["REALISTIC", "STRETCH", "PASS"]),
   confidence: z.enum(["low", "medium", "high"]),
   resumeContortion: z.enum(["low", "medium", "high"]),
-  score: z.number().min(0).max(100).nullable(),
+  score: z.number().int().min(0).max(100).nullable(),
   strongestMatches: z.array(z.object({
     requirementId: nullableText, requirement: z.string().min(1), evidence: z.string().min(1),
     source: z.object({ company: nullableText, role: nullableText, project: nullableText }).strict(),
@@ -112,6 +113,7 @@ export const JOB_INSTRUCTIONS = [
   "Separate required from preferred qualifications exactly as written.",
   "Mark a requirement core only when the text makes it mandatory or central to the role.",
   "Do not invent company, role, location, technologies, or requirements.",
+  "If the text does not name the employer, set company to null; never infer it from products, domains or similar postings.",
   "Put ambiguity or missing information in warnings.",
 ].join(" ");
 
@@ -127,6 +129,7 @@ export const ASSESSMENT_INSTRUCTIONS = [
   "Use requirement IDs from the job whenever one applies.",
   "A truthful STRETCH is better than a fabricated REALISTIC.",
   "A label is not a hiring probability.",
+  "score, when you give one, is an integer from 0 to 100 where 100 is the strongest evidence-backed fit; use null rather than a guess, and never a 0-1 fraction.",
   "Also produce screeningContext from the same structured inputs; it never changes the verdict.",
   "Every screening evidence reference cites one exact location: source candidate with path headline, skills[i], domains[i], leadership[i], customerFacing[i], aiEvidence[i], cloudEvidence[i], roles[i].title, roles[i].responsibilities[j] or roles[i].evidence[j]; source job with path required[i].text, preferred[i].text or responsibilities[i]. Indices are zero-based positions in the supplied JSON and the quote copies that field's exact text.",
   "seniorityFit compares the candidate's demonstrated scope with the role's stated scope, never the candidate's worth. Do not conclude overleveled or underleveled from years, titles or headlines alone; cite at least one role responsibility, role evidence or leadership entry and one job requirement or responsibility, otherwise answer uncertain.",
@@ -165,7 +168,7 @@ export function toJob(parsed: z.infer<typeof JobExtractionSchema>, description: 
   const withIds = (items: typeof parsed.required, kind: "required" | "preferred") =>
     items.map((item, index) => ({ ...item, id: `${jobId}_${kind}_${index + 1}` }));
   const job = JobPostingSchema.parse({
-    id: jobId, company: parsed.company, title: parsed.title,
+    id: jobId, ...(parsed.company === null ? {} : { company: parsed.company }), title: parsed.title,
     ...(parsed.location === null ? {} : { location: parsed.location }), description,
     required: withIds(parsed.required, "required"), preferred: withIds(parsed.preferred, "preferred"),
     responsibilities: parsed.responsibilities, roleFamily: parsed.roleFamily,
@@ -176,8 +179,9 @@ export function toJob(parsed: z.infer<typeof JobExtractionSchema>, description: 
 }
 
 // modelVersion records which model (and, for routed providers, which endpoint) produced the draft.
-export function toAssessment(draft: z.infer<typeof AssessmentDraftSchema>, modelVersion: string): FitAssessment {
-  const { screeningContext: rawContext, ...parsed } = draft;
+export function toAssessment(input: z.infer<typeof AssessmentDraftSchema>, modelVersion: string): FitAssessment {
+  // Re-check the generation contract (integer score etc.) regardless of which transport parsed the draft.
+  const { screeningContext: rawContext, ...parsed } = AssessmentDraftSchema.parse(input);
   const normalizeGap = (gap: (typeof parsed.gaps)[number]) => omitNull(gap);
   // Producer normalization only: bounds and shape. Reference validation against the captured inputs
   // happens in finalizeAssessment. A context outside the contract is dropped, never the fit.
