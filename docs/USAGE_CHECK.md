@@ -63,8 +63,8 @@ reading aid, not the widget) and one real widget card per posting. A posting tha
 reported with the fixed error message and does not stop the others. Each tool call is bounded at
 5 minutes (the MCP client default of 60 seconds is too short for some free models). The model request
 behind it carries a cancel signal for the same 5 minutes, which fetch honours until the response body is
-fully read (the SDK's own `timeout` only covers the wait for headers), and results are assembled only
-after cancelled or late calls have settled; `results.json` records how long every call took and the per-call
+fully read (the SDK's own `timeout` only covers the wait for headers), and before results are assembled the runner waits up to 10 seconds for cancelled or late calls to
+settle, recording how many were still unsettled (`unsettledCalls`, expected 0); `results.json` records how long every call took and the per-call
 telemetry (finish status, token counters, upstream provider), never the content.
 
 Results are written to `data/usage-check/<timestamp>/results.json` (gitignored, `0o600`). It

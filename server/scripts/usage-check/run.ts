@@ -91,7 +91,8 @@ export async function runUsageCheck(deps: UsageCheckDeps): Promise<UsageCheckRes
       promptVersion ??= assessment.assessment.promptVersion;
       jobs.push({ label: job.label, status: "assessed", ingest, assessment, ingestMs: ingested.ms, assessMs: assessed.ms });
     }
-    // Let cancelled or late model calls settle so their telemetry is in the saved file, not lost after it.
+    // Wait (bounded) for cancelled or late model calls so their telemetry lands in the saved file; anything
+    // still pending after the grace period is counted, not awaited further.
     const unsettledCalls = await deadline.settle(SETTLE_GRACE_MS);
     if (unsettledCalls) log(`  ${unsettledCalls} model call(s) still unsettled after ${SETTLE_GRACE_MS} ms`);
     return { kind: "usage-check", generatedAt: (deps.now ?? (() => new Date()))().toISOString(), provider: deps.provider, model: deps.model,
