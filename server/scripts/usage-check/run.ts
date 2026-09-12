@@ -21,6 +21,9 @@ export type JobOutcome =
 export type UsageCheckResults = {
   kind: "usage-check"; generatedAt: string; provider: string; model: string; promptVersion?: string;
   profile: ProfileUpsertResult; profileMs: number; jobs: JobOutcome[]; modelCalls: number; toolTimeoutMs: number;
+  // Model calls cancelled by the per-call deadline, and calls that still had not settled when the
+  // results were assembled (the settle wait is bounded, so this should be 0).
+  abortedCalls: number; unsettledCalls: number;
   // Per-call telemetry from the analyzer hook: identifiers, finish status and token counters only (no content).
   telemetry: AnalyzerResponseEvent[];
 };
@@ -40,20 +43,21 @@ export type UsageCheckDeps = {
 export async function runUsageCheck(deps: UsageCheckDeps): Promise<UsageCheckResults> {
   const log = deps.log ?? (() => undefined);
   const store = new CareerStore(); // in-memory: the check leaves only the results file behind
+  const toolTimeoutMs = deps.toolTimeoutMs ?? DEFAULT_TOOL_TIMEOUT_MS;
   let calls = 0;
+  const deadline = withCallDeadline(toolTimeoutMs);
   const telemetry: AnalyzerResponseEvent[] = [];
   deps.onResponse?.((event) => {
     telemetry.push(event);
     log(`    model ${event.operation} ${event.outcome} in ${Math.round(event.durationMs)} ms · status ${event.responseStatus ?? "n/a"} · tokens in ${event.usage?.inputTokens ?? "?"} out ${event.usage?.outputTokens ?? "?"} reasoning ${event.usage?.reasoningTokens ?? "?"} · upstream ${event.upstreamProvider ?? "n/a"}${event.error ? ` · error ${event.error.name}` : ""}`);
   });
-  const createAnalyzer = () => { const inner = deps.createAnalyzer(); return countCalls(inner, () => { calls += 1; }); };
+  const createAnalyzer = () => { const inner = deps.createAnalyzer(); return deadline.wrap(countCalls(inner, () => { calls += 1; })); };
   const app = createHttpApp({ store, createAnalyzer, ...(deps.fetchJob ? { fetchJob: deps.fetchJob } : {}) });
   const server = app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve, reject) => { server.once("listening", resolve); server.once("error", reject); });
   const port = (server.address() as AddressInfo).port;
   const client = new Client({ name: "career-radar-usage-check", version: "0.0.0" });
   await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`)));
-  const toolTimeoutMs = deps.toolTimeoutMs ?? DEFAULT_TOOL_TIMEOUT_MS;
   // A timed-out or thrown call becomes a failed step with the SDK's own message (never provider text).
   const call = async (name: string, args: Record<string, unknown>): Promise<{ ok: boolean; content: unknown; structured: unknown; ms: number }> => {
     const started = performance.now();
@@ -87,8 +91,12 @@ export async function runUsageCheck(deps: UsageCheckDeps): Promise<UsageCheckRes
       promptVersion ??= assessment.assessment.promptVersion;
       jobs.push({ label: job.label, status: "assessed", ingest, assessment, ingestMs: ingested.ms, assessMs: assessed.ms });
     }
+    // Let cancelled or late model calls settle so their telemetry is in the saved file, not lost after it.
+    const unsettledCalls = await deadline.settle(SETTLE_GRACE_MS);
+    if (unsettledCalls) log(`  ${unsettledCalls} model call(s) still unsettled after ${SETTLE_GRACE_MS} ms`);
     return { kind: "usage-check", generatedAt: (deps.now ?? (() => new Date()))().toISOString(), provider: deps.provider, model: deps.model,
-      ...(promptVersion ? { promptVersion } : {}), profile, profileMs: upsert.ms, jobs, modelCalls: calls, toolTimeoutMs, telemetry };
+      ...(promptVersion ? { promptVersion } : {}), profile, profileMs: upsert.ms, jobs, modelCalls: calls, toolTimeoutMs,
+      abortedCalls: deadline.aborted, unsettledCalls, telemetry };
   } finally {
     await client.close();
     await new Promise<void>((resolve) => server.close(() => resolve()));
@@ -96,9 +104,43 @@ export async function runUsageCheck(deps: UsageCheckDeps): Promise<UsageCheckRes
   }
 }
 
+export const SETTLE_GRACE_MS = 10_000;
+
+// The SDK's own `timeout` only covers the wait for response headers; a slow body streams on after it.
+// An AbortSignal passed to the request is honoured by fetch until the body is fully read, so every
+// analyzer call gets its own deadline signal (combined with any caller signal) and the in-flight
+// promises are tracked so the caller can wait for them before assembling results.
+export function withCallDeadline(ms: number) {
+  const pending = new Set<Promise<unknown>>();
+  let aborted = 0;
+  const guard = <T>(caller: AbortSignal | undefined, run: (signal: AbortSignal) => Promise<T>): Promise<T> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => { aborted += 1; controller.abort(); }, ms);
+    const signal = caller ? AbortSignal.any([caller, controller.signal]) : controller.signal;
+    const promise = run(signal).finally(() => clearTimeout(timer));
+    pending.add(promise);
+    promise.catch(() => undefined).finally(() => pending.delete(promise));
+    return promise;
+  };
+  return {
+    get aborted() { return aborted; },
+    wrap: (inner: CareerAnalyzer): CareerAnalyzer => ({
+      extractProfile: (text, id, signal) => guard(signal, (s) => inner.extractProfile(text, id, s)),
+      extractJob: (description, signal) => guard(signal, (s) => inner.extractJob(description, s)),
+      assess: (profile, job, signal) => guard(signal, (s) => inner.assess(profile, job, s)),
+    }),
+    // Resolves with the number of calls still pending after the grace period.
+    settle: async (graceMs: number): Promise<number> => {
+      if (pending.size === 0) return 0;
+      await Promise.race([Promise.allSettled([...pending]), new Promise<void>((resolve) => { const t = setTimeout(resolve, graceMs); t.unref(); })]);
+      return pending.size;
+    },
+  };
+}
+
 function countCalls(inner: CareerAnalyzer, tick: () => void): CareerAnalyzer {
   return {
-    extractProfile: (text, id) => { tick(); return inner.extractProfile(text, id); },
+    extractProfile: (text, id, signal) => { tick(); return inner.extractProfile(text, id, signal); },
     extractJob: (description, signal) => { tick(); return inner.extractJob(description, signal); },
     assess: (profile, job, signal) => { tick(); return inner.assess(profile, job, signal); },
   };
@@ -125,7 +167,7 @@ export function renderIndex(results: UsageCheckResults): string {
   return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Career Radar · usage check</title>
   <body style="max-width:960px;margin:32px auto;padding:0 18px;font:14px/1.6 system-ui">
   <h1 style="font-size:20px">Career Radar · usage check</h1>
-  <p>${escape(results.generatedAt)} · provider <strong>${escape(results.provider)}</strong> · model <strong>${escape(results.model)}</strong> · prompt ${escape(results.promptVersion ?? "n/a")} · model calls ${results.modelCalls} · profile extraction ${results.profileMs} ms · per-call bound ${results.toolTimeoutMs} ms</p>
+  <p>${escape(results.generatedAt)} · provider <strong>${escape(results.provider)}</strong> · model <strong>${escape(results.model)}</strong> · prompt ${escape(results.promptVersion ?? "n/a")} · model calls ${results.modelCalls} (${results.abortedCalls} cancelled by the ${results.toolTimeoutMs} ms per-call bound${results.unsettledCalls ? `, ${results.unsettledCalls} unsettled` : ""}) · profile extraction ${results.profileMs} ms</p>
   <p>Profile <code>${escape(results.profile.profile.id)}</code> — ${escape(results.profile.profile.headline)} (${results.profile.profile.roles.length} roles, ${results.profile.profile.skills.length} skills${results.profile.warnings.length ? `, ${results.profile.warnings.length} extraction warnings` : ""})</p>
   <p style="color:#555">This table is a reading aid for prioritizing; the cards behind each link are the actual widget output. Verdicts are not hiring probabilities. Times are what the MCP client waited per call on this provider; they say nothing about other providers.</p>
   <table style="border-collapse:collapse;width:100%"><thead><tr style="text-align:left;border-bottom:2px solid #333"><th>#</th><th>Job</th><th>Verdict</th><th>Confidence</th><th>Blockers</th><th>Scope / story</th><th>Clarify</th><th>extract + assess ms</th><th>Model</th></tr></thead><tbody>${rows}</tbody></table>

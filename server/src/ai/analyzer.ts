@@ -15,7 +15,7 @@ export type { AnalyzerOperation, AnalyzerResponseEvent, AnalyzerTransport } from
 export const DEFAULT_OPENAI_MODEL = "gpt-5-mini";
 
 export interface CareerAnalyzer {
-  extractProfile(resumeText: string, profileId?: string): Promise<ProfileExtraction>;
+  extractProfile(resumeText: string, profileId?: string, signal?: AbortSignal): Promise<ProfileExtraction>;
   extractJob(description: string, signal?: AbortSignal): Promise<JobExtraction>;
   assess(profile: CandidateProfile, job: JobPosting, signal?: AbortSignal): Promise<FitAssessment>;
 }
@@ -68,11 +68,11 @@ export class OpenAICareerAnalyzer implements CareerAnalyzer {
     return observeCall(this.#onResponse, operation, this.#model, "OpenAI", call, projectResponse);
   }
 
-  async extractProfile(resumeText: string, profileId?: string): Promise<ProfileExtraction> {
+  async extractProfile(resumeText: string, profileId?: string, signal?: AbortSignal): Promise<ProfileExtraction> {
     const response = await this.#observe("extractProfile", () => this.#client.responses.parse({
       model: this.#model, store: false, instructions: PROFILE_INSTRUCTIONS, input: profileInput(resumeText),
       text: { format: zodTextFormat(CandidateExtractionSchema, OUTPUT_NAMES.extractProfile) },
-    }));
+    }, { signal, ...(signal ? { maxRetries: 0 } : {}) }));
     return toProfile(requireParsed(response.output_parsed, "candidate profile"), resumeText, profileId);
   }
 

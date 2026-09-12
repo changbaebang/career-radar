@@ -3,7 +3,9 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { stableId } from "../src/domain/store.js";
-import { renderAssessment, renderIndex, runUsageCheck } from "../scripts/usage-check/run.js";
+import { renderAssessment, renderIndex, runUsageCheck, withCallDeadline } from "../scripts/usage-check/run.js";
+import { OpenAICareerAnalyzer } from "../src/ai/analyzer.js";
+import { createServer } from "node:http";
 import { parseUsageArgs } from "../scripts/usage-check/cli.js";
 import { groundedAssessment } from "./discovery-fixtures.js";
 import { syntheticJob, syntheticProfile } from "./fixtures.js";
@@ -39,6 +41,7 @@ describe("usage check (real MCP tools over HTTP, fake analyzer, no network)", ()
     expect(results).toMatchObject({ kind: "usage-check", provider: "openrouter", model: "synthetic/free-model", modelCalls: 7, promptVersion: groundedAssessment.promptVersion, toolTimeoutMs: 300_000 });
     expect(results.profileMs).toBeGreaterThanOrEqual(0);
     expect(results.telemetry).toEqual([]); // the fake analyzer emits no hook events
+    expect(results).toMatchObject({ abortedCalls: 0, unsettledCalls: 0 });
     expect(results.jobs.every((j) => j.status === "assessed" && j.ingestMs >= 0 && j.assessMs >= 0)).toBe(true);
     expect(results.jobs.map((j) => j.status)).toEqual(["assessed", "assessed", "assessed"]);
     expect(analyzer.extractProfile).toHaveBeenCalledTimes(1);
@@ -68,17 +71,46 @@ describe("usage check (real MCP tools over HTTP, fake analyzer, no network)", ()
     expect(renderIndex(results)).toContain("failed at job_assess");
   });
 
-  it("turns a tool call that outlives the per-call bound into a failed step and keeps going", async () => {
+  it("cancels a model call that outlives the per-call bound, records it, and keeps going", async () => {
     const analyzer = fakeAnalyzer();
-    analyzer.assess.mockImplementationOnce(() => new Promise(() => undefined)); // first assessment never settles
+    let seen: AbortSignal | undefined;
+    // First assessment hangs until the deadline signal fires, like a request whose body never finishes.
+    analyzer.assess.mockImplementationOnce((_profile: unknown, _job: unknown, signal?: AbortSignal) => new Promise((_, reject) => {
+      seen = signal; signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
+    }));
     const results = await runUsageCheck({ resumeText: "Synthetic resume text that is long enough to pass the minimum length check.", jobs: jobs.slice(0, 2),
       createAnalyzer: () => analyzer, provider: "openai", model: "gpt-synthetic", toolTimeoutMs: 300 });
     expect(results.jobs.map((j) => j.status)).toEqual(["failed", "assessed"]);
     const failed = results.jobs[0]!;
     expect(failed.status === "failed" && failed.step).toBe("job_assess");
-    expect(failed.status === "failed" && failed.message).toMatch(/timed out/i);
     expect(failed.status === "failed" && failed.assessMs).toBeGreaterThanOrEqual(250);
-    expect(renderIndex(results)).toContain("timed out");
+    expect(seen?.aborted).toBe(true);
+    expect(results).toMatchObject({ abortedCalls: 1, unsettledCalls: 0 });
+    expect(renderIndex(results)).toContain("1 cancelled by the 300 ms per-call bound");
+  });
+
+  it("bounds a slow response body with the deadline signal where the SDK timeout alone does not (real SDK, local server)", async () => {
+    // Headers immediately, body completed only after 400 ms.
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.write('{"id":"resp_x","object":"response","model":"m","status":"completed","output":[],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}');
+      setTimeout(() => res.end("}"), 400);
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const baseURL = `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`;
+    try {
+      vi.stubEnv("OPENAI_BASE_URL", baseURL);
+      const adapter = new OpenAICareerAnalyzer({ apiKey: "synthetic-not-a-real-key", transport: { maxRetries: 0, logLevel: "off", timeout: 100 } });
+      let started = performance.now();
+      await expect(adapter.extractProfile("SYNTHETIC-RESUME")).rejects.toThrow(); // completes after ~400 ms, then fails parsing: timeout did not bound the body
+      expect(performance.now() - started).toBeGreaterThanOrEqual(350);
+      const deadline = withCallDeadline(100);
+      started = performance.now();
+      await expect(deadline.wrap(adapter).extractProfile("SYNTHETIC-RESUME")).rejects.toMatchObject({ name: "AbortError" });
+      expect(performance.now() - started).toBeLessThan(350);
+      expect(deadline.aborted).toBe(1);
+      expect(await deadline.settle(1_000)).toBe(0);
+    } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
   });
 
   it("parses arguments and requires one to five postings unless replaying", () => {

@@ -13,7 +13,8 @@ const callerDirectory = process.env.INIT_CWD ?? process.cwd();
 const fromCaller = (path: string) => resolve(callerDirectory, path);
 
 // Same SDK pins as the live harness: one HTTP attempt per counted call and no SDK logging, so the
-// printed call bound is the real request bound and OPENAI_LOG=debug cannot echo the resume.
+// printed call bound is the real request bound and OPENAI_LOG=debug cannot echo the resume. The SDK
+// `timeout` bounds only the wait for headers; the per-call AbortSignal in run.ts bounds the body.
 export const USAGE_TRANSPORT = { maxRetries: 0, logLevel: "off", timeout: DEFAULT_TOOL_TIMEOUT_MS } as const;
 export const USAGE_ERRORS = {
   baseUrlSet: "Refused: unset OPENAI_BASE_URL (shell or .env.local); the usage check only sends to the destination it printed.",
@@ -100,7 +101,7 @@ async function main(): Promise<number> {
     log: (line) => console.error(`  ${line}`), onResponse: (fn) => { register = fn; } });
   mkdirSync(out, { recursive: true, mode: 0o700 });
   writeFileSync(join(out, "results.json"), `${JSON.stringify(results, null, 2)}\n`, { flag: "wx", mode: 0o600 });
-  console.error(`Saved ${join(out, "results.json")} (${results.modelCalls} model calls; ${results.jobs.filter((j) => j.status === "assessed").length}/${results.jobs.length} assessed; profile extraction ${results.profileMs} ms).`);
+  console.error(`Saved ${join(out, "results.json")} (${results.modelCalls} model calls, ${results.abortedCalls} cancelled by the per-call bound, ${results.unsettledCalls} unsettled; ${results.jobs.filter((j) => j.status === "assessed").length}/${results.jobs.length} assessed; profile extraction ${results.profileMs} ms).`);
   console.error("Deleting that directory removes the local results file only; what the provider retains and anything you printed or copied are separate.");
   serve(results, args.port);
   return 0;

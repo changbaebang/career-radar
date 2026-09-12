@@ -93,8 +93,8 @@ export class OpenRouterCareerAnalyzer implements CareerAnalyzer {
     return `openrouter/${response.model ?? this.#model}@${response.provider ?? "unknown"}`;
   }
 
-  async extractProfile(resumeText: string, profileId?: string): Promise<ProfileExtraction> {
-    const { draft } = await this.#complete("extractProfile", CandidateExtractionSchema, PROFILE_INSTRUCTIONS, profileInput(resumeText));
+  async extractProfile(resumeText: string, profileId?: string, signal?: AbortSignal): Promise<ProfileExtraction> {
+    const { draft } = await this.#complete("extractProfile", CandidateExtractionSchema, PROFILE_INSTRUCTIONS, profileInput(resumeText), signal);
     return toProfile(draft, resumeText, profileId);
   }
 
