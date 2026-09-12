@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
-import type { FitAssessment } from "@career-radar/shared";
+import { JobAssessmentResultSchema, type FitAssessment } from "@career-radar/shared";
 import { CareerStore } from "../src/domain/store.js";
 import { syntheticJob as job, syntheticProfile as profile } from "./fixtures.js";
 
@@ -27,6 +27,14 @@ function filePath() {
 }
 
 describe("SQLite CareerStore", () => {
+  it("keeps reading snapshots saved with a fractional score from before the integer generation contract", () => {
+    const store = storeAt();
+    const legacy: FitAssessment = { ...assessment, score: 0.65 }; // stored by an earlier version; its scale is unknown and left as is
+    const id = store.saveAssessment(profile, job, legacy);
+    expect(store.saveApplication({ assessmentId: id, status: "saved" }).verdictAtDecision).toBe("STRETCH");
+    expect(JobAssessmentResultSchema.safeParse({ job, assessment: legacy, assessmentId: id }).success).toBe(true);
+  });
+
   it("saves an application from a job whose employer was not stated, without inventing one", () => {
     const store = storeAt();
     const { company: _named, ...unnamed } = { ...job, id: "job_unnamed" }; void _named;

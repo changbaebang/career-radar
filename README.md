@@ -159,7 +159,7 @@ explicit correction — it supersedes the **whole prior outcome history** for ag
 history. Stage clearing retracts previous reach; unknown stages/dates are not inferred.
 `pipeline_summary` shows stage reach, current coverage and last-update exclusions without
 changing fit verdicts or claiming probabilities. [Contract and examples](docs/MILESTONE_4C.md).
-Widget URI is now v5 (M4-B2): refresh ChatGPT descriptors before testing. Local synthetic checks do
+Widget URI is now v6 (v5 for M4-B2, v6 once `company` became optional): refresh ChatGPT descriptors before testing. Local synthetic checks do
 not establish actual host/model behavior. No API calls are required for this slice.
 
 ### M4-B1 evidence contract
@@ -201,8 +201,10 @@ would be transmitted. The point is to read the result and answer three questions
 helps prioritize; see [USAGE_CHECK.md](docs/USAGE_CHECK.md), including why a local run still
 transmits the inputs. The first round (synthetic profile, three public postings, OpenRouter free
 models) led to three contract changes: a posting that does not name the employer keeps `company`
-absent instead of letting the model fill it in, `score` is an integer on a stated 0-100 scale, and
-`OPENROUTER_REASONING_EFFORT` can bound reasoning tokens. Prompt version is `milestone-4b2-v2`.
+absent instead of letting the model fill it in (widget URI v6, since the v5 widget parses strictly),
+newly generated `score` values are integers on a stated 0-100 scale while stored fractions stay
+readable, and `OPENROUTER_REASONING_EFFORT` adjusts reasoning intensity (whether it actually lowers
+reasoning tokens is unverified). Prompt version is `milestone-4b2-v2`.
 
 ## Documentation references
 

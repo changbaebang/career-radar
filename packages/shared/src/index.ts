@@ -63,8 +63,10 @@ export const GapSchema = z.object({
 
 export const FitAssessmentSchema = z.object({
   verdict: VerdictSchema, confidence: ConfidenceSchema,
-  // score, when present, is an integer on a 0-100 scale (100 = strongest evidence-backed fit); never a 0-1 fraction.
-  resumeContortion: ResumeContortionSchema, score: z.number().int().min(0).max(100).optional(),
+  // Read contract: any stored 0-100 value is accepted, because snapshots saved before milestone-4b2-v2
+  // can hold fractions such as 0.65 whose intended scale is unknown and must not be rewritten. The
+  // generation contract (server/src/ai/contracts.ts) requires an integer on the stated 0-100 scale.
+  resumeContortion: ResumeContortionSchema, score: z.number().min(0).max(100).optional(),
   strongestMatches: z.array(EvidenceMatchSchema), gaps: z.array(GapSchema),
   hardBlockers: z.array(GapSchema), interviewRisks: z.array(z.string().min(1)),
   recommendation: z.string().min(1), missingInformation: z.array(z.string().min(1)),

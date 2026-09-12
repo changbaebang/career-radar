@@ -161,7 +161,7 @@ Secure MCP Tunnel은 개발 및 비공개 연결용이며 공개 Plugin 제출�
 진행 집계도 철회하며, 모르는 단계·날짜는 추정하지 않습니다.
 `pipeline_summary`는 단계별 진행과 현재 기록의 알려진/모르는 정보, 수정 시점
 필터의 제외 건수를 보여줍니다. 기존 적합도 판정은 바꾸지 않습니다.
-[사용 계약과 예시](docs/MILESTONE_4C.md)를 참고하세요. 위젯 URI는 M4-B2부터 v5이므로
+[사용 계약과 예시](docs/MILESTONE_4C.md)를 참고하세요. 위젯 URI는 M4-B2에서 v5, `company`가 선택값이 된 뒤 v6이므로
 ChatGPT에서 도구 정보를 새로고침해야 합니다. 이 단계는 API 호출 없이 검증하며
 실제 ChatGPT 호스트·모델 검증은 별도입니다.
 
@@ -202,8 +202,9 @@ strict JSON 스키마 출력과 `require_parameters` 라우팅으로 보낼 수 
 도움이 되는지 세 가지 질문에 답하는 것이 목적입니다. 로컬 실행도 입력을 외부로 전송하는 이유를
 포함해 [USAGE_CHECK.md](docs/USAGE_CHECK.md)를 참고하세요. 1차(합성 프로필, 공개 공고 세 개, OpenRouter
 무료 모델)에서 계약 세 가지를 고쳤습니다. 공고에 고용주 이름이 없으면 `company`를 비워 두고 모델이 채우지
-못하게 했고, `score`는 0~100 정수로 못 박았으며, `OPENROUTER_REASONING_EFFORT`로 추론 토큰을 제한할 수
-있습니다. 프롬프트 버전은 `milestone-4b2-v2`입니다.
+못하게 했고(v5 위젯은 strict 파싱이라 위젯 URI v6), 새로 생성되는 `score`는 0~100 정수이며 저장된 소수 값은
+그대로 읽습니다. `OPENROUTER_REASONING_EFFORT`는 추론 강도를 조절하는 옵션이고 실제로 추론 토큰이 줄어드는지는
+확인하지 않았습니다. 프롬프트 버전은 `milestone-4b2-v2`입니다.
 
 ## 참고 문서
 

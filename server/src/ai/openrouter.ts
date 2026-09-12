@@ -61,9 +61,10 @@ export class OpenRouterCareerAnalyzer implements CareerAnalyzer {
   readonly #reasoningEffort?: OpenRouterReasoningEffort;
   readonly #onResponse?: (event: AnalyzerResponseEvent) => void;
 
-  // reasoningEffort: optional OpenRouter `reasoning.effort`. Reasoning tokens are billed as output and,
-  // on the free endpoints tried so far, can dwarf the answer; this bounds them. It is sent as a request
-  // parameter, so with require_parameters routing it also restricts routing to endpoints that accept it.
+  // reasoningEffort: optional OpenRouter `reasoning.effort`, an intensity hint rather than a token cap.
+  // Reasoning tokens are billed as output and, on the free endpoints tried so far, dwarfed the answer;
+  // whether this lowers them is unverified. It is sent as a request parameter, so with require_parameters
+  // routing it also restricts routing to endpoints that accept it.
   constructor(options: { apiKey?: string; model?: string; reasoningEffort?: string; onResponse?: (event: AnalyzerResponseEvent) => void; transport?: AnalyzerTransport } = {}) {
     const apiKey = options.apiKey ?? process.env.OPENROUTER_API_KEY;
     if (!apiKey?.trim()) throw new Error(OPENROUTER_ERRORS.missingKey);

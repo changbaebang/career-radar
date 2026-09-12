@@ -179,8 +179,9 @@ export function toJob(parsed: z.infer<typeof JobExtractionSchema>, description: 
 }
 
 // modelVersion records which model (and, for routed providers, which endpoint) produced the draft.
-export function toAssessment(draft: z.infer<typeof AssessmentDraftSchema>, modelVersion: string): FitAssessment {
-  const { screeningContext: rawContext, ...parsed } = draft;
+export function toAssessment(input: z.infer<typeof AssessmentDraftSchema>, modelVersion: string): FitAssessment {
+  // Re-check the generation contract (integer score etc.) regardless of which transport parsed the draft.
+  const { screeningContext: rawContext, ...parsed } = AssessmentDraftSchema.parse(input);
   const normalizeGap = (gap: (typeof parsed.gaps)[number]) => omitNull(gap);
   // Producer normalization only: bounds and shape. Reference validation against the captured inputs
   // happens in finalizeAssessment. A context outside the contract is dropped, never the fit.
