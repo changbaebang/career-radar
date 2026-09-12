@@ -85,3 +85,125 @@ describe("usage check (real MCP tools over HTTP, fake analyzer, no network)", ()
     expect(run.stdout).toBe("");
   });
 });
+
+// --- review follow-ups: access gate, pinned transport, caller-relative paths ---
+import { request as httpRequest } from "node:http";
+import type { AddressInfo } from "node:net";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { spawn } from "node:child_process";
+import { afterEach } from "vitest";
+import { createResultsApp, type UsageCheckResults } from "../scripts/usage-check/run.js";
+import { USAGE_ERRORS, usageAnalyzerFactory } from "../scripts/usage-check/cli.js";
+
+const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
+const cleanup: Array<() => void | Promise<void>> = [];
+afterEach(async () => { for (const fn of cleanup.splice(0).reverse()) await fn(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+
+async function syntheticResults(): Promise<UsageCheckResults> {
+  return runUsageCheck({ resumeText: "Synthetic resume text that is long enough to pass the minimum length check.", jobs: jobs.slice(0, 1),
+    createAnalyzer: () => fakeAnalyzer(), provider: "synthetic", model: "synthetic-no-model", now: () => new Date("2026-09-12T00:00:00.000Z") });
+}
+function rawGet(port: number, path: string, headers: Record<string, string>): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest({ hostname: "127.0.0.1", port, path, method: "GET", headers }, (response) => {
+      let body = ""; response.setEncoding("utf8"); response.on("data", (chunk: string) => { body += chunk; });
+      response.on("end", () => resolve({ status: response.statusCode ?? 0, body }));
+    });
+    req.on("error", reject); req.end();
+  });
+}
+
+describe("usage check results page access gate", () => {
+  it("serves loopback requests and rejects foreign Host or Origin before any result is returned", async () => {
+    const results = await syntheticResults();
+    const server = createResultsApp(results, "/* bundle */").listen(0, "127.0.0.1");
+    await new Promise<void>((resolve) => server.once("listening", resolve));
+    cleanup.push(() => new Promise<void>((resolve) => server.close(() => resolve())));
+    const port = (server.address() as AddressInfo).port;
+    const ok = await rawGet(port, "/?view=json", { Host: `127.0.0.1:${port}` });
+    expect(ok.status).toBe(200);
+    expect(ok.body).toContain(results.profile.profile.id);
+    const foreign: Array<Record<string, string>> = [{ Host: `rebind.example:${port}` }, { Host: `127.0.0.1:${port}`, Origin: `http://rebind.example:${port}` }, { Host: `rebind.example:${port}`, Origin: `http://rebind.example:${port}` }];
+    for (const headers of foreign) {
+      const denied = await rawGet(port, "/?view=json", headers);
+      expect(denied.status).toBe(403);
+      expect(denied.body).not.toContain(results.profile.profile.id);
+      expect(denied.body).not.toContain("REALISTIC");
+    }
+    expect((await rawGet(port, "/", { Host: `localhost:${port}`, Origin: `http://localhost:${port}` })).status).toBe(200);
+    expect((await rawGet(port, "/?view=assessment&job=0", { Host: `[::1]:${port}` })).status).toBe(200);
+  });
+});
+
+describe("usage check analyzer transport (real SDK, stubbed fetch)", () => {
+  it("makes exactly one HTTP attempt per call and never prints request bodies under OPENAI_LOG=debug", async () => {
+    vi.stubEnv("OPENAI_API_KEY", "synthetic-not-a-real-key"); vi.stubEnv("OPENAI_LOG", "debug"); vi.stubEnv("OPENAI_BASE_URL", "");
+    const attempts: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      attempts.push(String(init?.body ?? ""));
+      return new Response('{"error":{"message":"synthetic 500"}}', { status: 500, headers: { "content-type": "application/json", "retry-after-ms": "1" } });
+    }));
+    const debug = vi.spyOn(console, "debug").mockImplementation(() => undefined);
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    await expect(usageAnalyzerFactory("openai")().extractProfile("SYNTHETIC-RESUME-MARKER")).rejects.toThrow();
+    expect(attempts).toHaveLength(1); // signal-less profile extraction: no SDK retries
+    expect(attempts[0]).toContain("SYNTHETIC-RESUME-MARKER"); // the request itself is unchanged
+    expect(debug).not.toHaveBeenCalled();
+    expect(info).not.toHaveBeenCalled();
+  });
+});
+
+describe("usage check through the root pnpm command", () => {
+  const rootScript = (args: string[], env: Record<string, string> = {}) => {
+    const execPath = process.env.npm_execpath;
+    const [command, prefix] = execPath && /\.c?js$/.test(execPath) ? [process.execPath, [execPath]] : ["pnpm", [] as string[]];
+    return { command, argv: [...prefix, "usage-check", ...args], env: { ...process.env, ...env } };
+  };
+  const scratch = () => {
+    const directory = mkdtempSync(join(repositoryRoot, "data", "usage-check-test-")); // under gitignored data/*
+    cleanup.push(() => rmSync(directory, { recursive: true, force: true }));
+    return directory;
+  };
+
+  it("resolves a relative --job file from the caller's directory and refuses OPENAI_BASE_URL", () => {
+    const directory = scratch();
+    writeFileSync(join(directory, "posting.txt"), "Synthetic pasted posting: lead a React platform team for a commerce product.");
+    const relative = join("data", directory.split("/").pop()!, "posting.txt");
+    const { command, argv, env } = rootScript(["--job", relative], { CAREER_RADAR_PROVIDER: "openrouter", OPENROUTER_MODEL: "synthetic/free-model", OPENAI_BASE_URL: "" });
+    const plan = spawnSync(command, argv, { cwd: repositoryRoot, encoding: "utf8", env, timeout: 180_000 });
+    expect(plan.status, plan.stderr).toBe(3);
+    expect(plan.stderr).toContain("posting.txt");
+    expect(plan.stderr).not.toContain("ENOENT");
+    expect(plan.stderr).toContain("SDK retries off");
+    const refused = spawnSync(command, [...argv, "--approve-transmission"], { cwd: repositoryRoot, encoding: "utf8", timeout: 180_000,
+      env: { ...env, CAREER_RADAR_PROVIDER: "openai", OPENAI_API_KEY: "synthetic-not-a-real-key", OPENAI_BASE_URL: "https://review-destination.invalid/v1" } });
+    expect(refused.status).toBe(2);
+    expect(refused.stderr).toContain(USAGE_ERRORS.baseUrlSet);
+  });
+
+  it("replays a saved results file given as a caller-relative path", async () => {
+    const directory = scratch();
+    mkdirSync(join(directory, "run"));
+    writeFileSync(join(directory, "run", "results.json"), JSON.stringify(await syntheticResults()));
+    const relative = join("data", directory.split("/").pop()!, "run", "results.json");
+    const port = 8100 + Math.floor(Math.random() * 400);
+    const { command, argv, env } = rootScript(["--replay", relative, "--port", String(port)]);
+    const child = spawn(command, argv, { cwd: repositoryRoot, env, stdio: ["ignore", "pipe", "pipe"] });
+    cleanup.push(() => { child.kill("SIGINT"); });
+    let stderr = "";
+    await new Promise<void>((resolve, reject) => {
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk: string) => { stderr += chunk; if (stderr.includes("Usage check page")) resolve(); });
+      child.once("exit", (code) => reject(new Error(`exited ${code} before serving: ${stderr}`)));
+      setTimeout(() => reject(new Error(`timed out before serving: ${stderr}`)), 170_000).unref();
+    });
+    const page = await rawGet(port, "/", { Host: `127.0.0.1:${port}` });
+    expect(page.status).toBe(200);
+    expect(page.body).toContain("Career Radar · usage check");
+    const json = await rawGet(port, "/?view=json", { Host: `127.0.0.1:${port}` });
+    expect(json.status).toBe(200);
+    expect(JSON.parse(json.body)).toMatchObject({ kind: "usage-check", modelCalls: 3 });
+    expect((await rawGet(port, "/?view=json", { Host: `rebind.example:${port}` })).status).toBe(403);
+  }, 200_000);
+});

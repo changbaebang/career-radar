@@ -3,9 +3,10 @@ import { JobAssessmentResultSchema, JobIngestResultSchema, ProfileUpsertResultSc
   type JobAssessmentResult, type JobIngestResult, type ProfileUpsertResult } from "@career-radar/shared";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import express, { type Express } from "express";
 import type { CareerAnalyzer } from "../../src/ai/analyzer.js";
 import { CareerStore } from "../../src/domain/store.js";
-import { createHttpApp } from "../../src/httpApp.js";
+import { createHttpApp, isLoopbackHost, isLoopbackOrigin } from "../../src/httpApp.js";
 import type { fetchJobUrl } from "../../src/infra/fetch/job-url.js";
 
 // The usage check: one profile, a few postings, read the result. It drives the real MCP tools
@@ -109,4 +110,28 @@ export function renderAssessment(result: JobAssessmentResult, bundle: string, in
   return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Career Radar · assessment ${index + 1}</title>
   <body style="max-width:760px;margin:32px auto;padding:0 18px"><p style="font:14px/1.6 system-ui"><a href="/">← summary</a> · job ${index + 1} of ${total}</p>
   <div id="root"></div><script>window.openai={toolOutput:${serialized}};</script><script>${bundle}</script></body></html>`;
+}
+
+// The results page serves the structured profile and the assessments, so it gets the same
+// loopback Host/Origin gate as the MCP server: binding to 127.0.0.1 alone does not stop a
+// DNS-rebinding page from reaching it with its own Host.
+export function createResultsApp(results: UsageCheckResults, bundle: string): Express {
+  const app = express();
+  app.use((request, response, next) => {
+    if (!isLoopbackHost(request.get("host")) || !isLoopbackOrigin(request.get("origin"))) {
+      response.status(403).type("text").send("Only loopback hosts may read usage-check results.");
+      return;
+    }
+    next();
+  });
+  app.get("/", (req, res) => {
+    if (req.query.view === "json") { res.type("json").send(JSON.stringify(results, null, 2)); return; }
+    if (req.query.view === "assessment") {
+      const index = Number(req.query.job);
+      const job = results.jobs[index];
+      if (job?.status === "assessed") { res.type("html").send(renderAssessment(job.assessment, bundle, index, results.jobs.length)); return; }
+    }
+    res.type("html").send(renderIndex(results));
+  });
+  return app;
 }

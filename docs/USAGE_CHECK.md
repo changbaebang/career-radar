@@ -37,7 +37,9 @@ with the job the app was built for.
   `jobs.lever.co` or `jobs.ashbyhq.com`, or save their text to files. Choose roles you would
   actually weigh against each other; the point is prioritizing, not covering the market.
 - Each run makes at most 1 + 2 × postings model calls (profile extraction, then extraction and
-  assessment per posting).
+  assessment per posting), one HTTP attempt each: the script pins SDK retries and SDK logging off,
+  like the live harness, and refuses to run while `OPENAI_BASE_URL` is set so requests can only go
+  to the destination it printed.
 
 ## Path A — inside ChatGPT (the real product surface)
 
@@ -61,8 +63,11 @@ reading aid, not the widget) and one real widget card per posting. A posting tha
 reported with the fixed error message and does not stop the others.
 
 Results are written to `data/usage-check/<timestamp>/results.json` (gitignored, `0o600`). It
-contains the structured profile, the postings and the assessments; delete the directory to remove
-every trace. `pnpm usage-check --replay data/usage-check/<timestamp>/results.json` serves a saved
+contains the structured profile, the postings and the assessments; deleting the directory removes
+that local file, not what the provider retains or anything you printed elsewhere. Relative `--job`,
+`--resume`, `--out` and `--replay` paths are resolved from the directory where you ran the command.
+The page is served on loopback only and rejects requests whose Host or Origin is not a loopback
+address, the same gate the MCP server uses. `pnpm usage-check --replay data/usage-check/<timestamp>/results.json` serves a saved
 run without any call. The app database is not touched: the check uses an in-memory store.
 
 ## Record
