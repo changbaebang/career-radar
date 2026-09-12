@@ -51,7 +51,7 @@ pnpm dev
 - MCP 엔드포인트: `http://localhost:8000/mcp`
 - 상태 확인 엔드포인트: `http://localhost:8000/health`
 
-`.env.example`을 Git에서 제외되는 `.env.local`로 복사한 뒤 `OPENAI_API_KEY`를 설정합니다. `OPENAI_MODEL`은 선택 사항이며 기본값은 `gpt-5-mini`입니다. 서버가 로컬에서 이 파일을 읽고, 인증 정보는 React 위젯으로 전달하지 않습니다.
+`.env.example`을 Git에서 제외되는 `.env.local`로 복사한 뒤 `OPENAI_API_KEY`를 설정합니다. `OPENAI_MODEL`은 선택 사항이며 기본값은 `gpt-5-mini`입니다. 서버가 로컬에서 이 파일을 읽고, 인증 정보는 React 위젯으로 전달하지 않습니다. `CAREER_RADAR_PROVIDER=openrouter`와 `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`을 설정하면 OpenRouter 어댑터를 대신 사용합니다. 다른 제공자의 결과가 무엇을 증명하고 무엇을 증명하지 않는지는 [모델 제공자](docs/PROVIDERS.md)를 참고하세요.
 
 ## 검증 명령어
 
@@ -183,6 +183,16 @@ ChatGPT에서 도구 정보를 새로고침해야 합니다. 이 단계는 API �
 분리해 보여주고, 없으면 "평가하지 않음"으로 표시합니다. 실제 모델이 위치를 정확히
 인용하는지, 근거 없이 판단을 유보하는지는 여기서 **확인하지 않았습니다**. 평가 실행기의
 모델 모드는 아직 구현 전이며, 그 평가와 #4 라이브 측정은 비용 승인 뒤에만 실행합니다. [B2 메모](docs/MILESTONE_4B2.md).
+
+### 모델 제공자 — 합성 검증만
+
+프롬프트와 출력 계약은 제공자에 독립적입니다. 기본 OpenAI Responses API 외에
+`CAREER_RADAR_PROVIDER=openrouter`로 같은 세 작업을 OpenRouter Chat Completions 엔드포인트에
+strict JSON 스키마 출력과 `require_parameters` 라우팅으로 보낼 수 있습니다. 어댑터는 모든 응답을
+다시 검증하고 거절·잘림·스키마 불일치는 고정 문구로 실패합니다. `modelVersion`에
+`openrouter/<모델>@<상위 제공자>`를 기록하므로 그 결과는 해당 엔드포인트만 증명합니다.
+`pnpm measure:live --provider openrouter`는 같은 승인 절차 뒤에 그 경로를 측정합니다. 이번
+작업에서 실제 제공자를 호출하지는 않았습니다. [상세](docs/PROVIDERS.md).
 
 ## 참고 문서
 

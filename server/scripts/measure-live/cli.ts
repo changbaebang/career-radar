@@ -6,7 +6,9 @@ import { join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { VERSION as OPENAI_SDK_VERSION } from "openai/version";
-import { DEFAULT_OPENAI_MODEL, OpenAICareerAnalyzer, PROMPT_VERSION, type CareerAnalyzer } from "../../src/ai/analyzer.js";
+import { DEFAULT_OPENAI_MODEL, OpenAICareerAnalyzer, PROMPT_VERSION, type AnalyzerResponseEvent, type CareerAnalyzer } from "../../src/ai/analyzer.js";
+import { OPENROUTER_ERRORS, OpenRouterCareerAnalyzer } from "../../src/ai/openrouter.js";
+import { providerDestination } from "../../src/ai/provider.js";
 import { loadLocalEnv } from "../../src/config.js";
 import { JobDiscovery } from "../../src/domain/jobs/search.js";
 import { CareerStore } from "../../src/domain/store.js";
@@ -29,11 +31,12 @@ function snapshotGateEnv(): GateEnv {
 const gateEnv = snapshotGateEnv();
 
 const ALLOWED_MESSAGES = new Set<string>([...Object.values(REFUSALS), "Selected candidate IDs are not present in the search result.",
-  "The search returned no candidates to measure.", "Set OPENAI_API_KEY in .env.local before a live run.", "Declined; 0 model calls made.", "Report redaction failed."]);
+  "The search returned no candidates to measure.", "Set OPENAI_API_KEY in .env.local before a live run.", OPENROUTER_ERRORS.missingKey, OPENROUTER_ERRORS.missingModel,
+  "Declined; 0 model calls made.", "Report redaction failed."]);
 
 function sha256(path: string): string { return createHash("sha256").update(readFileSync(resolve(root, path))).digest("hex"); }
 
-function provenance(requestedModel: string): Provenance {
+function provenance(requestedModel: string, defaultModel: string): Provenance {
   let codeSha = "unknown", dirty = true;
   try {
     const git = (args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
@@ -43,7 +46,7 @@ function provenance(requestedModel: string): Provenance {
     codeSha, dirty,
     hashes: { analyzer: sha256("server/src/ai/analyzer.ts"), search: sha256("server/src/domain/jobs/search.ts"), policy: sha256("server/src/domain/assessment/policy.ts"), schema: sha256("packages/shared/src/index.ts") },
     openaiSdkVersion: OPENAI_SDK_VERSION, nodeVersion: process.version,
-    promptVersion: PROMPT_VERSION, defaultModel: DEFAULT_OPENAI_MODEL, requestedModel,
+    promptVersion: PROMPT_VERSION, defaultModel, requestedModel,
   };
 }
 
@@ -83,20 +86,27 @@ async function main(): Promise<number> {
   let inner: CareerAnalyzer;
   const hookTarget: { current?: MeasuredAnalyzer } = {};
   let requestedModel = "synthetic-no-model";
+  const defaultModel = options.provider === "openrouter" ? "none (OPENROUTER_MODEL required)" : DEFAULT_OPENAI_MODEL;
+  const destination = providerDestination(options.provider);
 
   if (mode === "live") {
     if (Date.parse(context.search.expiresAt) - Date.now() < plannedMaxWallMs(options)) throw new Error(REFUSALS.wallTime);
     log([
       "Live measurement plan", `  board: ${options.boardToken}   searchId: ${context.search.searchId}   expiresAt: ${context.search.expiresAt}`,
       ...context.hits.filter((h) => context.selectedIds.includes(h.candidate.candidateId)).map((h) => `  candidate: ${h.candidate.candidateId} — ${h.candidate.title} — ${h.candidate.location} — ${h.description.length} chars`),
-      `  model: OPENAI_MODEL from .env.local if set, else ${DEFAULT_OPENAI_MODEL} (read only after confirmation)`,
+      `  provider: ${options.provider}   destination: ${destination}`,
+      options.provider === "openrouter"
+        ? "  model: OPENROUTER_MODEL from .env.local (required, no default; read only after confirmation)"
+        : `  model: OPENAI_MODEL from .env.local if set, else ${DEFAULT_OPENAI_MODEL} (read only after confirmation)`,
       `  prompt version: ${PROMPT_VERSION}`,
       `  runs: A-production-deadline (${options.deadlineMs} ms) → B-retry (${options.retryMode})${options.forcedAbortMs !== undefined ? ` → C-forced-abort (${options.forcedAbortMs} ms)` : ""}${options.includeProfileExtraction ? " + profile extraction" : ""}`,
       `  model-call upper bound: ${plan.upperBound}   cap: ${plan.cap}   settle wait: ${options.settleWaitMs} ms`,
-      "  These public job descriptions and the synthetic profile will be transmitted to https://api.openai.com/v1 only",
-      "  (OPENAI_BASE_URL must be unset; SDK retries and SDK logging are pinned off for every harness request).",
-      "  No dollar estimate is computed; confirm cost in the OpenAI usage dashboard for the run window.",
-      `Type the cap number (${plan.cap}) to approve at most ${plan.cap} paid Responses API calls:`,
+      `  These public job descriptions and the synthetic profile will be transmitted to ${destination} only`,
+      options.provider === "openrouter"
+        ? "  (OpenRouter forwards them to the upstream provider serving the model; check that provider's data policy. SDK retries and logging are pinned off)."
+        : "  (OPENAI_BASE_URL must be unset; SDK retries and SDK logging are pinned off for every harness request).",
+      "  No dollar estimate is computed; confirm cost in the provider's usage dashboard for the run window. A free tier is still an external transmission.",
+      `Type the cap number (${plan.cap}) to approve at most ${plan.cap} model calls:`,
     ].join("\n"));
     const rl = createInterface({ input: process.stdin, output: process.stderr, terminal: false });
     let line: string;
@@ -109,12 +119,21 @@ async function main(): Promise<number> {
     loadLocalEnv();
     const loaded = resolveMode(options, snapshotGateEnv(), context.selectedIds.length);
     if (loaded.refusal) throw new Error(loaded.refusal);
-    if (!process.env.OPENAI_API_KEY?.trim()) throw new Error("Set OPENAI_API_KEY in .env.local before a live run.");
-    requestedModel = process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
-    forbidden.push(process.env.OPENAI_API_KEY);
-    const analyzer = new OpenAICareerAnalyzer({ onResponse: (event) => hookTarget.current?.onResponseEvent(event), transport: { ...HARNESS_TRANSPORT } });
-    delete process.env.OPENAI_API_KEY;
-    inner = analyzer;
+    const onResponse = (event: AnalyzerResponseEvent) => hookTarget.current?.onResponseEvent(event);
+    if (options.provider === "openrouter") {
+      if (!process.env.OPENROUTER_API_KEY?.trim()) throw new Error(OPENROUTER_ERRORS.missingKey);
+      if (!process.env.OPENROUTER_MODEL?.trim()) throw new Error(OPENROUTER_ERRORS.missingModel);
+      requestedModel = process.env.OPENROUTER_MODEL;
+      forbidden.push(process.env.OPENROUTER_API_KEY);
+      inner = new OpenRouterCareerAnalyzer({ onResponse, transport: { ...HARNESS_TRANSPORT } });
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      if (!process.env.OPENAI_API_KEY?.trim()) throw new Error("Set OPENAI_API_KEY in .env.local before a live run.");
+      requestedModel = process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
+      forbidden.push(process.env.OPENAI_API_KEY);
+      inner = new OpenAICareerAnalyzer({ onResponse, transport: { ...HARNESS_TRANSPORT } });
+      delete process.env.OPENAI_API_KEY;
+    }
   } else {
     inner = new FakeCareerAnalyzer(options.scenario ?? "ok");
   }
@@ -128,7 +147,7 @@ async function main(): Promise<number> {
   const tempDir = inspection ? undefined : mkdtempSync(join(tmpdir(), "career-radar-measure-"));
   const store = new CareerStore(join(inspection ?? tempDir!, "harness.db"));
   store.upsertProfile(measurementProfile);
-  const prov = provenance(requestedModel);
+  const prov = provenance(requestedModel, defaultModel);
   const inputs = reportInputs(options, context.selectedIds, mode);
 
   let state: RunState | undefined; let interrupted = false; let exitCode = 0;

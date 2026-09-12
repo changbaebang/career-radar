@@ -12,6 +12,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CareerAnalyzer } from "../src/ai/analyzer.js";
+import { OPENROUTER_BASE_URL, OpenRouterCareerAnalyzer } from "../src/ai/openrouter.js";
 import { createHttpApp } from "../src/httpApp.js";
 import {
   CAREER_RADAR_WIDGET_URI,
@@ -133,6 +134,32 @@ describe("Career Radar HTTP and MCP server", () => {
     await expect(response.json()).resolves.toMatchObject({
       name: "Career Radar", milestone: "Milestone 4", state: "ready",
     });
+  });
+
+  it("surfaces a fixed provider configuration message instead of a stack when the environment names an unknown provider", async () => {
+    vi.stubEnv("CAREER_RADAR_PROVIDER", "bogus");
+    try {
+      const client = await connectClient(await startTestServer({ store: new CareerStore() }));
+      const result = await client.callTool({ name: "profile_upsert", arguments: { resumeText: "Synthetic resume text that is long enough to pass the minimum length check." } });
+      expect(result.isError).toBe(true);
+      expect(JSON.stringify(result.content)).toContain("Set CAREER_RADAR_PROVIDER to openai or openrouter.");
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it("never forwards a provider's HTTP error body through the OpenRouter adapter into an MCP result", async () => {
+    const realFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => String(input).startsWith(OPENROUTER_BASE_URL)
+      ? new Response('{"error":{"message":"SECRET-PROVIDER-BODY","code":"bad_request"}}', { status: 400, headers: { "content-type": "application/json" } })
+      : realFetch(input, init)));
+    try {
+      const createAnalyzer = () => new OpenRouterCareerAnalyzer({ apiKey: "synthetic-not-a-real-key", model: "synthetic/free-model", transport: { maxRetries: 0, logLevel: "off" } });
+      const client = await connectClient(await startTestServer({ store: new CareerStore(), createAnalyzer }));
+      const result = await client.callTool({ name: "profile_upsert", arguments: { resumeText: "Synthetic resume text that is long enough to pass the minimum length check." } });
+      expect(result.isError).toBe(true);
+      const text = JSON.stringify(result.content);
+      expect(text).toContain("OpenRouter request failed (HTTP 400)");
+      expect(text).not.toContain("SECRET-PROVIDER-BODY");
+    } finally { vi.unstubAllGlobals(); }
   });
 
   it("lists and calls the status tool and serves its widget resource", async () => {

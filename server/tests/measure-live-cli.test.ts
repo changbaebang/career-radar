@@ -82,7 +82,7 @@ describe("measure:live CLI (dry run only; approvals are refused under the test r
   });
 
   it.each([[["--approve-model-cost"], REFUSALS.costWithoutNetwork], [["--bogus"], REFUSALS.unknownOption], [["--scenario", "stall"], REFUSALS.stallNeedsShortDeadline],
-    [["--approve-network", "--no-save"], REFUSALS.dryRunOnlyFlags]])("rejects %j with a fixed message", (args, message) => {
+    [["--approve-network", "--no-save"], REFUSALS.dryRunOnlyFlags], [["--provider", "bogus"], REFUSALS.unknownOption]])("rejects %j with a fixed message", (args, message) => {
     const run = cli(args);
     expect(run.status).toBe(2);
     expect(run.stderr.trim()).toBe(message);
@@ -130,5 +130,15 @@ describe("measure:live CLI (dry run only; approvals are refused under the test r
     expect(run.status).toBe(0);
     expect(run.stdout).toContain("--approve-network --approve-model-cost");
     expect(run.stdout).toContain("environment variables can refuse, never grant");
+    expect(run.stdout).toContain("--provider openai|openrouter");
+  });
+
+  it("records the provider in a dry run and refuses openrouter approvals under the test runner too", () => {
+    const run = cli(["--provider", "openrouter", "--no-save"]);
+    expect(run.status, run.stderr).toBe(0);
+    expect(JSON.parse(run.stdout)).toMatchObject({ mode: "dry-run", modelCalls: 10 });
+    const refused = cli(["--provider", "openrouter", "--approve-network", "--approve-model-cost"]);
+    expect(refused.status).toBe(2);
+    expect(refused.stderr.trim()).toBe(REFUSALS.ciEnvironment);
   });
 });

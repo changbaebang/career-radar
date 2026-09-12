@@ -1,3 +1,4 @@
+import { isProviderName, type ProviderName } from "../../src/ai/provider.js";
 import { RECOMMEND_DEADLINE_MS } from "../../src/domain/jobs/search.js";
 
 // Pure gating rules for the live measurement harness. No I/O here: everything is decided from
@@ -18,6 +19,7 @@ export type Options = {
   help: boolean;
   approveNetwork: boolean;
   approveModelCost: boolean;
+  provider: ProviderName;
   scenario?: Scenario;
   boardToken: string;
   titleKeywords?: string;
@@ -64,6 +66,7 @@ Modes (decided by argv only; environment variables can refuse, never grant):
 
 Flags:
   --scenario ok|fail-at-3|stall   dry-run only (default ok); stall needs --deadline-ms <= 10000
+  --provider openai|openrouter    default openai; openrouter reads OPENROUTER_API_KEY and OPENROUTER_MODEL from .env.local (see docs/PROVIDERS.md)
   --board-token TOKEN             default greenhouse
   --title-keywords S  --location S  --limit 1..10 (default 5)
   --candidate-ids a,b,c           default: first min(5, limit) search results; max 5
@@ -89,7 +92,7 @@ function integer(value: string | undefined, min: number, max: number): number {
 
 export function parseArgs(argv: string[]): Options {
   const options: Options = {
-    help: false, approveNetwork: false, approveModelCost: false, boardToken: "greenhouse", limit: 5,
+    help: false, approveNetwork: false, approveModelCost: false, provider: "openai", boardToken: "greenhouse", limit: 5,
     deadlineMs: RECOMMEND_DEADLINE_MS, retryMode: "failed-only", includeProfileExtraction: false,
     settleWaitMs: DEFAULT_SETTLE_WAIT_MS, save: true, inspect: false,
   };
@@ -104,6 +107,11 @@ export function parseArgs(argv: string[]): Options {
       case "--include-profile-extraction": options.includeProfileExtraction = true; break;
       case "--no-save": options.save = false; break;
       case "--inspect": options.inspect = true; break;
+      case "--provider": {
+        const v = next();
+        if (!isProviderName(v)) throw new Error(REFUSALS.unknownOption);
+        options.provider = v; break;
+      }
       case "--scenario": {
         const v = next();
         if (v !== "ok" && v !== "fail-at-3" && v !== "stall") throw new Error(REFUSALS.unknownOption);
@@ -168,7 +176,7 @@ export function resolveMode(options: Options, env: GateEnv, candidateCount: numb
   if (approval && (options.scenario !== undefined || !options.save)) return refuse(REFUSALS.dryRunOnlyFlags);
   if (approval && (env.CI || env.GITHUB_ACTIONS || env.VITEST || env.NODE_ENV === "test")) return refuse(REFUSALS.ciEnvironment);
   if (approval && env.CAREER_RADAR_DB_PATH) return refuse(REFUSALS.databasePathSet);
-  if (mode === "live" && env.OPENAI_BASE_URL) return refuse(REFUSALS.baseUrlSet);
+  if (mode === "live" && options.provider === "openai" && env.OPENAI_BASE_URL) return refuse(REFUSALS.baseUrlSet);
   if (cap > HARD_MAX_MODEL_CALLS) return refuse(REFUSALS.capAboveCeiling);
   if (plan.upperBound > cap) return refuse(REFUSALS.planAboveCap);
   if (plannedMaxWallMs(options) > MAX_PLANNED_WALL_MS) return refuse(REFUSALS.wallTime);
