@@ -99,6 +99,7 @@ describe("OpenRouterCareerAnalyzer (real SDK, stubbed fetch, no network)", () =>
   it.each([
     ["refusal", () => completion("", {}, { message: { role: "assistant", content: null, refusal: "SECRET-REFUSAL" } }), OPENROUTER_ERRORS.refused],
     ["truncation", () => completion(JSON.stringify(assessmentDraft).slice(0, 40), {}, { finish_reason: "length" }), OPENROUTER_ERRORS.truncated],
+    ["upstream error finish", () => completion("", {}, { finish_reason: "error", message: { role: "assistant", content: null } }), OPENROUTER_ERRORS.finishError],
     ["non-JSON content", () => completion("SECRET-PROSE not json"), OPENROUTER_ERRORS.invalidJson],
     ["schema mismatch", () => completion({ verdict: "MAYBE", SECRET: "SECRET-FIELD" }), OPENROUTER_ERRORS.schemaMismatch],
     ["empty content", () => completion(""), OPENROUTER_ERRORS.noContent],

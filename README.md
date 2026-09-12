@@ -192,6 +192,15 @@ mismatch. `modelVersion` records `openrouter/<model>@<upstream provider>`, so a 
 that endpoint. `pnpm measure:live --provider openrouter` measures that path after the same
 approval flow. No provider was called for this slice. [Details](docs/PROVIDERS.md).
 
+### Usage check (next step, not a milestone)
+
+`pnpm usage-check --job <url|file> ...` puts one profile (the synthetic resume by default) and
+up to five postings through the real MCP tools with the configured provider and serves a local
+page with the widget output per posting. Without `--approve-transmission` it only prints what
+would be transmitted. The point is to read the result and answer three questions about whether it
+helps prioritize; see [USAGE_CHECK.md](docs/USAGE_CHECK.md), including why a local run still
+transmits the inputs.
+
 ## Documentation references
 
 - [Plugin quickstart](https://developers.openai.com/plugins/build/app-quickstart)

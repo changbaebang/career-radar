@@ -15,8 +15,8 @@ export class FakeCareerAnalyzer implements CareerAnalyzer {
 
   constructor(scenario: Scenario = "ok", delayMs = 20) { this.#scenario = scenario; this.#delayMs = delayMs; }
 
-  async extractProfile(resumeText: string, profileId?: string): Promise<ProfileExtraction> {
-    await this.#wait();
+  async extractProfile(resumeText: string, profileId?: string, signal?: AbortSignal): Promise<ProfileExtraction> {
+    await this.#wait(signal);
     const profile = CandidateProfileSchema.parse({ ...measurementProfile, id: profileId ?? stableId("profile", resumeText), sourceHash: hashSource(resumeText) });
     return { profile, warnings: ["synthetic extraction"] };
   }

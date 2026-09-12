@@ -10,6 +10,7 @@
     "demo": "tsx scripts/demo.ts",
     "eval": "tsx ../evals/run-evals.ts",
     "measure:live": "tsx scripts/measure-live/cli.ts",
+    "usage-check": "tsx scripts/usage-check/cli.ts",
     "start": "node dist/index.js",
     "typecheck": "tsc -p tsconfig.check.json",
     "test": "vitest run"

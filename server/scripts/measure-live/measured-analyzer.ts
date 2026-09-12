@@ -90,9 +90,9 @@ export class MeasuredAnalyzer implements CareerAnalyzer {
     }
   }
 
-  extractProfile(resumeText: string, profileId?: string): Promise<ProfileExtraction> {
+  extractProfile(resumeText: string, profileId?: string, signal?: AbortSignal): Promise<ProfileExtraction> {
     if (!this.#allowProfileExtraction) return Promise.reject(new Error("Profile extraction is disabled; pass --include-profile-extraction."));
-    return this.#measure("extractProfile", "profile", undefined, () => this.#inner.extractProfile(resumeText, profileId));
+    return this.#measure("extractProfile", "profile", signal, () => this.#inner.extractProfile(resumeText, profileId, signal));
   }
 
   extractJob(description: string, signal?: AbortSignal): Promise<JobExtraction> {

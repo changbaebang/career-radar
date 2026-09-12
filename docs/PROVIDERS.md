@@ -40,7 +40,9 @@ usage and quality measured on one provider do not verify another.
   OpenRouter request has no equivalent, so the live report records `store: "n/a"`. Retention follows
   your OpenRouter provider-routing and data settings, not this request.
 - **Retries and logging** follow the same transport options as the OpenAI adapter: batch calls send
-  `maxRetries: 0`, and the live harness pins retries and SDK logging off for every request.
+  `maxRetries: 0`, and the live harness and the usage check pin retries and SDK logging off for every
+  request; the usage check also bounds each request at 5 minutes. A `finish_reason` of `error` from the
+  upstream endpoint is reported as its own fixed message, distinct from truncation.
 - **Free is not private.** The resume text and the public job descriptions leave the machine on
   either provider. OpenRouter forwards them to the upstream provider that serves the chosen model;
   review that provider's data policy and your OpenRouter privacy settings before a live run. The
