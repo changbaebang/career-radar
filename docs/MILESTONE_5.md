@@ -178,8 +178,12 @@ row or a prompt version would notice. Verification labels are what the PR may cl
 - **Test/eval.** Validator unit tests mirroring `screening.test.ts`; policy-mode eval gains
   citation cases with expected `citationCorrectness` (valid ÷ supplied) and `unsupportedClaimRate`
   (claims with no resolvable citation ÷ claims, per `claimId`) computed deterministically from
-  injected drafts; a stored-snapshot fixture from before B parses unchanged; MCP integration test
-  that outputs carry citations and the v7 URI.
+  injected drafts; claim-id control cases: two matches on the same `requirementId` with different
+  evidence get different ids, two ID-less matches with different requirement text get different
+  ids, and a gap with an ID plus a blocker without one but with the same normalized text collapse to
+  one claim whose surviving `claimId` carries both citation sets (the case that a `kind +
+  requirementId ?? text` string concatenation gets wrong); a stored-snapshot fixture from before B
+  parses unchanged; MCP integration test that outputs carry citations and the v7 URI.
 - **Label at merge.** `synthetic-verified`. Whether a live model produces resolvable chunk ids is
   M5-D's question.
 
@@ -211,7 +215,11 @@ row or a prompt version would notice. Verification labels are what the PR may cl
   `unmatchedGoldRequirements` and `unmatchedExtractedRequirements` as extraction outcomes. Blocker
   recall is reported twice: `blockerRecallMatched` over matched gold requirements only, and
   `blockerRecallAll` over all gold blockers with unmatched ones counted as misses, so an extraction
-  miss cannot make recall look better. Golden set: 30–50 authored cases whose structured shape
+  miss cannot make recall look better; with zero matched requirements `blockerRecallMatched` is
+  `null` (reported as N/A), never 1.0. An unmatched gold requirement is listed with the nearest
+  extracted text and stays labelled `unmatched`: text equality cannot tell a paraphrase from a
+  semantic miss, so the runner never classifies the cause, and the case's human-review status is
+  where that call is made. Golden set: 30–50 authored cases whose structured shape
   mirrors the policy fixtures (so the same failure modes are covered), plus A–F scenario pairs and
   the M5-B citation cases.
 - **Contract impact.** New report version and metric version; no runtime contract change.
@@ -227,8 +235,9 @@ row or a prompt version would notice. Verification labels are what the PR may cl
   failure; the runner refuses under CI/test env like the harness; extracting the same posting twice
   (fresh generated IDs each time) scores identically with a fake analyzer; a golden case whose
   extraction drops one of two gold blockers reports `blockerRecallMatched` 1.0 and
-  `blockerRecallAll` 0.5, never a single number; no golden case carries two conflicting gold
-  verdicts for the same inputs.
+  `blockerRecallAll` 0.5, never a single number; a case with no matched requirement reports
+  `blockerRecallMatched` as N/A; no golden case carries two conflicting gold verdicts for the same
+  inputs.
 - **Dependency on #4.** Latency and abort behaviour of the five-candidate batch stay in #4 via
   `measure:live`; model-mode eval is per case and does not re-measure the batch. #4's approved runs
   are the latency baseline this harness cites.
