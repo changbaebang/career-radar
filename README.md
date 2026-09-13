@@ -206,6 +206,12 @@ newly generated `score` values are integers on a stated 0-100 scale while stored
 readable, and `OPENROUTER_REASONING_EFFORT` adjusts reasoning intensity (whether it actually lowers
 reasoning tokens is unverified). Prompt version is `milestone-4b2-v2`.
 
+### M5 (planned)
+
+A reviewed plan for a grounded-evidence milestone (retrieval over a synthetic corpus, citations to
+retrieved chunks, a model-mode eval harness, run-level observability, bounded tool use last) is in
+[MILESTONE_5.md](docs/MILESTONE_5.md) with ADR-0013. Nothing from it is implemented yet.
+
 ## Documentation references
 
 - [Plugin quickstart](https://developers.openai.com/plugins/build/app-quickstart)

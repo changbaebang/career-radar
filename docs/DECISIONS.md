@@ -95,3 +95,12 @@ Widget v3 adds grouped recommendations, evidence/gaps, explicit failure/shortage
 User feedback motivates explicit role-scope and career-story context plus stage-aware response reporting. Keep evidence-based fit, screening uncertainties, and reported hiring outcomes separate. Neither a rejection nor an interview automatically changes the stored fit verdict, and no outcome supplies a supervised fit label without independent human evidence review. Minimum years, missing title, leadership-to-IC transitions, and demographic proxies must not become automatic negative signals.
 
 Prefer an optional versioned screening context, preserve existing free-text stages while adding a normalized projection, and use correction-safe events without copying private notes. Start with a local, no-API evaluation runner and synthetic fixtures; integrate schemas/prompts/UI and stage analytics in separate implementation PRs. Exact contracts, migration/deletion safeguards, metric definitions, and live-verification boundaries are in [MILESTONE_4.md](MILESTONE_4.md). Broader search, automatic applications, compensation inference, and policy learning from outcomes are deferred.
+
+## ADR-0013: Make evidence retrievable and measurable before giving the model autonomy
+
+**Status:** Proposed — M5 planning only; no runtime changes in this PR.
+
+The owner wants the repository to be honest evidence of designing, evaluating and operating a grounded GenAI application, not of ML training or production RAG operations. The first usage check (2026-09-12) showed that the product loop works and that its failures are about evidence: an invented employer, an unanchored score, runaway reasoning. So M5 adds retrieval over a public-safe evidence corpus, extends the located-citation contract to retrieved chunks, and evaluates the real model path on a versioned golden set before any tool autonomy is added; bounded tool use comes last and OpenAI-first, and application outcomes are never exposed to the assessment model.
+
+Every slice ends with the same usage check on the same inputs, carries a `synthetic-verified` / `live-verified` / `not verified` label, and keeps read contracts stable while tightening only generation contracts. Embeddings, hybrid retrieval, cloud vector stores and multi-user deployment are deferred or gated on explicit approval. Slices, contract impact and acceptance criteria are in [MILESTONE_5.md](MILESTONE_5.md).
+
