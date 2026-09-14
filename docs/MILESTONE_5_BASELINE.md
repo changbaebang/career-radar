@@ -16,8 +16,8 @@ carries one of three labels and the run or SHA that supports it.
 | --- | --- | --- |
 | Code SHA | `47e7c13ec412c902ddae6cd9ba46c05e9700981c` | `codeSha` in the baseline report; `dirty: false` |
 | Prompt version | `milestone-4b2-v2` | `PROMPT_VERSION`, `server/src/ai/contracts.ts` |
-| Policy hash | `c32f094edb818e2daa158bc61f8414584abe6b04f209debef2338249b09e24fc` | sha256 of `server/src/domain/assessment/policy.ts` |
-| Shared schema hash | `0e6a63c3e7afe7ad1c7869960bac72424f27cb38f11eafe5155caab189fc36a8` | sha256 of `packages/shared/src/index.ts` |
+| Policy hash | `c32f094edb818e2daa158bc61f8414584abe6b04f209debef2338249b09e24fc` | `digest(fileText)` of `server/src/domain/assessment/policy.ts`, where `digest` (`evals/evaluate.ts`) is `sha256(canonical(value))` and `canonical` of a string is `JSON.stringify(fileText)`; not the sha256 of the raw file bytes |
+| Shared schema hash | `0e6a63c3e7afe7ad1c7869960bac72424f27cb38f11eafe5155caab189fc36a8` | same method over `packages/shared/src/index.ts` |
 | Dataset | `synthetic-policy-v2`, 28 cases, hash `c685971017902d7e21251301dcdb8e47567341cebbec338210d66c025f462c54` | `evals/dataset.ts`, `evals/fixtures/cases.ts` |
 | Metrics / report | `policy-metrics-v2` / report version 3 | `evals/evaluate.ts` |
 | SQLite schema | `PRAGMA user_version = 2` (two migrations) | `server/src/infra/db/migrations.ts` |
@@ -101,7 +101,7 @@ SHA.
 | Live batch measurement harness `measure:live` (approval gates, redaction, abort) | synthetic-verified; live: **not verified** | dry-run and fake-analyzer tests; no approved run (issue #4) |
 | OpenAI adapter (Responses API, `store: false`) | synthetic-verified; live: **not verified** | fetch-stub tests; the only live attempt (M1) stopped at a credit error |
 | OpenRouter adapter (`require_parameters`, re-validation, telemetry) | live-verified for `dots-studio/dots-3-note-preview:free`; structured-output failures observed with `liquid/lfm-2.5-2.6b:free` | runs `2026-09-12T03-07-22.190Z` and `2026-09-12T03-03-45.865Z`; other models: **not verified** |
-| Usage-check runner (`pnpm usage-check`, loopback results page, per-call deadline) | synthetic-verified; used live in round 1 | `server/tests/usage-check.test.ts`; both runs above |
+| Usage-check runner (`pnpm usage-check`, loopback results page, per-call deadline with cancel propagation) | current runner: synthetic-verified; live: **not verified** | `server/tests/usage-check.test.ts`. The pre-fix runner (before the #18 review fixes) produced both round-1 runs above; the missing cancel propagation seen there was fixed afterwards and has not been exercised live since |
 | #19 contract changes: employer optional, integer `score` generation contract, `OPENROUTER_REASONING_EFFORT` | synthetic-verified; live: **not verified** | `server/tests`; post-#19 re-run pending |
 | Widget v6 strict parsing, stored pre-#19 snapshots still readable | synthetic-verified | `server/tests` (store snapshot fixture), `web` build |
 | ChatGPT host: tool discovery, widget v6 rendering, re-entry, error display | **not verified** | only the M0 status card was seen in ChatGPT (2026-09-09); runbook `docs/HOST_CHECK.md`, run pending (issue #5) |
