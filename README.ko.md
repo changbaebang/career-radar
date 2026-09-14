@@ -215,8 +215,9 @@ strict JSON 스키마 출력과 `require_parameters` 라우팅으로 보낼 수 
 
 ### M5 (진행 중)
 
-근거 기반 마일스톤(합성 코퍼스 검색, 검색된 조각에 대한 인용, 모델 모드 평가 실행기, 실행 단위 관측,
-제한된 도구 사용은 마지막) 계획을 [MILESTONE_5.md](docs/MILESTONE_5.md)와 ADR-0013으로 정리했습니다.
+근거 기반 마일스톤(합성 코퍼스 검색, 검색된 조각에 대한 인용, 모델 모드 평가 실행기, 실행 단위 관측) 계획을
+[MILESTONE_5.md](docs/MILESTONE_5.md)와 ADR-0013으로 정리했습니다. 제한된 도구
+사용(M5-C)은 2026-09-14에 제외했습니다(ADR-0014).
 M5-0은 끝났습니다. M5 이전 기준선을 [MILESTONE_5_BASELINE.md](docs/MILESTONE_5_BASELINE.md)(코드 SHA,
 프롬프트·정책·스키마·데이터셋 식별자, 사용 확인 1차의 호출별 지연, 기능별 확인 표시)와 커밋된 정책 평가
 보고서 `evals/baselines/m5-0/report.json`으로 동결했고, 이후 실행은 `pnpm eval --baseline
@@ -229,8 +230,19 @@ M5-B는 검색을 판정 경로에 넣었습니다. 모델을 부르기 전에 `
 `chunk:<id>` 참조는 그 실행의 검색 흔적에만 해석되고(해시만으로는 아무것도 증명하지 않음) 인용문은 조각
 텍스트와 같아야 합니다. 정책이 병합된 결격 사유의 인용을 옮기고 제거된 주장의 인용을 버리며, 무효한 인용은
 고정 문구와 함께 버리고 확신도를 낮춥니다. 위젯 URI v7, `PROMPT_VERSION` `milestone-5b-v1`, 인용 평가 사례
-7건과 `citationCorrectness`·`unsupportedClaimRate`. 실제 모델이 해석되는 조각 id를 인용하는지는 미측정(M5-D)이고,
-모델 모드 평가·도구는 구현하지 않았습니다.
+7건과 `citationCorrectness`·`unsupportedClaimRate`.
+M5-D는 모델 모드 평가 실행기를 더했습니다. `pnpm eval --mode model`은 합성 골든셋
+33건(`model-golden-v1`: 원문 이력서·공고 텍스트, 요건 텍스트로 지정한 예상 결격 사유, 허용
+집합으로 적은 판정, 사람 검토는 모두 `pending`)을 추출·판정·결정적 파이프라인에 통과시킵니다.
+`--approve-transmission` 없이는 골든 가짜 분석기로 도는 dry run(네트워크 없음)이고, 붙이면
+합성 텍스트가 설정된 제공자로 전송됩니다(기본 OpenRouter, `--provider openai`는
+`--approve-model-cost`도 필요). 보고서(`model-metrics-v1`)는 실행 결과(추출·판정
+실패는 분류된 실패이지 `PASS`가 아님), 요건 일치율, 일치한 요건 기준과 전체 골든 결격 기준의 결격 재현율,
+판정 일치, 인용 정확도, 지연과 제공자가 보고한 토큰을 기록하고 이력서·공고 텍스트는 담지
+않습니다([evals/README.md](evals/README.md)). 소유자 결정(2026-09-14,
+ADR-0014): M5 검증은 무료 티어에서 마무리합니다 — 유료 제공자 없음, 어휘 검색만, 합성 코퍼스만,
+M5-C 제외. 승인된 실제 실행은 아직 없어 모델 모드 수치는 전부 dry run이고, 실제 모델이 해석되는 조각
+id를 인용하는지는 여전히 미측정입니다.
 
 ## 참고 문서
 

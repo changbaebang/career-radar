@@ -216,8 +216,9 @@ recommendation batch waits for #4. Until a run is logged there, host behaviour i
 ### M5 (in progress)
 
 A reviewed plan for a grounded-evidence milestone (retrieval over a synthetic corpus, citations to
-retrieved chunks, a model-mode eval harness, run-level observability, bounded tool use last) is in
-[MILESTONE_5.md](docs/MILESTONE_5.md) with ADR-0013. M5-0 is done: the pre-M5 baseline is frozen
+retrieved chunks, a model-mode eval harness, run-level observability) is in
+[MILESTONE_5.md](docs/MILESTONE_5.md) with ADR-0013; bounded tool use (M5-C) was dropped on
+2026-09-14 (ADR-0014). M5-0 is done: the pre-M5 baseline is frozen
 in [MILESTONE_5_BASELINE.md](docs/MILESTONE_5_BASELINE.md) (code SHA, prompt/policy/schema/dataset
 identifiers, round-1 usage-check latencies, and a verification label per feature) with the
 committed policy-eval report `evals/baselines/m5-0/report.json`; compare any later run with
@@ -233,9 +234,20 @@ and blocker may carry citations, a `chunk:<id>` reference resolves only against 
 retrieval trace (a hash alone proves nothing), quotes must equal the chunk text, the policy
 re-keys citations of merged blockers and drops those of removed claims, and invalid citations are
 dropped with a fixed note and lower confidence. Widget URI v7, `PROMPT_VERSION` `milestone-5b-v1`,
-seven citation eval cases with `citationCorrectness` and `unsupportedClaimRate`. Whether a live
-model cites resolvable chunk ids is unmeasured (M5-D); model-mode evals and tools are not
-implemented.
+seven citation eval cases with `citationCorrectness` and `unsupportedClaimRate`.
+M5-D adds the model-mode eval harness: `pnpm eval --mode model` runs a 33-case synthetic golden set
+(`model-golden-v1`: raw resume and posting texts, expected blockers by requirement text, verdicts as
+allowed sets, every case `pending` human review) through extraction, assessment and the
+deterministic pipeline. Without `--approve-transmission` it is a dry run with a golden fake analyzer
+(no network); with it the synthetic texts go to the configured provider, OpenRouter by default, and
+`--provider openai` also needs `--approve-model-cost`. The report (`model-metrics-v1`) records
+execution outcomes (a failed extraction or assessment is a classified failure, never `PASS`),
+requirement match rate, blocker recall over matched and over all gold blockers, verdict agreement,
+citation correctness, latency and provider-reported tokens, and never resume or posting text
+([evals/README.md](evals/README.md)). Owner decision (2026-09-14, ADR-0014): M5 finishes its
+verification on the free tier — no paid provider, lexical retrieval only, synthetic corpus only,
+M5-C dropped. No approved live run has been made yet, so every model-mode number is dry-run only and
+whether a live model cites resolvable chunk ids stays unmeasured.
 
 ## Documentation references
 

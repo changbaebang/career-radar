@@ -1,8 +1,10 @@
 # Policy evaluation — M4-A
 
-This runner executes **synthetic deterministic policy contracts**, not a model.
+The policy runner (`pnpm eval`) executes **synthetic deterministic policy contracts**, not a model.
 It neither loads `.env` nor reads the application database. No network/model calls,
-private input import, screening context, stage analytics, or model-mode switch is implemented.
+private input import, screening context or stage analytics. The model-mode switch
+(`pnpm eval --mode model`, M5-D, last section) is the one path in this directory that can transmit
+anything, and only behind an approval flag; without the flag it is a dry run.
 The live measurement harness (`pnpm measure:live`, see `docs/LIVE_MEASUREMENT.md`) is a separate
 tool: its reports also land under ignored `evals/reports/` but describe live batch timings, never policy cases.
 
@@ -158,3 +160,68 @@ terms are all absent from the index returns an empty hit list and is listed in
 score and rank (`deterministic`). Report version 1, metrics `retrieval-metrics-v1`; the report is
 validated against a strict schema before it is written. Exit `0` success, `1` dataset problems or
 non-deterministic scores, `2` invalid arguments or output error.
+
+## Model-mode evaluation (M5-D)
+
+```sh
+pnpm eval --mode model --no-save                                   # dry run: golden fake analyzer, zero network
+pnpm eval --mode model --cases gm-frontend-lead-realistic,gm-two-required-blockers --no-save
+pnpm eval --mode model --output evals/reports/model-first-dry-run  # dry run, saved
+pnpm eval --mode model --approve-transmission                      # live: the golden texts go to OpenRouter (free tier)
+pnpm eval --mode model --approve-transmission --provider openai --approve-model-cost   # live on OpenAI (not the default)
+pnpm eval --mode model --baseline evals/reports/<dir>/report.json --no-save
+pnpm eval --mode model --help
+```
+
+Runs the real model path over the golden set in `fixtures/golden/` (`model-golden-v1`, 33 synthetic
+cases as raw resume and posting text): profile extraction, job extraction and assessment through an
+analyzer, then the deterministic pipeline (pre-retrieval, policy, citation and context validation).
+Model gold is not policy gold: expected blockers are named by requirement *text* because extraction
+assigns ids at run time, the expected verdict is an allowed set, and every case starts with
+`humanReview: "pending"`, so `humanVerdictAgreement` is N/A until a reviewer signs cases.
+
+**Execution.** Argv alone decides. Without `--approve-transmission` the analyzer is
+`GoldenFakeAnalyzer` (a deterministic parser of the golden text format; no network; `execution:
+"dry-run"`, provider `fake`); with it, `createAnalyzerFromEnv` builds the real adapter from
+`.env.local`. The default provider is `openrouter` (owner decision 2026-09-14: the project verifies
+on the free tier); `--provider openai` additionally requires `--approve-model-cost` and is refused
+while `OPENAI_BASE_URL` is set. The environment can only refuse, never grant: approval flags are
+rejected under `CI`, `GITHUB_ACTIONS`, `VITEST` and `NODE_ENV=test`. Up to 3 calls per case, one
+HTTP attempt each (`maxRetries: 0`, SDK logging off, 300 s per call); `--max-model-calls` is at most
+150 and never below the plan, which `--cases` and `--limit` shrink. A free call is still an external
+transmission of the synthetic texts; the plan printed before the run names the destination and the
+model.
+
+**Scoring.** Extracted required requirements are mapped to gold by normalized-text equality only
+(`requirementMatchRate`, `matchedGold`, `unmatchedGold` with the nearest extracted text,
+`unmatchedExtracted`); the cause of a miss is never classified. Blocker recall is reported twice:
+`blockerRecallMatched` over matched gold blockers (`null`, shown as N/A, when none matched; never
+1.0) and `blockerRecallAll` over all gold blockers with unmatched ones counted as misses. Also per
+case: `verdictInAllowedSet`, `spuriousBlockers`, `forbiddenClaims` (a `mustNotClaim` substring
+inside a positive match's evidence), `inventedEmployer` (a company where the posting names none),
+citation counts (`supplied`, `valid`, `claims`, `unsupported`) with `citationInvalid`, retrieval
+counts (`queries`, `chunks`, `missingTerms`) and content-free telemetry per call. Failures are
+outcomes: `extraction_failed` (stage `extractProfile` or `extractJob`) or `assessment_failed`,
+classed as `schema_failure`, `refusal`, `truncation`, `timeout`, `provider_error` or `other` from
+fixed adapter messages, error names and telemetry, never from message prose; a case behind the call
+cap is `not_attempted` and makes `success` false. Aggregates: outcome counts, the rates above,
+`goldVerdictAgreement` (all assessed cases), `humanVerdictAgreement` (reviewed cases only),
+failure-class rates, `citationCorrectness`, `unsupportedClaimRate`, latency per operation (min /
+median / max) and provider-reported tokens. Cost is never computed.
+
+**Report.** `reportKind: "model-evaluation"`, report version 1, `model-metrics-v1`, validated
+against a strict schema and saved as `evals/reports/model-<timestamp>-<uuid>/report.{json,md}`
+(directory `0700`, files `0600`) unless `--no-save`; stdout carries the report without `cases`.
+Before anything is written, `assertModelReportRedacted` throws if the JSON or the Markdown contains
+a resume or posting text, a headline, an evidence sentence, a responsibility line, a key-shaped
+string or a prompt tag; gold requirement texts are the authored contract and may appear.
+`--baseline` compares case by case on the same `provider`, `requestedModel`, `promptVersion` and
+golden-set hash (`outcomeChanged`, `verdictChanged`, `blockerRecallAllChanged`); a changed outcome
+under a live model is a model-path observation, not a policy regression. Exit `0` when every
+selected case was attempted, `1` on golden-set problems or not-attempted cases (the report is still
+written), `2` on an argument or gate refusal or an incompatible baseline.
+
+**What a dry run establishes.** Numbers under the fake verify the runner, not any model: the fake's
+verdicts follow a fixed token-overlap rule and are not meant to agree with the gold set. Retention
+is as for policy reports above. A live report names its provider, model and upstream and is evidence
+for that endpoint only.

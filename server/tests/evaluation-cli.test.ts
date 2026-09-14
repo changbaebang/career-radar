@@ -43,8 +43,15 @@ describe("evaluation CLI (synthetic only)", () => {
     expect(readFileSync(join(output, "report.json"), "utf8")).toBe(before);
   });
 
-  it.each([["--mode", "model"], ["--baseline"], ["--output", "unused", "--no-save"]].map((args) => ({ args })))("rejects unsupported arguments $args", ({ args }) => {
+  it.each([["--mode", "other"], ["--mode"], ["--baseline"], ["--output", "unused", "--no-save"]].map((args) => ({ args })))("rejects unsupported arguments $args", ({ args }) => {
     expect(cli(args).status).toBe(2);
+  });
+
+  // M5-D: `--mode model` is the only other mode; it is handed to the model-mode runner (its own tests cover it).
+  it("delegates --mode model to the model-mode runner", () => {
+    const result = cli(["--mode", "model", "--help"]);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("pnpm eval --mode model");
   });
 
   it("rejects legacy/malformed baselines without echoing file contents", () => {
