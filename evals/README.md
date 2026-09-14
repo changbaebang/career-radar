@@ -221,18 +221,23 @@ cap is `not_attempted` and makes `success` false. Aggregates: outcome counts, th
 failure-class rates, `citationCorrectness`, `unsupportedClaimRate`, latency per operation (min /
 median / max) and provider-reported tokens. Cost is never computed.
 
-**Report.** `reportKind: "model-evaluation"`, report version 1, `model-metrics-v1`, validated
+**Report.** `reportKind: "model-evaluation"`, report version 2, `model-metrics-v1`, validated
 against a strict schema and saved as `evals/reports/model-<timestamp>-<uuid>/report.{json,md}`
-(directory `0700`, files `0600`) unless `--no-save`; stdout carries the report without `cases`.
-Before anything is written, `assertModelReportRedacted` throws if the JSON or the Markdown contains
-a resume or posting text, a headline, an evidence sentence, a responsibility line, a key-shaped
-string or a prompt tag; gold requirement texts are the authored contract and may appear.
-`--baseline` compares case by case on the same `provider`, `requestedModel`, `promptVersion` and
-golden-set hash (`outcomeChanged`, `verdictChanged`, `blockerRecallAllChanged`); a changed outcome
-under a live model is a model-path observation, not a policy regression. Exit `0` when every
-selected case was attempted, `1` on golden-set problems (no call, no report) or not-attempted cases
-at the call cap (the report is still written), `2` on an argument or gate refusal or an incompatible
-baseline.
+(directory `0700`, files `0600`) unless `--no-save`; stdout carries the report without `cases`. Each
+assessed case also records the model's draft as counts (`draft`: verdict, confidence, matches, gaps,
+hard blockers, citations) next to the final counts (`final`) and the fixed pipeline notes it carries
+as short codes (`notes`: `citationInvalid`, `citationOrphan`, `citationRekeyed`, `citationBounds`,
+`screeningContextDiscarded`, `ungroundedMatchRemoved`; only these exact sentences are looked up,
+model-written notes are never copied), so a verdict change can be attributed to the policy
+(`verdictChangedByPolicy`) and dropped citations to their rule (`noteCounts`). Before anything is
+written, `assertModelReportRedacted` throws if the JSON or the Markdown contains a resume or posting
+text, a headline, an evidence sentence, a responsibility line, a key-shaped string or a prompt tag;
+gold requirement texts are the authored contract and may appear. `--baseline` compares case by case
+on the same `provider`, `requestedModel`, `promptVersion` and golden-set hash (`outcomeChanged`,
+`verdictChanged`, `blockerRecallAllChanged`); a changed outcome under a live model is a model-path
+observation, not a policy regression. Exit `0` when every selected case was attempted, `1` on
+golden-set problems (no call, no report) or not-attempted cases at the call cap (the report is still
+written), `2` on an argument or gate refusal or an incompatible baseline.
 
 **What a dry run establishes.** Numbers under the fake verify the runner, not any model: the fake's
 verdicts follow a fixed token-overlap rule and are not meant to agree with the gold set. Retention

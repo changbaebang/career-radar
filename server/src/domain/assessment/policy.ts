@@ -8,6 +8,10 @@ export { normalizeEvidence } from "./normalize.js";
 
 const BINARY_HARD_REQUIREMENTS = new Set(["language", "location", "certification", "education"]);
 
+// Fixed diagnostic added when ungrounded positive claims were removed; exported so the model-mode
+// evaluation can count it without copying model-written text.
+export const UNGROUNDED_MATCH_REMOVED = "One or more positive claims lacked a traceable candidate-profile evidence sentence.";
+
 function candidateEvidence(profile: CandidateProfile): string[] {
   return [profile.headline, ...profile.skills, ...profile.domains, ...profile.leadership,
     ...profile.customerFacing, ...profile.aiEvidence, ...profile.cloudEvidence,
@@ -95,7 +99,7 @@ export function applyAssessmentPolicy(profile: CandidateProfile, job: JobPosting
   if (assessment.resumeContortion === "high" && verdict === "REALISTIC") verdict = "STRETCH";
   if (strongestMatches.length === 0 && verdict === "REALISTIC") { verdict = "STRETCH"; confidence = "low"; }
   const missingInformation = [...assessment.missingInformation, ...reconciled.notes];
-  if (removedUngrounded) missingInformation.push("One or more positive claims lacked a traceable candidate-profile evidence sentence.");
+  if (removedUngrounded) missingInformation.push(UNGROUNDED_MATCH_REMOVED);
   return FitAssessmentSchema.parse({ ...assessment, verdict, confidence, strongestMatches, gaps,
     hardBlockers, missingInformation: [...new Set(missingInformation)],
     ...(reconciled.citations !== undefined ? { citations: reconciled.citations } : {}) });
