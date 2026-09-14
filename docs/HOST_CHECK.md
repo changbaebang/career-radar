@@ -41,16 +41,26 @@ Out of scope for this round:
   sees every tool input and output. The provider's and OpenAI's retention apply; deleting local
   files does not delete those copies. Approve per round.
 - **Database.** Unlike `pnpm usage-check`, `pnpm dev` uses the app database. Point the run at a
-  throwaway file so the check never mixes with the owner's data, and delete it afterwards:
+  throwaway file so the check never mixes with the owner's data:
 
   ```bash
   CAREER_RADAR_DB_PATH=data/host-check.db pnpm dev
-  # afterwards
-  rm -f data/host-check.db
   ```
 
   Shell variables win over `.env.local` (`process.loadEnvFile` does not override existing
-  variables), so the override works without editing the file.
+  variables), so the override works without editing the file. The path is resolved against the
+  **repository root** whatever the current directory is (`resolveDatabasePath` in
+  `server/src/config.ts`), so the file is `<repo>/data/host-check.db`, next to the real app database
+  `<repo>/data/career-radar.db`, which this check never touches. Cleanup comes at the end of the
+  round, in this order: stop the server (Ctrl-C) and the tunnel first, never unlink the file under
+  a running server; then, from the repository root, remove the database and its SQLite side files
+  (the store runs in WAL mode, so `-wal` and `-shm` files can remain):
+
+  ```bash
+  cd "$(git rev-parse --show-toplevel)"
+  rm -f data/host-check.db data/host-check.db-wal data/host-check.db-shm
+  ls data/   # career-radar.db stays; no host-check.* left
+  ```
 - **Record the identifiers first**, so the answers stay tied to what produced them: `git rev-parse
   --short HEAD`, the widget URI (`CAREER_RADAR_WIDGET_URI` in `server/src/mcp/createServer.ts`,
   `widget-v6.html` today), `PROMPT_VERSION` in `server/src/ai/contracts.ts`, and provider and model
@@ -65,11 +75,12 @@ Out of scope for this round:
 3. **Refresh the app connection.** Tool and resource metadata changed since the last host session
    (v5 → v6, new tools). After the refresh, confirm the app's resource list shows
    `ui://career-radar/widget-v6.html` and the tool list shows nine tools.
-4. Print the synthetic resume to paste:
+4. Print the synthetic resume to paste (a subshell, so the working directory stays at the
+   repository root for every other command on this page):
 
    ```bash
-   cd server && node --import tsx --input-type=module -e \
-     'import { measurementResumeText } from "./scripts/measure-live/synthetic-inputs.ts"; console.log(measurementResumeText)'
+   (cd server && node --import tsx --input-type=module -e \
+     'import { measurementResumeText } from "./scripts/measure-live/synthetic-inputs.ts"; console.log(measurementResumeText)')
    ```
 
 5. Have the three posting text files from round 1 open. Paste text, not URLs: only allowed job
@@ -83,9 +94,10 @@ different one, note that as a finding (tool descriptions are part of what #5 ver
 | # | Prompt (or action) | Expected tool | What to check |
 | --- | --- | --- | --- |
 | 1 | "Show Career Radar status." | `career_radar_status` | Status card renders (eyebrow "Milestone 4", capabilities list). "Waiting for Career Radar…" is replaced, not stuck. |
-| 2 | "Create my candidate profile from this resume text:" + pasted synthetic resume | `profile_upsert` | One model call. Text reply names the profile id and says raw text was not retained. No provider error body in the reply. |
+| 2 | "Create my candidate profile from this resume text:" + pasted synthetic resume | `profile_upsert` | One extraction. (This is the server's default analyzer path, which does not pin SDK retries the way `usage-check` does, so one extraction may be more than one HTTP attempt; the host round does not count attempts.) Text reply names the profile id and says raw text was not retained. No provider error body in the reply. |
 | 3 | "Ingest this job posting:" + posting text (three times, one per posting) | `job_ingest` | Text reply names the job id; a posting without an employer shows "(employer not stated)", never an invented company. |
-| 4 | "Assess the <title> posting against my profile." (three times) | `job_assess` | Assessment card: verdict, integer score on the 0-100 scale, evidence with requirement ids, blockers, screening context with explicit `uncertain`. Compare with the round-1 results file for the same posting; differences from #19 are expected (employer absent instead of invented, integer score). |
+| 4a | "Assess the <title> posting against my profile." (three times) | `job_assess` | **Card (what v6 renders):** employer line or "Employer not stated in the posting", title, verdict pill, confidence and contortion pills; "Strongest evidence" as requirement text plus evidence sentence, or the "No verified matching evidence" message; "Critical gaps" (up to three) or its message; a "Hard blockers" section only when there are any; the screening section either as "Not evaluated for this assessment…" or as the two pills "Role scope" and "Career story", each evaluated or marked `uncertain`. The card shows no score and no requirement ids; their absence is not a failure. |
+| 4b | Open the tool call's result that Developer Mode exposes (the structured result, not the card) | (same call) | **Structured result:** `assessment.score` absent or an integer 0-100 (it is optional; a fraction is a failure); `strongestMatches[].requirementId` present when the extracted requirement had an id; `screeningContext` absent, or present with `seniorityFit` and `careerStoryRisk` each either evaluated or `uncertain` (a normally evaluated value is not a failure); `job.company` absent for the posting that names no employer. Compare with the round-1 results file for the same posting; differences from #19 are expected (employer absent instead of invented, integer score). |
 | 5 | Re-entry: open another conversation, come back, scroll to each card; then reload the ChatGPT tab | (none) | Cards re-render from the host's tool output; none falls back to "Waiting for Career Radar…". |
 | 6 | "Save the <title> assessment as an application I plan to apply to." | `application_save` | Text-only reply with the application id (this tool has no widget). No verdict is invented. |
 | 7 | "Show my application pipeline." | `pipeline_summary` | Pipeline card renders with the saved application counted. |
@@ -107,6 +119,9 @@ inputs into a plain chat in another tab.
   #4's measurement. Note only if a step visibly exceeded the host's limit or was cancelled.
 - Anything ChatGPT did that the tool descriptions did not intend (wrong tool, invented ids, a
   verdict phrased as advice).
+- Card checks and structured-result checks are recorded separately (4a and 4b): the card is
+  what a person sees, the structured result is what the model and the next tool read, and the two
+  can pass or fail independently.
 
 ## Run log
 
