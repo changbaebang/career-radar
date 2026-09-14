@@ -86,6 +86,14 @@ re-run `pnpm usage-check` on the same three postings with the merged #19 contrac
 results file name here; until then the usage-check row below stays `not verified` for the current
 SHA.
 
+## First check after the freeze (M5-A)
+
+M5-A added `EvidenceChunkSchema` to `packages/shared/src/index.ts`, the first M5 change to the
+shared schema hash. `pnpm eval --baseline evals/baselines/m5-0/report.json --no-save` on the M5-A
+branch reports `compatible: true`, `compared: 28`, `schemaChanged: true`, `regressions: []`: the
+comparison rule from this slice did what it was changed for. The row for M5-A is at the bottom of
+the table below.
+
 ## Verification labels by feature
 
 | Feature | Label | Supported by |
@@ -105,6 +113,7 @@ SHA.
 | #19 contract changes: employer optional, integer `score` generation contract, `OPENROUTER_REASONING_EFFORT` | synthetic-verified; live: **not verified** | `server/tests`; post-#19 re-run pending |
 | Widget v6 strict parsing, stored pre-#19 snapshots still readable | synthetic-verified | `server/tests` (store snapshot fixture), `web` build |
 | ChatGPT host: tool discovery, widget v6 rendering, re-entry, error display | **not verified** | only the M0 status card was seen in ChatGPT (2026-09-09); runbook `docs/HOST_CHECK.md`, run pending (issue #5) |
+| Evidence corpus, field/sentence chunkers, BM25 retrieval, `pnpm eval:retrieval` (M5-A) | synthetic-verified; live: not applicable (no model call) | `server/tests/evidence-*.test.ts`, `retrieval-*.test.ts`; retrieval eval on the M5-A branch: 36 queries, field chunker Recall@3 47/55 (0.855 micro, 0.866 macro) and Recall@5 49/55 (0.891 / 0.882), sentence chunker Recall@3 46/60 (0.767 / 0.773) and Recall@5 51/60 (0.850 / 0.845), deterministic, 0 dataset problems; three queries miss entirely (morphology and an abbreviation, by design) |
 
 No row above depends on anything not in the repository, in a results file named here, or in a
 linked issue. When a later slice changes a row, it changes this table in the same PR and names

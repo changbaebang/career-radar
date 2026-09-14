@@ -20,6 +20,9 @@ importers:
       typescript-eslint:
         specifier: ^8.42.0
         version: 8.67.0(eslint@10.8.1)(typescript@5.9.3)
+      zod:
+        specifier: ^3.25.76
+        version: 3.25.76
 
   packages/shared:
     dependencies:

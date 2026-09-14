@@ -122,3 +122,30 @@ individual, verified run directory through your file manager when no longer need
 No reports are uploaded automatically; CI artifact export is not configured here.
 
 Human fit review, actual model/host verification and design issues #8–11 remain separate.
+
+## Retrieval evaluation (M5-A, lexical)
+
+```sh
+pnpm eval:retrieval                # saves evals/reports/retrieval-<timestamp>-<uuid>/report.{json,md}
+pnpm eval:retrieval --no-save
+pnpm eval:retrieval --output evals/reports/retrieval-baseline
+```
+
+Measures Recall@3 and Recall@5 of in-process BM25 retrieval (`server/src/domain/evidence/`) over
+the synthetic corpus in `fixtures/corpus/` (one structured profile, project and blog documents,
+synthetic distractors), once per chunker (`field`: one chunk per profile field or document
+paragraph; `sentence`: one chunk per profile leaf or document sentence). No model call, no DB, no
+network. The tokenizer is NFKC + lower-case + split on non-letters/digits, no stemming, no stop
+words: recall on morphology and abbreviation queries is expected to be low, and the report says
+which query terms were absent from the index (`misses`).
+
+Relevance is authored in `fixtures/corpus/queries.ts` as sentence locators with their text. The
+runner checks each text against the sentence chunker, resolves the locator to chunk ids per chunker
+(a field chunk is relevant when it contains the sentence and its locator is the sentence's prefix),
+and refuses to score when any entry no longer resolves (`problems`, exit 1). Micro recall counts
+relevant chunks found over all relevant chunks; macro recall is the mean per query. A query whose
+terms are all absent from the index returns an empty hit list and is listed in
+`queriesWithoutHits`; a miss is never a fabricated chunk. Two builds and searches must agree on every
+score and rank (`deterministic`). Report version 1, metrics `retrieval-metrics-v1`; the report is
+validated against a strict schema before it is written. Exit `0` success, `1` dataset problems or
+non-deterministic scores, `2` invalid arguments or output error.

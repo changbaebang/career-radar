@@ -178,6 +178,23 @@ export const CareerRadarStatusSchema = z.object({
   checkedAt: z.string().datetime(), capabilities: z.array(z.string().min(1)).min(1),
 });
 
+// M5-A evidence corpus. A chunk is one retrievable unit of candidate evidence. `id` is a content
+// hash (sha256 over sourceType, sourceId, locator and text, computed by the server chunker) so a
+// citation can only name a chunk that exists in the run's corpus. `locator` reuses the B1 candidate
+// path grammar for profile chunks (`roles[0].evidence[1]`) and `section:<n>/sentence:<m>` for
+// documents. Read contract: additive, no existing schema changes.
+export const EvidenceSourceTypeSchema = z.enum(["profile", "project", "blog", "synthetic"]);
+export const EvidenceChunkSchema = z.object({
+  id: z.string().regex(/^[a-f0-9]{64}$/),
+  sourceType: EvidenceSourceTypeSchema,
+  sourceId: z.string().min(1).max(200),
+  locator: z.string().min(1).max(200),
+  text: z.string().min(1).max(2000),
+  metadata: z.record(z.string().min(1).max(100), z.string().max(500)).optional(),
+}).strict();
+export type EvidenceSourceType = z.infer<typeof EvidenceSourceTypeSchema>;
+export type EvidenceChunk = z.infer<typeof EvidenceChunkSchema>;
+
 export type CandidateProfile = z.infer<typeof CandidateProfileSchema>;
 export type Requirement = z.infer<typeof RequirementSchema>;
 export type JobPosting = z.infer<typeof JobPostingSchema>;

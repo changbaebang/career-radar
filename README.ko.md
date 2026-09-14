@@ -221,7 +221,10 @@ M5-0은 끝났습니다. M5 이전 기준선을 [MILESTONE_5_BASELINE.md](docs/M
 프롬프트·정책·스키마·데이터셋 식별자, 사용 확인 1차의 호출별 지연, 기능별 확인 표시)와 커밋된 정책 평가
 보고서 `evals/baselines/m5-0/report.json`으로 동결했고, 이후 실행은 `pnpm eval --baseline
 evals/baselines/m5-0/report.json`으로 비교합니다. 공유 스키마 변경은 이제 비교 불가가 아니라
-`schemaChanged`로 보고합니다(보고서 버전 3). 검색·인용·모델 모드 평가·도구는 아직 구현하지 않았습니다.
+`schemaChanged`로 보고합니다(보고서 버전 3). M5-A는 근거 코퍼스 계층을 더했습니다. `EvidenceChunkSchema`,
+필드·문장 단위 청커, 빠진 질의어를 보고하는 프로세스 내 BM25 색인, 방해 문서를 포함한 합성 코퍼스, 그리고
+`pnpm eval:retrieval`(청커별 Recall@3·Recall@5, 저작한 질의 36개; [evals/README.md](evals/README.md))입니다.
+검색은 아직 판정 경로에 없고(M5-B), 조각 인용·모델 모드 평가·도구는 구현하지 않았습니다.
 
 ## 참고 문서
 

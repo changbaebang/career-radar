@@ -112,6 +112,12 @@ still pending and the baseline page says so.
 
 ### M5-A — Evidence corpus and lexical retrieval (1–2 PRs)
 
+Status: **done, lexical only** (branch `feat/m5-a-retrieval`). `EvidenceChunkSchema` in shared,
+field and sentence chunkers, BM25 index with explicit misses, synthetic corpus of one profile plus
+nine documents (three distractors), 36 authored queries, `pnpm eval:retrieval`. Numbers and the
+M5-0 comparison result are on [MILESTONE_5_BASELINE.md](MILESTONE_5_BASELINE.md). A2 (embeddings)
+stays closed until the owner decides §5.1.
+
 - **Goal.** A retrieval layer over public-safe candidate evidence, measurable before any model sees it.
 - **Design.** `EvidenceChunkSchema { id, sourceType: "profile" | "project" | "blog" | "synthetic",
   sourceId, locator, text (≤ 2,000 chars), metadata }` in shared. Chunk IDs are content hashes so a

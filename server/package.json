@@ -9,6 +9,7 @@
     "db:reset": "tsx scripts/reset-db.ts",
     "demo": "tsx scripts/demo.ts",
     "eval": "tsx ../evals/run-evals.ts",
+    "eval:retrieval": "tsx ../evals/run-retrieval.ts",
     "measure:live": "tsx scripts/measure-live/cli.ts",
     "usage-check": "tsx scripts/usage-check/cli.ts",
     "start": "node dist/index.js",
