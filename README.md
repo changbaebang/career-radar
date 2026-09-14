@@ -206,6 +206,13 @@ newly generated `score` values are integers on a stated 0-100 scale while stored
 readable, and `OPENROUTER_REASONING_EFFORT` adjusts reasoning intensity (whether it actually lowers
 reasoning tokens is unverified). Prompt version is `milestone-4b2-v2`.
 
+### ChatGPT host check (not run yet)
+
+The real product surface has only been verified at the M0 connection; every widget bump since was
+reasoned from the parser. [HOST_CHECK.md](docs/HOST_CHECK.md) is the runbook for issue #5 at widget
+v6, scoped to status → profile → ingest → assess → application tools, and its run log; the
+recommendation batch waits for #4. Until a run is logged there, host behaviour is `not verified`.
+
 ### M5 (planned)
 
 A reviewed plan for a grounded-evidence milestone (retrieval over a synthetic corpus, citations to
