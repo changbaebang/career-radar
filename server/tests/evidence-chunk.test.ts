@@ -56,9 +56,16 @@ describe("M5-A profile chunker", () => {
 });
 
 describe("M5-A document chunker", () => {
-  it("splits paragraphs into sections, drops heading-only paragraphs, and sentences on . ! ?", () => {
+  it("splits paragraphs into sections, drops heading lines but keeps their bodies, and sentences on . ! ?", () => {
     expect(splitSections("# Title\n\nFirst para line one\nline two.\n\n\n## Sub\n\nSecond para."))
       .toEqual(["First para line one line two.", "Second para."]);
+    // Heading directly followed by text (no blank line): the body survives, the heading does not.
+    expect(splitSections("# Project\nBuilt React checkout.")).toEqual(["Built React checkout."]);
+    expect(chunkDocument({ sourceType: "blog", sourceId: "blog:demo", text: "# Project\nBuilt React checkout." }, "sentence").map((c) => c.text))
+      .toEqual(["Built React checkout."]);
+    // Heading-only paragraphs, in either layout, produce nothing.
+    expect(splitSections("# Only\n## Headings")).toEqual([]);
+    expect(splitSections("# Only\n\n## Headings\n\n")).toEqual([]);
     expect(splitSentences("One. Two! Three? Four")).toEqual(["One.", "Two!", "Three?", "Four"]);
     expect(splitSentences("  spaced   out.  ")).toEqual(["spaced out."]);
   });

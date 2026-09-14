@@ -43,7 +43,8 @@ export const RetrievalReportSchema = z.object({
       // Empty only when a relevance entry failed to resolve; that run is reported as a dataset problem.
       relevantChunkIds: z.array(z.string().regex(/^[a-f0-9]{64}$/)),
       hits: z.array(HitSchema),
-      recall: z.array(z.object({ k: z.number().int().positive(), found: z.number().int().nonnegative(), relevant: z.number().int().nonnegative(), value: z.number() }).strict()),
+      // value is null (N/A) when any relevance entry of the query failed to resolve.
+      recall: z.array(z.object({ k: z.number().int().positive(), found: z.number().int().nonnegative(), relevant: z.number().int().nonnegative(), value: z.number().nullable() }).strict()),
       misses: z.array(z.string()),
     }).strict()),
   }).strict()),
@@ -84,29 +85,34 @@ export function recallAtK(relevantIds: readonly string[], hitIds: readonly strin
   return { found, relevant: relevantIds.length, value: relevantIds.length ? found / relevantIds.length : 0 };
 }
 
+const NOT_APPLICABLE = (k: number) => ({ k, found: 0, relevant: 0, value: null });
+
 function evaluateChunker(corpus: RetrievalCorpus, querySet: QuerySet, chunker: Chunker) {
   const chunks = buildChunks(corpus, chunker);
   const sentenceChunks = chunker === "sentence" ? chunks : buildChunks(corpus, "sentence");
   const index = new EvidenceIndex(chunks);
-  const problems: string[] = [];
   const maxK = Math.max(...RECALL_KS);
-  const results = querySet.queries.map((query) => {
-    const relevance = resolveRelevance(query, chunks, sentenceChunks);
-    problems.push(...relevance.problems);
+  // Relevance is resolved for every query before anything is scored. A query with an unresolved
+  // entry gets N/A, not a score over the entries that happened to resolve, and the chunker's
+  // aggregate is N/A as well: a partially valid query set is a dataset problem, not a lower number.
+  const resolved = querySet.queries.map((query) => ({ query, ...resolveRelevance(query, chunks, sentenceChunks) }));
+  const problems = resolved.flatMap((entry) => entry.problems);
+  const results = resolved.map(({ query, ids, problems: queryProblems }) => {
     const trace = index.search(query.query, maxK);
     const hitIds = trace.hits.map((hit) => hit.chunkId);
     return {
-      queryId: query.id, query: query.query, relevantChunkIds: relevance.ids, hits: trace.hits,
-      recall: RECALL_KS.map((k) => ({ k, ...recallAtK(relevance.ids, hitIds, k) })),
+      queryId: query.id, query: query.query, relevantChunkIds: ids, hits: trace.hits,
+      recall: RECALL_KS.map((k) => queryProblems.length ? NOT_APPLICABLE(k) : { k, ...recallAtK(ids, hitIds, k) }),
       misses: trace.misses,
     };
   });
   const recall = RECALL_KS.map((k) => {
+    if (problems.length || !results.length) return { k, micro: ratio(0, 0), macro: null };
     const perQuery = results.map((r) => r.recall.find((entry) => entry.k === k)!);
     return {
       k,
       micro: ratio(perQuery.reduce((n, r) => n + r.found, 0), perQuery.reduce((n, r) => n + r.relevant, 0)),
-      macro: perQuery.length ? perQuery.reduce((n, r) => n + r.value, 0) / perQuery.length : null,
+      macro: perQuery.reduce((n, r) => n + (r.value ?? 0), 0) / perQuery.length,
     };
   });
   return {
@@ -146,6 +152,10 @@ const cell = (value: string) => value.replaceAll("|", "\\|").replace(/[\r\n]/g, 
 const percent = (value: number | null) => value === null ? "N/A" : `${(value * 100).toFixed(1)}%`;
 
 export function renderRetrievalMarkdown(report: RetrievalReport): string {
+  const found = (r: RetrievalReport["chunkers"][number]["results"][number], k: number) => {
+    const entry = r.recall.find((x) => x.k === k);
+    return entry?.value === null ? "N/A" : String(entry?.found ?? 0);
+  };
   const lines = [
     "# Career Radar retrieval evaluation (lexical)", "",
     "Synthetic corpus, BM25 in-process; model calls: **0**. Recall@K says how much of the authored evidence the top K chunks contain; it is not evidence quality or live model behaviour.", "",
@@ -154,13 +164,13 @@ export function renderRetrievalMarkdown(report: RetrievalReport): string {
     `- Tokenizer: ${report.tokenizerVersion}; scorer: ${report.scorerVersion}; chunk ids: ${report.chunkIdVersion}; report: ${report.reportVersion}; metrics: ${report.metricVersion}`,
     `- Deterministic across two runs: ${report.deterministic}; dataset problems: ${report.problems.length}`, "",
   ];
+  if (report.problems.length) lines.push("## Dataset problems (recall is N/A until these are fixed)", "", ...report.problems.map((p) => `- ${cell(p)}`), "");
   for (const entry of report.chunkers) {
     lines.push(`## Chunker: ${entry.chunker}`, "", `Chunks: ${entry.chunks}; indexed terms: ${entry.terms}; queries without any hit: ${entry.queriesWithoutHits.join(", ") || "none"}`, "",
       "| K | Micro recall (found / relevant) | Macro recall (mean per query) |", "| --- | --- | --- |",
       ...entry.recall.map((r) => `| ${r.k} | ${r.micro.numerator} / ${r.micro.denominator} = ${percent(r.micro.value)} | ${percent(r.macro)} |`), "",
       "| Query | Text | Relevant | Found@3 | Found@5 | Missing terms |", "| --- | --- | --- | --- | --- | --- |",
-      ...entry.results.map((r) => `| ${r.queryId} | ${cell(r.query)} | ${r.relevantChunkIds.length} | ${r.recall.find((x) => x.k === 3)?.found ?? 0} | ${r.recall.find((x) => x.k === 5)?.found ?? 0} | ${cell(r.misses.join(", ")) || "none"} |`), "");
+      ...entry.results.map((r) => `| ${r.queryId} | ${cell(r.query)} | ${r.relevantChunkIds.length} | ${found(r, 3)} | ${found(r, 5)} | ${cell(r.misses.join(", ")) || "none"} |`), "");
   }
-  if (report.problems.length) lines.push("## Dataset problems", "", ...report.problems.map((p) => `- ${cell(p)}`), "");
   return lines.join("\n");
 }

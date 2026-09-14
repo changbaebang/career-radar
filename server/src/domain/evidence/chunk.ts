@@ -10,8 +10,9 @@ import { canonical } from "../assessment/input-identity.js";
 //   section (a paragraph).
 // - "sentence": one chunk per profile leaf string (the B1-locatable evidence sentences) or per
 //   document sentence.
-// Chunk ids are content hashes over provenance and text, so the same corpus yields the same ids on
-// every run and a citation cannot name a chunk that was not built for the run.
+// Chunk ids are content hashes over provenance and text: the same corpus yields the same ids on
+// every run, so ids are stable identifiers for fixtures and traces. The hash alone does not prove
+// a chunk was part of a given run; that check is M5-B's, against the run's retrieval trace.
 export const CHUNK_ID_VERSION = "evidence-chunk-v1";
 export const MAX_CHUNK_CHARS = 2000;
 export const CHUNKERS = ["field", "sentence"] as const;
@@ -37,11 +38,14 @@ export function splitSentences(text: string): string[] {
   return text.replace(/\s+/g, " ").trim().split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
 }
 
-// A section is a paragraph (blank-line separated). Heading-only paragraphs (`# Title`) are dropped:
-// they are labels, not evidence. Line breaks inside a paragraph are spaces.
+// A section is a paragraph (blank-line separated). Markdown heading lines (`# Title`) are labels,
+// not evidence: they are removed line by line, and the paragraph's remaining body is kept, whether
+// the heading was followed by a blank line or directly by text. A paragraph that was only headings
+// is dropped. Line breaks inside a paragraph become spaces.
 export function splitSections(text: string): string[] {
-  return text.split(/\n\s*\n/).map((p) => p.replace(/\s+/g, " ").trim())
-    .filter((p) => p && !/^#{1,6}\s/.test(p));
+  return text.split(/\n\s*\n/)
+    .map((paragraph) => paragraph.split("\n").filter((line) => !/^\s*#{1,6}\s/.test(line)).join(" ").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
 }
 
 function build(base: Omit<EvidenceChunk, "id">): EvidenceChunk {
@@ -71,7 +75,10 @@ const FLAT_FIELDS = ["skills", "domains", "leadership", "customerFacing", "aiEvi
 
 // Profile chunks cover exactly the leaves the B1 locator grammar can resolve (`located()` in
 // screening.ts): headline, the flat evidence arrays, role titles, responsibilities and evidence.
-// Constraints and yearsExperience are policy inputs, not evidence sentences, and are not chunked.
+// Only unsplit sentence-level profile chunks carry a locator inside that grammar; field-level
+// locators name whole arrays (`roles[0].evidence`) and split chunks carry `/part:<n>`, which B1
+// does not resolve. Constraints and yearsExperience are policy inputs, not evidence sentences,
+// and are not chunked.
 export function chunkProfile(input: CandidateProfile, chunker: Chunker): EvidenceChunk[] {
   const profile = CandidateProfileSchema.parse(input);
   const sourceId = `profile:${profile.id}`;

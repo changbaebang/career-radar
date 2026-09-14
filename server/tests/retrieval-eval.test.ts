@@ -53,6 +53,25 @@ describe("M5-A Recall@K", () => {
     expect(report.problems).toEqual(["bad: no sentence chunk at project:tiny section:9/sentence:0"]);
   });
 
+  it("reports N/A, not a partial score, when a query mixes valid and unresolvable relevance", () => {
+    const mixed: RetrievalQuery = { ...tinyQueries[0]!, relevant: [...tinyQueries[0]!.relevant, { sourceId: "project:nope", locator: "section:0/sentence:0", text: "x" }] };
+    const report = runRetrievalEvaluation(tiny, { version: "tiny-v1", queries: [mixed, tinyQueries[1]!] }, metadata);
+    expect(report.success).toBe(false);
+    expect(report.problems).toEqual(["t1: no sentence chunk at project:nope section:0/sentence:0"]);
+    for (const entry of report.chunkers) {
+      // The mixed query is N/A; the aggregate is N/A because the query set is not trustworthy.
+      expect(entry.results[0]!.recall).toEqual([{ k: 3, found: 0, relevant: 0, value: null }, { k: 5, found: 0, relevant: 0, value: null }]);
+      expect(entry.results[1]!.recall[0]!.value).toBe(1);
+      expect(entry.recall).toEqual([
+        { k: 3, micro: { numerator: 0, denominator: 0, value: null }, macro: null },
+        { k: 5, micro: { numerator: 0, denominator: 0, value: null }, macro: null },
+      ]);
+    }
+    const markdown = renderRetrievalMarkdown(report);
+    expect(markdown.indexOf("## Dataset problems")).toBeLessThan(markdown.indexOf("## Chunker: field"));
+    expect(markdown).toContain("| t1 | React | 2 | N/A | N/A |");
+  });
+
   it("produces a strict, deterministic report with hand-checked numbers on the tiny corpus", () => {
     const report = runRetrievalEvaluation(tiny, { version: "tiny-v1", queries: tinyQueries }, metadata);
     expect(report).toMatchObject({ reportKind: "retrieval-evaluation", reportVersion: 1, mode: "lexical", modelCalls: 0, queries: 2, deterministic: true, success: true, problems: [] });

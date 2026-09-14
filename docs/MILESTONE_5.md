@@ -114,14 +114,15 @@ still pending and the baseline page says so.
 
 Status: **done, lexical only** (branch `feat/m5-a-retrieval`). `EvidenceChunkSchema` in shared,
 field and sentence chunkers, BM25 index with explicit misses, synthetic corpus of one profile plus
-nine documents (three distractors), 36 authored queries, `pnpm eval:retrieval`. Numbers and the
+ten documents (four distractors), 36 authored queries, `pnpm eval:retrieval`. Numbers and the
 M5-0 comparison result are on [MILESTONE_5_BASELINE.md](MILESTONE_5_BASELINE.md). A2 (embeddings)
 stays closed until the owner decides §5.1.
 
 - **Goal.** A retrieval layer over public-safe candidate evidence, measurable before any model sees it.
 - **Design.** `EvidenceChunkSchema { id, sourceType: "profile" | "project" | "blog" | "synthetic",
-  sourceId, locator, text (≤ 2,000 chars), metadata }` in shared. Chunk IDs are content hashes so a
-  citation cannot point at a chunk that was not in the run. Two chunkers: field-level (one chunk per
+  sourceId, locator, text (≤ 2,000 chars), metadata }` in shared. Chunk IDs are content hashes, so
+  the same corpus yields the same ids on every run; whether a cited chunk belonged to *this* run is
+  checked in M5-B against the run's retrieval trace, not by the hash. Two chunkers: field-level (one chunk per
   profile field or document section) and sentence-level. A lexical scorer (BM25 over tokenized text,
   in-process, no new service) with deterministic tie-breaking. Retrieval returns a trace
   `{ query, k, hits: [{ chunkId, score, rank }], misses }`; the trace is not part of any tool output
