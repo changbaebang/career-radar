@@ -37,6 +37,17 @@ regressions; `1` failed assertions, errors or empty run; `2` invalid arguments,
 unreadable/invalid baseline, incompatible versions, zero comparable cases or output error.
 The new versioned JSON shape replaces the old aggregate CLI shape.
 
+A comparison is incompatible only when `reportVersion`, `metricVersion` or `mode` differ.
+A different shared-schema hash (`packages/shared/src/index.ts`) is reported as
+`schemaChanged`, next to `policyChanged` and `datasetChanged`; comparability is decided per
+case by `contractHash` (report version 3, M5-0). The committed pre-M5 baseline is
+`evals/baselines/m5-0/report.json`, described in
+[docs/MILESTONE_5_BASELINE.md](../docs/MILESTONE_5_BASELINE.md):
+
+```sh
+pnpm eval --baseline evals/baselines/m5-0/report.json --no-save
+```
+
 ## What the 28 cases establish
 
 All 16 M1–M3 fixtures remain unchanged. `dataset.ts` adds rationale, expected required
