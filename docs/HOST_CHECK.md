@@ -2,7 +2,7 @@
 
 Status: **not run yet**. This page is the runbook and the record for verifying the real product
 surface (ChatGPT + Secure MCP Tunnel) before M5 changes it. Issue #5 was written against the M3
-tools and the v5 widget; the tool set and the widget URI have moved since, so this page re-bases
+tools and the v3 widget; the tool set and the widget URI have moved since, so this page re-bases
 the checklist on the current tree and narrows the first round to what M5-0 needs.
 
 ## Why before M5-0
