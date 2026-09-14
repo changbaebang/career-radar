@@ -25,12 +25,14 @@ describe("evaluation CLI (synthetic only)", () => {
     const first = cli(["--output", output]);
     expect(first.status, first.stderr).toBe(0);
     const json = readFileSync(join(output, "report.json"), "utf8");
-    expect(JSON.parse(json)).toMatchObject({ mode: "policy", modelCalls: 0, totals: { passed: 28 } });
-    expect(readFileSync(join(output, "report.md"), "utf8")).toContain("Human review pending: 28");
+    const total = JSON.parse(json).totals.cases as number;
+    expect(total).toBeGreaterThanOrEqual(35);
+    expect(JSON.parse(json)).toMatchObject({ mode: "policy", modelCalls: 0, totals: { passed: total } });
+    expect(readFileSync(join(output, "report.md"), "utf8")).toContain(`Human review pending: ${total}`);
     expect(statSync(join(output, "report.json")).mode & 0o777).toBe(0o600);
     const second = cli(["--baseline", join(output, "report.json"), "--no-save"], directory);
     expect(second.status, second.stderr).toBe(0);
-    expect(JSON.parse(second.stdout).comparison).toMatchObject({ compatible: true, compared: 28, regressions: [] });
+    expect(JSON.parse(second.stdout).comparison).toMatchObject({ compatible: true, compared: total, regressions: [] });
   });
 
   it("refuses to overwrite a report directory", () => {

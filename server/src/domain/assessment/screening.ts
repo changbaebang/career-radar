@@ -1,11 +1,19 @@
 import { EvidenceRefSchema, ScreeningContextV1Schema, ScreeningAssessmentSchema, MAX_PRODUCER_UNKNOWNS,
   type CandidateProfile, type JobPosting, type EvidenceRef, type ScreeningContextV1,
   type ScreeningAssessment } from "@career-radar/shared";
-import { normalizeEvidence } from "./policy.js";
+import { normalizeEvidence } from "./normalize.js";
 
 // Explicit locators only: never resolve arbitrary object paths, URLs or prototype properties.
-function located(ref: EvidenceRef, profile: CandidateProfile, job: JobPosting): string | undefined {
+// `evidence` maps chunk id → text for the chunks retrieved in this run; an `evidence` ref resolves
+// only there, and with no trace every evidence ref fails closed. Each source has its own branch, so
+// a ref with an unexpected source never falls through to another source's paths.
+export type RetrievedTexts = ReadonlyMap<string, string>;
+function located(ref: EvidenceRef, profile: CandidateProfile, job: JobPosting, evidence?: RetrievedTexts): string | undefined {
   const index = "(0|[1-9][0-9]*)";
+  if (ref.source === "evidence") {
+    const chunk = ref.path.match(/^chunk:([a-f0-9]{64})$/);
+    return chunk ? evidence?.get(chunk[1]!) : undefined;
+  }
   if (ref.source === "candidate") {
     if (ref.path === "headline") return profile.headline;
     const flat = ref.path.match(new RegExp(`^(skills|domains|leadership|customerFacing|aiEvidence|cloudEvidence)\\[${index}\\]$`));
@@ -15,16 +23,17 @@ function located(ref: EvidenceRef, profile: CandidateProfile, job: JobPosting): 
     const title = ref.path.match(new RegExp(`^roles\\[${index}\\]\\.title$`));
     return title ? profile.roles[Number(title[1])]?.title : undefined;
   }
+  if (ref.source !== "job") return undefined;
   const requirement = ref.path.match(new RegExp(`^(required|preferred)\\[${index}\\]\\.text$`));
   if (requirement) return job[requirement[1] as "required"][Number(requirement[2])]?.text;
   const responsibility = ref.path.match(new RegExp(`^responsibilities\\[${index}\\]$`));
   return responsibility ? job.responsibilities[Number(responsibility[1])] : undefined;
 }
 
-export function isEvidenceRefGrounded(profile: CandidateProfile, job: JobPosting, input: unknown): boolean {
+export function isEvidenceRefGrounded(profile: CandidateProfile, job: JobPosting, input: unknown, evidence?: RetrievedTexts): boolean {
   const parsed = EvidenceRefSchema.safeParse(input);
   if (!parsed.success) return false;
-  const source = located(parsed.data, profile, job);
+  const source = located(parsed.data, profile, job, evidence);
   const quote = normalizeEvidence(parsed.data.quote);
   return source !== undefined && quote.length > 0 && normalizeEvidence(source) === quote;
 }
@@ -39,14 +48,14 @@ function bothSources(refs: EvidenceRef[]): boolean {
 }
 
 // Pure, opt-in B1 validator. No outcome input, model calls, ranking or verdict policy.
-export function validateScreeningContext(profile: CandidateProfile, job: JobPosting, input: unknown): ScreeningContextV1 {
+export function validateScreeningContext(profile: CandidateProfile, job: JobPosting, input: unknown, evidence?: RetrievedTexts): ScreeningContextV1 {
   const context = ScreeningContextV1Schema.parse(input);
   // The producer contract is smaller than the schema bound; the difference is reserved for the
   // diagnostics added below, so a contract-abiding producer can never be rejected by validation.
   if (context.unknowns.length > MAX_PRODUCER_UNKNOWNS) throw new Error(`Producer supplied more than ${MAX_PRODUCER_UNKNOWNS} unknowns.`);
   const unknowns = new Set(context.unknowns);
   function check(refs: EvidenceRef[], scope: boolean) {
-    const valid = refs.filter((ref) => isEvidenceRefGrounded(profile, job, ref));
+    const valid = refs.filter((ref) => isEvidenceRefGrounded(profile, job, ref, evidence));
     return { valid, supported: valid.length === refs.length && bothSources(scope ? valid.filter(scopeRef) : valid) };
   }
   const seniority = check(context.seniorityFit.evidence, true);
@@ -72,9 +81,9 @@ export function validateScreeningContext(profile: CandidateProfile, job: JobPost
   return ScreeningContextV1Schema.parse({ ...context, unknowns: [...unknowns] });
 }
 
-export function validateScreeningAssessment(profile: CandidateProfile, job: JobPosting, input: unknown): ScreeningAssessment {
+export function validateScreeningAssessment(profile: CandidateProfile, job: JobPosting, input: unknown, evidence?: RetrievedTexts): ScreeningAssessment {
   const assessment = ScreeningAssessmentSchema.parse(input);
   return assessment.screeningContext === undefined ? assessment : {
-    ...assessment, screeningContext: validateScreeningContext(profile, job, assessment.screeningContext),
+    ...assessment, screeningContext: validateScreeningContext(profile, job, assessment.screeningContext, evidence),
   };
 }

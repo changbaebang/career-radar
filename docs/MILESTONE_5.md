@@ -144,6 +144,14 @@ stays closed until the owner decides §5.1.
 
 ### M5-B — Citations to retrieved evidence (1 PR)
 
+Status: **done, synthetic-verified** (branch `feat/m5-b-citations`). Pre-retrieval on `job_assess`
+and the recommendation batch, `EvidenceRef.source` gains `evidence`, `citations` on the fit
+result keyed by claim id, policy re-keying and orphan drops, validator with fail-closed chunk
+resolution, widget URI v7, `PROMPT_VERSION` `milestone-5b-v1`, seven citation eval cases with
+`citationCorrectness` and `unsupportedClaimRate`. Whether a live model cites resolvable chunk
+ids is still M5-D's question; the added latency of the pre-retrieval is reported by the next
+usage-check run.
+
 - **Goal.** Important claims in an assessment point at a retrieved chunk, and a pointer that does
   not resolve is not evidence.
 - **Design.** B is the first slice that puts retrieval on the assessment path: before the model

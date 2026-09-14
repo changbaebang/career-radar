@@ -161,7 +161,7 @@ Secure MCP Tunnel은 개발 및 비공개 연결용이며 공개 Plugin 제출�
 진행 집계도 철회하며, 모르는 단계·날짜는 추정하지 않습니다.
 `pipeline_summary`는 단계별 진행과 현재 기록의 알려진/모르는 정보, 수정 시점
 필터의 제외 건수를 보여줍니다. 기존 적합도 판정은 바꾸지 않습니다.
-[사용 계약과 예시](docs/MILESTONE_4C.md)를 참고하세요. 위젯 URI는 M4-B2에서 v5, `company`가 선택값이 된 뒤 v6이므로
+[사용 계약과 예시](docs/MILESTONE_4C.md)를 참고하세요. 위젯 URI는 M4-B2에서 v5, `company`가 선택값이 된 뒤 v6, M5-B의 인용과 `evidence` 참조 출처로 v7이므로
 ChatGPT에서 도구 정보를 새로고침해야 합니다. 이 단계는 API 호출 없이 검증하며
 실제 ChatGPT 호스트·모델 검증은 별도입니다.
 
@@ -204,7 +204,7 @@ strict JSON 스키마 출력과 `require_parameters` 라우팅으로 보낼 수 
 무료 모델)에서 계약 세 가지를 고쳤습니다. 공고에 고용주 이름이 없으면 `company`를 비워 두고 모델이 채우지
 못하게 했고(v5 위젯은 strict 파싱이라 위젯 URI v6), 새로 생성되는 `score`는 0~100 정수이며 저장된 소수 값은
 그대로 읽습니다. `OPENROUTER_REASONING_EFFORT`는 추론 강도를 조절하는 옵션이고 실제로 추론 토큰이 줄어드는지는
-확인하지 않았습니다. 프롬프트 버전은 `milestone-4b2-v2`입니다.
+확인하지 않았습니다. 프롬프트 버전은 `milestone-5b-v1`(M5-B, 그 전은 `milestone-4b2-v2`)입니다.
 
 ### ChatGPT 호스트 확인 — 미실행
 
@@ -224,7 +224,13 @@ evals/baselines/m5-0/report.json`으로 비교합니다. 공유 스키마 변경
 `schemaChanged`로 보고합니다(보고서 버전 3). M5-A는 근거 코퍼스 계층을 더했습니다. `EvidenceChunkSchema`,
 필드·문장 단위 청커, 빠진 질의어를 보고하는 프로세스 내 BM25 색인, 방해 문서를 포함한 합성 코퍼스, 그리고
 `pnpm eval:retrieval`(청커별 Recall@3·Recall@5, 저작한 질의 36개; [evals/README.md](evals/README.md))입니다.
-검색은 아직 판정 경로에 없고(M5-B), 조각 인용·모델 모드 평가·도구는 구현하지 않았습니다.
+M5-B는 검색을 판정 경로에 넣었습니다. 모델을 부르기 전에 `job_assess`와 추천 배치가 공고 요건으로
+프로필의 근거 문장을 검색해 `retrievedEvidence`로 넘기고, 근거·부족·결격 항목마다 인용을 붙일 수 있으며,
+`chunk:<id>` 참조는 그 실행의 검색 흔적에만 해석되고(해시만으로는 아무것도 증명하지 않음) 인용문은 조각
+텍스트와 같아야 합니다. 정책이 병합된 결격 사유의 인용을 옮기고 제거된 주장의 인용을 버리며, 무효한 인용은
+고정 문구와 함께 버리고 확신도를 낮춥니다. 위젯 URI v7, `PROMPT_VERSION` `milestone-5b-v1`, 인용 평가 사례
+7건과 `citationCorrectness`·`unsupportedClaimRate`. 실제 모델이 해석되는 조각 id를 인용하는지는 미측정(M5-D)이고,
+모델 모드 평가·도구는 구현하지 않았습니다.
 
 ## 참고 문서
 

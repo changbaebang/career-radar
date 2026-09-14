@@ -29,7 +29,7 @@ const candidate = { source: "candidate", path: "roles[0].evidence[0]", quote: "L
 const role = { source: "job", path: "required[0].text", quote: "Lead a React team" };
 const assessmentDraft = {
   verdict: "REALISTIC", confidence: "high", resumeContortion: "low", score: null,
-  strongestMatches: [{ requirementId: "req_1", requirement: "Lead a React team", evidence: "Led a React platform team", source: { company: null, role: null, project: null }, strength: "direct" }],
+  strongestMatches: [{ requirementId: "req_1", requirement: "Lead a React team", evidence: "Led a React platform team", source: { company: null, role: null, project: null }, strength: "direct", citations: [] }],
   gaps: [], hardBlockers: [], interviewRisks: [], recommendation: "Synthetic recommendation.", missingInformation: [],
   screeningContext: {
     seniorityFit: { value: "aligned", explanation: "Synthetic scope.", evidence: [candidate, role], confidence: "medium" },

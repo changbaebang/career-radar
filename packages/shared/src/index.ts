@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { SearchCandidateSchema } from "./search.js";
-import { ScreeningContextV1Schema } from "./screening.js";
+import { CitationSchema, ScreeningContextV1Schema } from "./screening.js";
 export * from "./search.js";
 export * from "./screening.js";
 
@@ -74,6 +74,9 @@ export const FitAssessmentSchema = z.object({
   // M4-B2: located screening context produced in the same assessment call and validated against the
   // captured inputs before storage/output. Absence means not evaluated, never low risk.
   screeningContext: ScreeningContextV1Schema.optional(),
+  // M5-B: citations attach to claims (matches, gaps, blockers) by claimId. Absent on results stored
+  // before M5-B; an empty array means the model cited nothing that survived validation.
+  citations: z.array(CitationSchema).max(64).optional(),
 }).strict();
 
 export const ProfileUpsertResultSchema = z.object({

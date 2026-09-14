@@ -128,7 +128,7 @@ export function withCallDeadline(ms: number) {
     wrap: (inner: CareerAnalyzer): CareerAnalyzer => ({
       extractProfile: (text, id, signal) => guard(signal, (s) => inner.extractProfile(text, id, s)),
       extractJob: (description, signal) => guard(signal, (s) => inner.extractJob(description, s)),
-      assess: (profile, job, signal) => guard(signal, (s) => inner.assess(profile, job, s)),
+      assess: (profile, job, signal, evidence) => guard(signal, (s) => inner.assess(profile, job, s, evidence)),
     }),
     // Resolves with the number of calls still pending after the grace period.
     settle: async (graceMs: number): Promise<number> => {
@@ -143,7 +143,7 @@ function countCalls(inner: CareerAnalyzer, tick: () => void): CareerAnalyzer {
   return {
     extractProfile: (text, id, signal) => { tick(); return inner.extractProfile(text, id, signal); },
     extractJob: (description, signal) => { tick(); return inner.extractJob(description, signal); },
-    assess: (profile, job, signal) => { tick(); return inner.assess(profile, job, signal); },
+    assess: (profile, job, signal, evidence) => { tick(); return inner.assess(profile, job, signal, evidence); },
   };
 }
 

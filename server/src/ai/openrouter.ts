@@ -1,3 +1,4 @@
+import type { RetrievedEvidence } from "../domain/evidence/retrieve.js";
 import type { CandidateProfile, FitAssessment, JobPosting } from "@career-radar/shared";
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
@@ -117,8 +118,8 @@ export class OpenRouterCareerAnalyzer implements CareerAnalyzer {
     return toJob(draft, description);
   }
 
-  async assess(profile: CandidateProfile, job: JobPosting, signal?: AbortSignal): Promise<FitAssessment> {
-    const { draft, response } = await this.#complete("assess", AssessmentDraftSchema, ASSESSMENT_INSTRUCTIONS, assessmentInput(profile, job), signal);
+  async assess(profile: CandidateProfile, job: JobPosting, signal?: AbortSignal, evidence?: RetrievedEvidence): Promise<FitAssessment> {
+    const { draft, response } = await this.#complete("assess", AssessmentDraftSchema, ASSESSMENT_INSTRUCTIONS, assessmentInput(profile, job, evidence), signal);
     return toAssessment(draft, this.#modelVersion(response));
   }
 }

@@ -144,11 +144,33 @@ function AssessmentCard({ result }: { result: JobAssessmentResult }) {
         <p className="message"><strong>Missing information:</strong> {assessment.missingInformation.join(" ")}</p>
       )}
 
+      <CitationsSection citations={assessment.citations} />
+
       <ScreeningContextSection context={assessment.screeningContext} />
 
       <h2>Recommendation</h2>
       <p className="recommendation">{assessment.recommendation}</p>
     </article>
+  );
+}
+
+// M5-B: citations that survived validation against this run's retrieved evidence. Absent on results
+// stored before M5-B (nothing is shown); an empty list means the model cited nothing that resolved.
+const claimLabel = (claimId: string) =>
+  claimId.startsWith("req:") ? `requirement ${claimId.slice(4)}` : claimId.startsWith("text:") ? "requirement" : "match";
+function CitationsSection({ citations }: { citations?: JobAssessmentResult["assessment"]["citations"] }) {
+  if (!citations) return null;
+  return (
+    <details>
+      <summary>{citations.length} validated citations</summary>
+      {citations.length === 0 ? (
+        <p className="message">No citation to retrieved evidence survived validation for this assessment.</p>
+      ) : citations.map((citation, index) => (
+        <p className="message" key={index}>
+          <strong>{claimLabel(citation.claimId)} · {citation.ref.source} · {citation.ref.path.length > 20 ? `${citation.ref.path.slice(0, 20)}…` : citation.ref.path}</strong><br />{citation.ref.quote}
+        </p>
+      ))}
+    </details>
   );
 }
 

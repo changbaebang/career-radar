@@ -13,10 +13,11 @@ function fixture(id: string): PolicyCase {
 }
 
 describe("M4-A policy evaluation", () => {
-  it("runs 28 explicit contracts and preserves all 16 legacy inputs and outputs", () => {
+  it("runs every explicit contract (28 pre-M5 cases plus the M5-B citation cases) and preserves all 16 legacy inputs and outputs", () => {
     const report = runEvaluation(policyCases, metadata);
     expect(report.success).toBe(true);
-    expect(report.totals).toMatchObject({ cases: 28, passed: 28, errors: 0, skipped: 0, humanReviewPending: 28 });
+    expect(policyCases.length).toBeGreaterThanOrEqual(35);
+    expect(report.totals).toMatchObject({ cases: policyCases.length, passed: policyCases.length, errors: 0, skipped: 0, humanReviewPending: policyCases.length });
     expect(report.modelCalls).toBe(0);
     expect(report.metrics.humanReviewedVerdictAgreement.value).toBeNull();
     for (const legacy of evalCases) {
@@ -161,7 +162,7 @@ describe("saved-run comparison", () => {
     const before = runEvaluation(policyCases, metadata);
     const after = runEvaluation(policyCases, { ...metadata, schemaHash: "schema-v2" });
     const comparison = compareReports(after, before);
-    expect(comparison).toMatchObject({ compatible: true, compared: 28, incompatibleReasons: [], schemaChanged: true, policyChanged: false, regressions: [], modified: [] });
+    expect(comparison).toMatchObject({ compatible: true, compared: policyCases.length, incompatibleReasons: [], schemaChanged: true, policyChanged: false, regressions: [], modified: [] });
     expect(compareReports(before, before).schemaChanged).toBe(false);
     expect(renderMarkdown(after, comparison)).toContain("schema changed: true");
   });
@@ -187,8 +188,8 @@ describe("saved-run comparison", () => {
     accepted[3].rationale += " Typo fixed.";
     const broken = runEvaluation(accepted, metadata, (_p, _j, d) => ({ ...d, verdict: "REALISTIC" }));
     const comparison = compareReports(broken, before);
-    expect(comparison).toMatchObject({ compatible: true, compared: 28, modified: [] });
-    expect(comparison.annotated).toHaveLength(28);
+    expect(comparison).toMatchObject({ compatible: true, compared: policyCases.length, modified: [] });
+    expect(comparison.annotated).toHaveLength(policyCases.length);
     expect(comparison.regressions.length).toBeGreaterThan(0);
   });
 

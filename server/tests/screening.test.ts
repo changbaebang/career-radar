@@ -158,3 +158,37 @@ describe("B1 A-F authored contracts, not measured model judgments", () => {
     expect(FitAssessmentSchema.safeParse({ ...fit, screeningContext: { ...context(), extra: true } }).success).toBe(false);
   });
 });
+
+describe("M5-B evidence refs in the B1 locator (this run's trace only)", () => {
+  const texts = new Map([["a".repeat(64), "Led a React platform team"]]);
+  const chunkRef = { source: "evidence" as const, path: `chunk:${"a".repeat(64)}`, quote: "Led a React platform team." };
+
+  it("resolves chunk:<id> only against the supplied trace and fails closed without one", () => {
+    expect(isEvidenceRefGrounded(profile, job, chunkRef, texts)).toBe(true);
+    expect(isEvidenceRefGrounded(profile, job, chunkRef)).toBe(false);
+    expect(isEvidenceRefGrounded(profile, job, { ...chunkRef, path: `chunk:${"b".repeat(64)}` }, texts)).toBe(false);
+    expect(isEvidenceRefGrounded(profile, job, { ...chunkRef, quote: "Never led a React platform team" }, texts)).toBe(false);
+    expect(isEvidenceRefGrounded(profile, job, { ...chunkRef, path: "chunk:not-a-hash" }, texts)).toBe(false);
+  });
+
+  it("keeps sources in their own branches: an evidence ref never resolves a candidate or job path, and a job ref never resolves candidate paths", () => {
+    expect(isEvidenceRefGrounded(profile, job, { source: "evidence", path: "roles[0].evidence[0]", quote: profile.roles[0]!.evidence[0]! }, texts)).toBe(false);
+    expect(isEvidenceRefGrounded(profile, job, { source: "evidence", path: "required[0].text", quote: job.required[0]!.text }, texts)).toBe(false);
+    expect(isEvidenceRefGrounded(profile, job, { source: "job", path: "roles[0].evidence[0]", quote: profile.roles[0]!.evidence[0]! }, texts)).toBe(false);
+    expect(isEvidenceRefGrounded(profile, job, { source: "candidate", path: `chunk:${"a".repeat(64)}`, quote: "Led a React platform team" }, texts)).toBe(false);
+  });
+
+  it("does not let chunk refs alone support a screening judgment: both candidate and job sources are still required", () => {
+    const context = {
+      version: "1", unknowns: [],
+      seniorityFit: { value: "aligned", explanation: "Scope matches.", evidence: [chunkRef, chunkRef], confidence: "medium" },
+      careerStoryRisk: { value: "low", explanation: "Continuous.", evidence: [chunkRef], confidence: "medium" },
+      screeningRisks: [],
+    };
+    const validated = validateScreeningContext(profile, job, context, texts);
+    expect(validated.seniorityFit.value).toBe("uncertain");
+    expect(validated.careerStoryRisk.value).toBe("uncertain");
+    // The refs themselves were valid, so they are kept as evidence of the uncertain judgment.
+    expect(validated.careerStoryRisk.evidence).toEqual([chunkRef]);
+  });
+});

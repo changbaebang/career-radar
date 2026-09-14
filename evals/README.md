@@ -37,6 +37,15 @@ regressions; `1` failed assertions, errors or empty run; `2` invalid arguments,
 unreadable/invalid baseline, incompatible versions, zero comparable cases or output error.
 The new versioned JSON shape replaces the old aggregate CLI shape.
 
+Since M5-B the policy-mode path is the production post-processing: the M1 policy, then citation
+validation against the deterministic pre-retrieval for the fixture's profile and job, then B1
+context validation (`policyPath` in `evaluate.ts`). Dataset `synthetic-policy-v3` adds seven
+citation cases (valid chunk citation kept; nonexistent id, quote from another chunk, negated
+quote and another corpus's id dropped; removed-match and dedup-pair regressions). Two additive
+metrics report `citationCorrectness` (valid ÷ supplied) and `unsupportedClaimRate` (claims
+without a surviving citation ÷ claims); the existing metric definitions are unchanged, so
+`metricVersion` stays `policy-metrics-v2`. Both measure locator validity and coverage only.
+
 A comparison is incompatible only when `reportVersion`, `metricVersion` or `mode` differ.
 A different shared-schema hash (`packages/shared/src/index.ts`) is reported as
 `schemaChanged`, next to `policyChanged` and `datasetChanged`; comparability is decided per

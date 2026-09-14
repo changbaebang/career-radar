@@ -1,7 +1,9 @@
 # ChatGPT host check — issue #5, widget v6
 
-Status: **not run yet**. This page is the runbook and the record for verifying the real product
-surface (ChatGPT + Secure MCP Tunnel) before M5 changes it. Issue #5 was written against the M3
+Status: **not run yet**. M5-B has since raised the widget to v7 (citations, `evidence` reference
+source), so a run now checks v7; the v6 baseline this page was written for was not captured. This
+page is the runbook and the record for verifying the real product surface (ChatGPT + Secure MCP
+Tunnel). Issue #5 was written against the M3
 tools and the v3 widget; the tool set and the widget URI have moved since, so this page re-bases
 the checklist on the current tree and narrows the first round to what M5-0 needs.
 
@@ -63,7 +65,7 @@ Out of scope for this round:
   ```
 - **Record the identifiers first**, so the answers stay tied to what produced them: `git rev-parse
   --short HEAD`, the widget URI (`CAREER_RADAR_WIDGET_URI` in `server/src/mcp/createServer.ts`,
-  `widget-v6.html` today), `PROMPT_VERSION` in `server/src/ai/contracts.ts`, and provider and model
+  `widget-v7.html` today), `PROMPT_VERSION` in `server/src/ai/contracts.ts`, and provider and model
   from `.env.local`. Never the key.
 
 ## Setup
@@ -73,8 +75,8 @@ Out of scope for this round:
 2. Connect ChatGPT as in [Connect from ChatGPT](../README.md#connect-from-chatgpt): Secure MCP Tunnel
    to `http://localhost:8000/mcp`, Developer Mode, a developer-mode app using the tunnel.
 3. **Refresh the app connection.** Tool and resource metadata changed since the last host session
-   (v5 → v6, new tools). After the refresh, confirm the app's resource list shows
-   `ui://career-radar/widget-v6.html` and the tool list shows nine tools.
+   (v6 → v7 with M5-B, new tools). After the refresh, confirm the app's resource list shows
+   `ui://career-radar/widget-v7.html` and the tool list shows nine tools.
 4. Print the synthetic resume to paste (a subshell, so the working directory stays at the
    repository root for every other command on this page):
 

@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
-import { CandidateProfileSchema, FitAssessmentSchema, JobPostingSchema, type FitAssessment } from "@career-radar/shared";
+import { CandidateProfileSchema, FitAssessmentSchema, JobPostingSchema, type CandidateProfile, type FitAssessment, type JobPosting } from "@career-radar/shared";
 import { canonical } from "../server/src/domain/assessment/input-identity.js";
+import { claimIds } from "../server/src/domain/assessment/claims.js";
+import { finalizeAssessment } from "../server/src/domain/assessment/pipeline.js";
 import { applyAssessmentPolicy, normalizeEvidence } from "../server/src/domain/assessment/policy.js";
+import { retrieveEvidence } from "../server/src/domain/evidence/retrieve.js";
 import { DATASET_VERSION, type PolicyCase } from "./dataset.js";
 
 export const VERDICTS = ["REALISTIC", "STRETCH", "PASS"] as const;
@@ -15,6 +18,7 @@ export type CaseResult = {
   // review state. Baselines compare contracts, so accepting a human review or fixing a rationale
   // typo never removes a case from regression comparison.
   caseId: string; contractHash: string; annotationHash: string; inputHash: string;
+  citations: { supplied: number; valid: number; claims: number; unsupported: number };
   status: "passed" | "failed" | "error" | "skipped";
   fixture: PolicyCase; actual?: FitAssessment;
   violations: string[]; error?: "invalid_fixture" | "policy_execution_failed" | "invalid_output";
@@ -27,9 +31,30 @@ export { canonical };
 export const digest = (value: unknown) => createHash("sha256").update(canonical(value)).digest("hex");
 const normalize = normalizeEvidence;
 export function contractOf(fixture: PolicyCase) {
-  const { profile, job, draftAssessment, expectedVerdict, expectedBlockerIds, expectedHardBlockerCount, mustNotClaim, requiredEvidence, skipReason } = fixture;
-  return { profile, job, draftAssessment, expectedVerdict, expectedBlockerIds, expectedHardBlockerCount, mustNotClaim, requiredEvidence, skipReason };
+  const { profile, job, draftAssessment, expectedVerdict, expectedBlockerIds, expectedHardBlockerCount, mustNotClaim, requiredEvidence, skipReason,
+    expectedValidCitations, expectedUnsupportedClaims } = fixture;
+  return { profile, job, draftAssessment, expectedVerdict, expectedBlockerIds, expectedHardBlockerCount, mustNotClaim, requiredEvidence, skipReason,
+    // M5-B expectations are part of the executable contract only for cases that state them, so the
+    // contract hashes of the 28 pre-M5 cases are unchanged (both keys are absent → omitted by canonical()).
+    ...(expectedValidCitations === undefined ? {} : { expectedValidCitations }),
+    ...(expectedUnsupportedClaims === undefined ? {} : { expectedUnsupportedClaims }) };
 }
+
+// M5-B citation counters per case: supplied = citations in the injected draft, valid = citations
+// that survived policy and validation, claims = matches + gaps + blockers in the output, unsupported
+// = output claims with no surviving citation. Locator validity and coverage only; whether a cited
+// sentence semantically supports the claim is a human-review question.
+export function citationCounts(draft: FitAssessment, actual: FitAssessment): CaseResult["citations"] {
+  const supported = new Set((actual.citations ?? []).map((citation) => citation.claimId));
+  const claims = [...claimIds(actual)];
+  return { supplied: draft.citations?.length ?? 0, valid: actual.citations?.length ?? 0, claims: claims.length,
+    unsupported: claims.filter((id) => !supported.has(id)).length };
+}
+
+// The policy-mode path is the production post-processing (M1 policy, M5-B citation validation,
+// B1 context validation) over the deterministic pre-retrieval for the fixture's profile and job.
+export const policyPath = (profile: CandidateProfile, job: JobPosting, draft: FitAssessment): FitAssessment =>
+  finalizeAssessment(profile, job, draft, retrieveEvidence(profile, job));
 export function annotationOf(fixture: PolicyCase) {
   const { rationale, humanReview, provenance } = fixture;
   return { rationale, humanReview, provenance };
@@ -76,7 +101,7 @@ function validFixture(fixture: PolicyCase): boolean {
 }
 
 export function runEvaluation(fixtures: PolicyCase[], metadata: RunMetadata,
-  policy: typeof applyAssessmentPolicy = applyAssessmentPolicy) {
+  policy: typeof applyAssessmentPolicy = policyPath) {
   if (new Set(fixtures.map((f) => f.caseId)).size !== fixtures.length) throw new Error("Duplicate case IDs");
   const cases: CaseResult[] = fixtures.map((source) => {
     const fixture = structuredClone(source);
@@ -85,6 +110,7 @@ export function runEvaluation(fixtures: PolicyCase[], metadata: RunMetadata,
       inputHash: digest({ profile: fixture.profile, job: fixture.job, draft: fixture.draftAssessment }),
       fixture, status: "error", violations: [],
       blockers: { found: [], missing: [], spurious: [], duplicates: [], unlinked: 0, textResolved: 0 },
+      citations: { supplied: 0, valid: 0, claims: 0, unsupported: 0 },
     };
     if (!validFixture(fixture)) { result.error = "invalid_fixture"; return result; }
     if (fixture.skipReason) { result.status = "skipped"; return result; }
@@ -98,6 +124,9 @@ export function runEvaluation(fixtures: PolicyCase[], metadata: RunMetadata,
     const actual = parsed.data;
     result.actual = actual;
     result.blockers = checkBlockers(fixture, actual);
+    result.citations = citationCounts(fixture.draftAssessment, actual);
+    if (fixture.expectedValidCitations !== undefined && result.citations.valid !== fixture.expectedValidCitations) result.violations.push("citation_validity_mismatch");
+    if (fixture.expectedUnsupportedClaims !== undefined && result.citations.unsupported !== fixture.expectedUnsupportedClaims) result.violations.push("unsupported_claims_mismatch");
     if (actual.verdict !== fixture.expectedVerdict) result.violations.push("verdict_mismatch");
     for (const key of ["missing", "spurious", "duplicates"] as const) {
       if (result.blockers[key].length) result.violations.push(`blocker_${key}`);
@@ -147,6 +176,9 @@ export function runEvaluation(fixtures: PolicyCase[], metadata: RunMetadata,
       nonRealisticToRealistic: ratio(falseRealistic(expectedNonRealistic), expectedNonRealistic.length),
       legacyPassToRealisticOverAllCases: ratio(falseRealistic(expectedPass), cases.length),
       textResolvedBlockers: evaluated.reduce((n, c) => n + c.blockers.textResolved, 0),
+      // M5-B (additive; metric definitions above are unchanged, so metricVersion stays).
+      citationCorrectness: ratio(evaluated.reduce((n, c) => n + c.citations.valid, 0), evaluated.reduce((n, c) => n + c.citations.supplied, 0)),
+      unsupportedClaimRate: ratio(evaluated.reduce((n, c) => n + c.citations.unsupported, 0), evaluated.reduce((n, c) => n + c.citations.claims, 0)),
       positiveEvidenceFailures: evaluated.filter((c) => c.violations.includes("required_evidence_missing") || c.violations.includes("forbidden_positive_claim")).length,
     }, confusionMatrix, cases,
     // Skips are deliberate deferrals: reported in totals/coverage, not a failed run.
