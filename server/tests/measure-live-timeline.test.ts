@@ -2,7 +2,10 @@ import type { JobRecommendations } from "@career-radar/shared";
 import { describe, expect, it } from "vitest";
 import type { OperationRecord } from "../scripts/measure-live/measured-analyzer.js";
 import { abortLatency, accountCache, assessmentSummary, classifyCandidateOutcomes, policyInspection, sumUsage, whatIf } from "../scripts/measure-live/timeline.js";
+import { matchClaimId } from "../src/domain/assessment/claims.js";
+import { finalizeAssessment } from "../src/domain/assessment/pipeline.js";
 import { applyAssessmentPolicy } from "../src/domain/assessment/policy.js";
+import { retrieveEvidence } from "../src/domain/evidence/retrieve.js";
 import { groundedAssessment } from "./discovery-fixtures.js";
 import { syntheticJob, syntheticProfile } from "./fixtures.js";
 
@@ -84,5 +87,21 @@ describe("measure:live timeline helpers", () => {
     expect(inspection.policyReplayMatches).toBe(true);
     expect(inspection.removedUngroundedMatches).toBe(ungrounded.strongestMatches.length - cleaned.strongestMatches.length);
     expect(policyInspection(syntheticProfile, syntheticJob, groundedAssessment, { ...final, verdict: "PASS" }).policyReplayMatches).toBe(false);
+  });
+
+  it("replays with the retrieval the call saw, so a valid chunk citation is not a mismatch (M5-B)", () => {
+    const evidence = retrieveEvidence(syntheticProfile, syntheticJob);
+    const chunk = evidence.chunks.find((c) => c.text === groundedAssessment.strongestMatches[0]!.evidence)!;
+    const draft = { ...groundedAssessment, confidence: "high" as const, citations: [
+      { claimId: matchClaimId(groundedAssessment.strongestMatches[0]!), ref: { source: "evidence" as const, path: `chunk:${chunk.id}`, quote: chunk.text } },
+    ] };
+    const final = finalizeAssessment(syntheticProfile, syntheticJob, draft, evidence);
+    expect(final).toMatchObject({ confidence: "high" });
+    expect(final.citations).toHaveLength(1);
+    // Recorded retrieval, and the deterministic reconstruction from the same inputs, both replay to the saved result.
+    expect(policyInspection(syntheticProfile, syntheticJob, draft, final, evidence).policyReplayMatches).toBe(true);
+    expect(policyInspection(syntheticProfile, syntheticJob, draft, final).policyReplayMatches).toBe(true);
+    // A replay with no retrieval at all would have dropped the citation and lowered confidence: that is the bug this guards.
+    expect(finalizeAssessment(syntheticProfile, syntheticJob, draft).confidence).toBe("low");
   });
 });

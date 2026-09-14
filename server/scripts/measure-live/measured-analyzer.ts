@@ -33,6 +33,7 @@ type Pending = { record: OperationRecord; promise: Promise<unknown>; signal?: Ab
 export class MeasuredAnalyzer implements CareerAnalyzer {
   readonly records: OperationRecord[] = [];
   readonly drafts = new Map<number, FitAssessment>();
+  readonly evidence = new Map<number, RetrievedEvidence>();
   readonly #inner: CareerAnalyzer;
   readonly #cap: number;
   readonly #clock: Clock;
@@ -113,6 +114,8 @@ export class MeasuredAnalyzer implements CareerAnalyzer {
     const candidateId = this.#byJobId.get(job.id);
     return this.#measure("assess", candidateId, signal, () => this.#inner.assess(profile, job, signal, evidence), (record, result) => {
       this.drafts.set(record.seq, structuredClone(result));
+      // M5-B: the retrieval this call saw, so the policy replay resolves the same chunk citations.
+      if (evidence) this.evidence.set(record.seq, structuredClone(evidence));
     });
   }
 

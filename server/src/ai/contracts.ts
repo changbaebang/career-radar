@@ -1,7 +1,9 @@
 import {
   CandidateProfileSchema,
+  CitationSchema,
   FitAssessmentSchema,
   JobPostingSchema,
+  MAX_CITATIONS,
   MAX_PRODUCER_UNKNOWNS,
   ScreeningContextV1Schema,
   type CandidateProfile,
@@ -10,6 +12,7 @@ import {
 } from "@career-radar/shared";
 import { z } from "zod";
 
+import { CITATION_BOUNDS_DROPPED } from "../domain/assessment/citations.js";
 import { matchClaimId, requirementClaimId } from "../domain/assessment/claims.js";
 import { SCREENING_CONTEXT_DISCARDED } from "../domain/assessment/pipeline.js";
 import type { RetrievedEvidence } from "../domain/evidence/retrieve.js";
@@ -197,8 +200,11 @@ export function toAssessment(input: z.infer<typeof AssessmentDraftSchema>, model
   // Re-check the generation contract (integer score etc.) regardless of which transport parsed the draft.
   const { screeningContext: rawContext, ...parsed } = AssessmentDraftSchema.parse(input);
   // Per-claim draft citations become the top-level `citations` list keyed by claim id (claims.ts);
-  // the id is computed here, never by the model.
-  const citations = [
+  // the id is computed here, never by the model. The generation schema carries no bounds (strict JSON
+  // schemas reject them), so the read-contract bounds are applied here per citation: an out-of-bounds
+  // reference or a surplus beyond MAX_CITATIONS is dropped with a fixed note and lowers confidence,
+  // exactly like an invalid citation later in validation. The fit itself never fails on a citation.
+  const rawCitations = [
     ...parsed.strongestMatches.flatMap((match) => match.citations.map((ref) => ({
       claimId: matchClaimId({ ...(match.requirementId === null ? {} : { requirementId: match.requirementId }), requirement: match.requirement, evidence: match.evidence }), ref,
     }))),
@@ -206,6 +212,8 @@ export function toAssessment(input: z.infer<typeof AssessmentDraftSchema>, model
       claimId: requirementClaimId({ ...(gap.requirementId === null ? {} : { requirementId: gap.requirementId }), requirement: gap.requirement }), ref,
     }))),
   ];
+  const citations = rawCitations.filter((citation) => CitationSchema.safeParse(citation).success).slice(0, MAX_CITATIONS);
+  const citationsDropped = citations.length !== rawCitations.length;
   const normalizeGap = (gap: (typeof parsed.gaps)[number]) => { const { citations: _refs, ...rest } = gap; void _refs; return omitNull(rest); };
   // Producer normalization only: bounds and shape. Reference validation against the captured inputs
   // happens in finalizeAssessment. A context outside the contract is dropped, never the fit.
@@ -215,7 +223,8 @@ export function toAssessment(input: z.infer<typeof AssessmentDraftSchema>, model
     ...parsed, ...(parsed.score === null ? { score: undefined } : { score: parsed.score }),
     strongestMatches: parsed.strongestMatches.map((match) => { const { citations: _refs, ...rest } = match; void _refs; return { ...omitNull(rest), source: omitNull(match.source) }; }),
     gaps: parsed.gaps.map(normalizeGap), hardBlockers: parsed.hardBlockers.map(normalizeGap), citations,
-    missingInformation: contextKept ? parsed.missingInformation : [...parsed.missingInformation, SCREENING_CONTEXT_DISCARDED],
+    missingInformation: [...new Set([...parsed.missingInformation, ...(contextKept ? [] : [SCREENING_CONTEXT_DISCARDED]), ...(citationsDropped ? [CITATION_BOUNDS_DROPPED] : [])])],
+    ...(citationsDropped ? { confidence: "low" as const } : {}),
     ...(contextKept ? { screeningContext: context.data } : {}),
     modelVersion, promptVersion: PROMPT_VERSION,
   });

@@ -10,10 +10,17 @@ export const EvidenceRefSchema = z.object({
   quote: z.string().trim().min(1).max(2000),
 }).strict();
 // A citation supports one claim of the fit result, named by its claimId (server/src/domain/assessment/claims.ts).
+export const MAX_CITATIONS = 64;
+export const MAX_CLAIM_ID_CHARS = 200;
 export const CitationSchema = z.object({
-  claimId: z.string().min(1).max(200),
+  claimId: z.string().min(1).max(MAX_CLAIM_ID_CHARS),
   ref: EvidenceRefSchema,
 }).strict();
+
+// Exact-match grounding must survive the model adding a trailing period or wrapping quotes. One
+// rule for the M1 policy, the validators, claim ids, the evaluation harness and the widget.
+export const normalizeEvidence = (value: string) =>
+  value.trim().toLocaleLowerCase().replaceAll(/\s+/g, " ").replace(/^["'\u201c\u2018]+|["'\u201d\u2019.,;:!?]+$/g, "");
 const evidence = z.array(EvidenceRefSchema).max(8);
 
 // B1 contract only. The existing model output and MCP/widget schemas remain unchanged.

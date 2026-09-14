@@ -11,6 +11,8 @@ export const CITATION_ORPHAN_DROPPED =
   "One or more citations were dropped because the claim they supported was removed or is not in the result.";
 export const CITATION_REKEYED =
   "One or more citations were moved to a merged requirement claim.";
+export const CITATION_BOUNDS_DROPPED =
+  "One or more citations were dropped because they exceeded the citation contract bounds (reference length, claim id length or citation count).";
 
 // M5-B validator, the B1 rule applied to fit citations: a citation is evidence only when its
 // reference resolves against the exact inputs of this run (candidate/job paths, or a `chunk:<id>`

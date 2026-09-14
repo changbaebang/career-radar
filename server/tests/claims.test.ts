@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { claimIds, matchClaimId, requirementClaimId } from "../src/domain/assessment/claims.js";
+import { TEXT_HASH_CLAIM_PREFIX, claimIds, matchClaimId, requirementClaimId } from "../src/domain/assessment/claims.js";
 import { groundedAssessment } from "./discovery-fixtures.js";
 
 describe("M5-B claim ids", () => {
@@ -27,6 +27,15 @@ describe("M5-B claim ids", () => {
     expect(requirementClaimId({ requirementId: "req_1", requirement: "Anything" })).toBe("req:req_1");
     expect(requirementClaimId({ requirement: "Deep security architecture experience." })).toBe("text:deep security architecture experience");
     expect(requirementClaimId({ requirementId: "req_1", requirement: "A" })).toBe(requirementClaimId({ requirementId: "req_1", requirement: "B" }));
+  });
+
+  it("falls back to a hashed text key when the normalized requirement would not fit the claim id bound", () => {
+    const long = requirementClaimId({ requirement: "r".repeat(196) });
+    expect(long.startsWith(TEXT_HASH_CLAIM_PREFIX)).toBe(true);
+    expect(long.length).toBeLessThanOrEqual(200);
+    expect(requirementClaimId({ requirement: "r".repeat(196) })).toBe(long);
+    expect(requirementClaimId({ requirement: "r".repeat(197) })).not.toBe(long);
+    expect(requirementClaimId({ requirement: "r".repeat(195) })).toBe(`text:${"r".repeat(195)}`);
   });
 
   it("collects every claim id a result carries, across matches, gaps and blockers", () => {

@@ -110,7 +110,7 @@ export function summarizeRun(active: ActiveRun, deps: Pick<RunDeps, "measured" |
     if (item) {
       row.assessmentId = item.assessmentId; row.final = assessmentSummary(item.assessment);
       const job = store.getJob(item.jobId);
-      if (draft && job) row.policy = policyInspection(profile, job, draft, item.assessment);
+      if (draft && job) row.policy = policyInspection(profile, job, draft, item.assessment, assessOp ? measured.evidence.get(assessOp.seq) : undefined);
     }
     return row;
   });
