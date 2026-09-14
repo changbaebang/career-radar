@@ -213,11 +213,17 @@ reasoned from the parser. [HOST_CHECK.md](docs/HOST_CHECK.md) is the runbook for
 v6, scoped to status → profile → ingest → assess → application tools, and its run log; the
 recommendation batch waits for #4. Until a run is logged there, host behaviour is `not verified`.
 
-### M5 (planned)
+### M5 (in progress)
 
 A reviewed plan for a grounded-evidence milestone (retrieval over a synthetic corpus, citations to
 retrieved chunks, a model-mode eval harness, run-level observability, bounded tool use last) is in
-[MILESTONE_5.md](docs/MILESTONE_5.md) with ADR-0013. Nothing from it is implemented yet.
+[MILESTONE_5.md](docs/MILESTONE_5.md) with ADR-0013. M5-0 is done: the pre-M5 baseline is frozen
+in [MILESTONE_5_BASELINE.md](docs/MILESTONE_5_BASELINE.md) (code SHA, prompt/policy/schema/dataset
+identifiers, round-1 usage-check latencies, and a verification label per feature) with the
+committed policy-eval report `evals/baselines/m5-0/report.json`; compare any later run with
+`pnpm eval --baseline evals/baselines/m5-0/report.json`. A shared-schema change is now reported as
+`schemaChanged` instead of making the comparison incompatible (report version 3). Retrieval,
+citations, model-mode evals and tools are not implemented yet.
 
 ## Documentation references
 
