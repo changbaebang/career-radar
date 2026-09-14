@@ -171,7 +171,9 @@ usage-check run.
   normalizeEvidence(requirement), normalizeEvidence(evidence)]))`; a requirement claim (a gap or a
   blocker, which the policy may copy between the two arrays) has the id `"req:" + requirementId`
   when an ID exists, else `"text:" + normalizeEvidence(requirement)`, so promotion does not change
-  it. A new optional `citations` array on the fit result carries `{ claimId, ref: EvidenceRef }`.
+  it; when that text key would exceed the claim-id bound (200 chars), the id is
+  `"text-sha256:" + sha256(normalizeEvidence(requirement))` instead, since requirement text has no
+  length bound of its own. A new optional `citations` array on the fit result carries `{ claimId, ref: EvidenceRef }`.
   The M1 policy keeps citations consistent when it rewrites claims: a removed match takes its
   citations with it; `uniqueGaps` collapses a gap when its ID **or** its normalized text was already
   seen, and when it does, the citations of the collapsed gap are re-keyed to the surviving gap's
