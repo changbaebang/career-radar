@@ -103,6 +103,21 @@ baseline on the M5-B branch reports `compatible: true`, `compared: 28`, `schemaC
 current tree therefore runs `PROMPT_VERSION` `milestone-5b-v1`, widget `ui://career-radar/widget-v7.html`
 and dataset `synthetic-policy-v3` (35 cases); the identifiers above stay the frozen pre-M5 values.
 
+## Third check after the freeze (M5-D)
+
+M5-D changes neither `packages/shared` nor the policy file; the comparison on the M5-D branch is the
+same as after M5-B (`compatible: true`, `compared: 28`, `schemaChanged: true`, `policyChanged:
+true`, `regressions: []`, the seven citation cases under `added`). Model-mode reports are not
+compared with this policy baseline: `pnpm eval --mode model` has its own report kind and its own
+`--baseline`, and its first live-verified report — an approved free-tier run, per the 2026-09-14
+owner decision (ADR-0014) — will be the model-mode baseline. The dry run on the branch (golden fake,
+33 cases, 99 calls) verifies the runner only: 33/33 assessed, `requirementMatchRate` 45/45,
+`blockerRecallMatched` and `blockerRecallAll` 10/11, 27/33 verdicts inside the allowed set,
+`citationCorrectness` 24/24, `unsupportedClaimRate` 26/50, 0 invented employers, 0 forbidden claims.
+The one missed blocker and the six verdicts outside the allowed set are the fake's fixed overlap
+rule at work (the fake is not gold), and the fake cites a match only when its evidence sentence was
+retrieved and never cites a gap or blocker, so those claims count as unsupported.
+
 ## Verification labels by feature
 
 | Feature | Label | Supported by |
@@ -116,7 +131,7 @@ and dataset `synthetic-policy-v3` (35 cases); the identifiers above stay the fro
 | Stage-aware application history, correction-safe aggregation (M4-C) | synthetic-verified; live: **not verified** | `server/tests`; not exercised in round 1 |
 | Screening context in the model path, `unknowns` when ungrounded (M4-B2) | synthetic-verified; live-verified pre-#19 (same run) | `server/tests`; run `2026-09-12T03-07-22.190Z` (`uncertain` values observed); post-#19: **not verified** |
 | Live batch measurement harness `measure:live` (approval gates, redaction, abort) | synthetic-verified; live: **not verified** | dry-run and fake-analyzer tests; no approved run (issue #4) |
-| OpenAI adapter (Responses API, `store: false`) | synthetic-verified; live: **not verified** | fetch-stub tests; the only live attempt (M1) stopped at a credit error |
+| OpenAI adapter (Responses API, `store: false`) | synthetic-verified; live: **not verified**, not scheduled (ADR-0014: free tier only) | fetch-stub tests; the only live attempt (M1) stopped at a credit error |
 | OpenRouter adapter (`require_parameters`, re-validation, telemetry) | live-verified for `dots-studio/dots-3-note-preview:free`; structured-output failures observed with `liquid/lfm-2.5-2.6b:free` | runs `2026-09-12T03-07-22.190Z` and `2026-09-12T03-03-45.865Z`; other models: **not verified** |
 | Usage-check runner (`pnpm usage-check`, loopback results page, per-call deadline with cancel propagation) | current runner: synthetic-verified; live: **not verified** | `server/tests/usage-check.test.ts`. The pre-fix runner (before the #18 review fixes) produced both round-1 runs above; the missing cancel propagation seen there was fixed afterwards and has not been exercised live since |
 | #19 contract changes: employer optional, integer `score` generation contract, `OPENROUTER_REASONING_EFFORT` | synthetic-verified; live: **not verified** | `server/tests`; post-#19 re-run pending |
@@ -124,6 +139,7 @@ and dataset `synthetic-policy-v3` (35 cases); the identifiers above stay the fro
 | ChatGPT host: tool discovery, widget v6 rendering, re-entry, error display | **not verified** | only the M0 status card was seen in ChatGPT (2026-09-09); runbook `docs/HOST_CHECK.md`, run pending (issue #5) |
 | Citations to retrieved evidence (M5-B): pre-retrieval before the model call, `chunk:<id>` refs resolved only against the run's trace, claim ids, policy re-keying, validator, widget v7 | synthetic-verified; live: **not verified** | `server/tests/{claims,citations,retrieve,snapshot-compat}.test.ts`, `screening.test.ts`, `httpApp.test.ts`; policy eval 35/35 with the seven citation cases: `citationCorrectness` 4/9 and `unsupportedClaimRate` 48/51 by construction (five adversarial refs are meant to be dropped); whether a live model produces resolvable chunk ids is M5-D's question |
 | Evidence corpus, field/sentence chunkers, BM25 retrieval, `pnpm eval:retrieval` (M5-A) | synthetic-verified; live: not applicable (no model call) | `server/tests/evidence-*.test.ts`, `retrieval-*.test.ts`; retrieval eval on the M5-A branch: 36 queries, field chunker Recall@3 47/55 (0.855 micro, 0.866 macro) and Recall@5 49/55 (0.891 / 0.882), sentence chunker Recall@3 46/60 (0.767 / 0.773) and Recall@5 51/60 (0.850 / 0.845), deterministic, 0 dataset problems; no query returned an empty hit list, and three queries returned hits that contained none of their relevant chunks (morphology and an abbreviation, by design) |
+| Model-mode eval harness (M5-D): golden set `model-golden-v1` (33 raw-text cases, all `pending`), `pnpm eval --mode model`, failure classes as outcomes, two blocker recalls, redaction, baseline comparison | synthetic-verified; live: **not verified** | `server/tests/model-eval.test.ts`, `server/tests/model-eval-cli.test.ts`; the dry run on the M5-D branch above (fake-analyzer numbers verify the runner, not a model); no approved free-tier run yet, so whether a live model cites resolvable chunk ids and every live rate stay open |
 
 No row above depends on anything not in the repository, in a results file named here, or in a
 linked issue. When a later slice changes a row, it changes this table in the same PR and names

@@ -6,6 +6,9 @@ Status: **proposal**. Reviewed against `main` at `f8eee80` (#19) and open issues
 each item onto what the repository already has, cuts what is duplicated, and turns the rest into
 PR-sized slices with contract impact, acceptance criteria and test/eval plans.
 
+Update 2026-09-14 (owner decision): M5 finishes its verification on the free tier. See the third
+rule in §0, the resolved decisions in §5, and the status lines of M5-C (dropped) and M5-D (done).
+
 ## 0. What M5 is for, and what it is not
 
 The goal stays as drafted: make the repository honest evidence that the owner can **design,
@@ -26,6 +29,14 @@ Two rules from M4 carry over unchanged and gate every slice below:
 - **Measure before claim.** `synthetic-verified`, `live-verified` and `not verified` are the only
   three labels. Live verification needs an approved call and names its provider and model
   (`docs/PROVIDERS.md`); numbers from one endpoint say nothing about another.
+- **Free tier only (owner decision, 2026-09-14).** The owner has not found a large advantage of
+  this app over pasting the same details into a plain ChatGPT conversation, and will not spend on a
+  paid provider for it. Every remaining live check therefore runs on the free OpenRouter route
+  (`docs/PROVIDERS.md`): the OpenAI adapter stays in the tree, but no slice depends on it and the
+  model-mode runner refuses `--provider openai` without an explicit cost flag. A free call is still
+  an external transmission of the synthetic texts and keeps the same approval discipline. This
+  decision resolves §5 (lexical only, synthetic corpus, M5-C dropped), ends M5 at E, and makes the
+  plain-chat comparison the central finding of F rather than a footnote.
 
 ## 1. Review of the draft: what already exists
 
@@ -210,6 +221,28 @@ usage-check run.
 
 ### M5-D — Minimal model-mode eval harness (1–2 PRs)
 
+Status: **done, synthetic-verified** (branch `feat/m5-d-model-eval`). `pnpm eval --mode model`
+(`evals/model-mode-cli.ts`, `evals/model-mode.ts`) over the golden set `model-golden-v1`
+(`evals/fixtures/golden/`, 33 raw-text cases, all `pending`). Dry run by default with a golden fake
+analyzer (`GoldenFakeAnalyzer`, zero network); `--approve-transmission` sends the golden texts to
+the provider, `openrouter` by default (free tier), and `--provider openai` additionally needs
+`--approve-model-cost`. From the #25 review: a live OpenRouter run accepts only a `:free` model id
+unless the cost flag is given, every call carries a deadline that covers the response body (shared
+`withCallDeadline`, `server/src/ai/deadline.ts`), and golden-set integrity problems stop the run before
+the analyzer exists. Deviations from the design below, on purpose: the gate is model mode's own
+`resolveModelGate` with the harness rules (CI/test refusal, base-URL refusal, hard ceiling of 150
+calls, fixed refusal strings) because the flags differ (no network/cost pair and no typed cost
+confirmation on the free tier), while the transport pin and `assertRedacted` are reused from the
+harness; `citation_invalid` is a per-case flag (`citationInvalid`), not a failure class, because the
+pipeline drops invalid citations and the case is still assessed; `tool_failure` exists in the class
+enum but nothing produces it (M5-C dropped); Recall@K is not computed in model mode (golden cases
+carry no relevance labels) and the report records per-case retrieval counts (queries, chunks,
+missing terms) instead; the report carries provider-reported token counters and never a cost or a
+dashboard link; the report fields are `unmatchedGold` and `unmatchedExtracted`. The dry run verifies
+the runner only (33/33 assessed, 99 calls, `requirementMatchRate` 45/45, both blocker recalls 10/11,
+27/33 verdicts inside the allowed set; the fake's verdicts are not gold). No approved run yet: every
+live number, including whether a model cites resolvable chunk ids, is `not verified`.
+
 - **Goal.** Evaluate the real model path on a versioned golden set, with the same approval
   discipline as `measure:live`.
 - **Design.** `pnpm eval --mode model` in the existing runner: for each golden case it runs
@@ -267,6 +300,10 @@ usage-check run.
 
 ### M5-E — Observability: one run ID through every stage (1 PR)
 
+Status: **not started**. Unchanged by the 2026-09-14 decision except that the tool-query rules below
+have no producer while M5-C is dropped; the run ID, stage records, counters and trace redaction stay
+in scope.
+
 - **Goal.** Explain a slow, expensive, invalid or failed assessment stage by stage.
 - **Design.** A `runId` created per tool call, threaded through analyzer telemetry (new optional
   field on `AnalyzerResponseEvent`), the retrieval trace, the validator diagnostics and the pipeline.
@@ -290,6 +327,9 @@ usage-check run.
   removal-path test.
 
 ### M5-C — Bounded tool use in assessment (1–2 PRs, last, OpenAI-first)
+
+Status: **dropped** (owner decision, 2026-09-14; §0 and ADR-0014). Kept for the record, not
+scheduled: M5 ends at E, and tool use stays `not verified` for every provider.
 
 - **Goal.** Let the assessment call request evidence instead of receiving everything up front,
   within a budget a reviewer can read.
@@ -321,18 +361,25 @@ usage-check run.
 
 ### M5-F — Portfolio evidence and failure write-up (docs + blog)
 
-Architecture and data-flow page, the policy baseline (M5-0) compared with the post-M5 policy report
-and the model-mode baseline (first D run) compared with the post-C model-mode report, at least one recorded
-failure with its design change (the first usage check already supplies three), README positioning
-that separates verified, synthetic-only and unverified, and the article "what broke when I added
-retrieval". This slice has no code; it is the blog series continuing.
+Architecture and data-flow page, the policy baseline (M5-0) compared with the post-M5 policy report,
+the model-mode report of the first approved free-tier D run (there is no post-C report: C is
+dropped), at least one recorded failure with its design change (the first usage check already
+supplies three), README positioning that separates verified, synthetic-only and unverified, and the
+article "what broke when I added retrieval". Its central finding is the one that ended the
+paid-provider question: the owner did not find a large advantage of the app over pasting the same
+details into a plain ChatGPT conversation. The write-up states what the app adds that plain chat
+cannot show (a deterministic policy, located citations, failures counted as outcomes, comparable
+reports) and what it does not add for the person prioritizing applications, with the usage-check and
+model-mode numbers as the evidence rather than a conclusion. This slice has no code; it is the blog
+series continuing.
 
 ## 4. Order and gates
 
-0 → A → B → D → E → C → F. Evidence quality must be measurable (A, B, D) before the model gets
-autonomy (C). Slices that change the assessment path (B, C) are followed by a usage-check re-run on
-the same inputs when a call is approved; a re-run that makes the three answers worse is reworked
-before the next assessment-path slice merges. A, D and E may proceed on their own evals meanwhile.
+0 → A → B → D → E → F; C is dropped (2026-09-14). Evidence quality must be measurable (A, B, D)
+before the model gets autonomy, and with C dropped it gets none in M5. The slice that changed the
+assessment path (B) is followed by a usage-check re-run on the same inputs when a call is approved;
+a re-run that makes the three answers worse is reworked before the next assessment-path slice
+merges. A, D and E proceed on their own evals meanwhile.
 
 ## 5. Decisions the owner must make before M5-A
 
@@ -341,6 +388,11 @@ before the next assessment-path slice merges. A, D and E may proceed on their ow
 2. **Tool use.** Keep M5-C in scope given the host/latency unknowns, or drop it and let M5 end at E.
 3. **Corpus.** Synthetic-only in the repository; the owner's public writing indexed locally only.
    Confirm, or name what may be committed.
+
+Resolved 2026-09-14 (owner): 1 — lexical only, no embeddings provider; 2 — M5-C dropped, M5 ends at
+E; 3 — synthetic only in the repository, nothing else committed. The reason is recorded in §0:
+verification finishes on the free tier because the owner did not find a large enough advantage over
+plain chat to spend on a paid provider.
 
 ## 6. Issue boundaries
 

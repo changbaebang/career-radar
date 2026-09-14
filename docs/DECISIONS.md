@@ -98,8 +98,16 @@ Prefer an optional versioned screening context, preserve existing free-text stag
 
 ## ADR-0013: Make evidence retrievable and measurable before giving the model autonomy
 
-**Status:** Proposed — M5 planning only; no runtime changes in this PR.
+**Status:** Accepted for M5-0, A, B and D (implemented); the tool-use part (M5-C) is dropped by ADR-0014.
 
 The owner wants the repository to be honest evidence of designing, evaluating and operating a grounded GenAI application, not of ML training or production RAG operations. The first usage check (2026-09-12) showed that the product loop works and that its failures are about evidence: an invented employer, an unanchored score, runaway reasoning. So M5 adds retrieval over a public-safe evidence corpus, extends the located-citation contract to retrieved chunks, and evaluates the real model path on a versioned golden set before any tool autonomy is added; bounded tool use comes last and OpenAI-first, and application outcomes are never exposed to the assessment model.
 
 Every slice ends with the same usage check on the same inputs when a call is approved (a slice may merge as synthetic-verified before that), carries a `synthetic-verified` / `live-verified` / `not verified` label, and keeps read contracts stable while tightening only generation contracts. Embeddings, hybrid retrieval, cloud vector stores and multi-user deployment are deferred or gated on explicit approval. Slices, contract impact and acceptance criteria are in [MILESTONE_5.md](MILESTONE_5.md).
+
+## ADR-0014: Finish M5 verification on the free tier, without a paid provider or tool use
+
+**Status:** Accepted — owner decision, 2026-09-14 (M5-D PR).
+
+The owner has not found a large advantage of this app over pasting the same details into a plain ChatGPT conversation, and does not intend to spend on a paid provider for it. M5 therefore finishes its verification on the free OpenRouter route: the model-mode evaluation (M5-D) defaults to `--provider openrouter` and refuses `--provider openai` without an explicit `--approve-model-cost`, the OpenAI adapter stays in the tree unexercised, and the three open questions of the plan are resolved as lexical-only retrieval, a synthetic-only corpus and no bounded tool use (M5-C dropped; M5 ends at E).
+
+A free call is still an external transmission and keeps the approval flags, the CI/test refusal, the hard call ceiling and the redaction rules. Free-tier results are evidence for the named endpoint and model only; nothing measured on it verifies OpenAI. The plain-chat comparison becomes the central finding of the M5-F write-up rather than a footnote. Reversal is cheap: an approved paid run on the OpenAI path needs only the existing flag, no code change.

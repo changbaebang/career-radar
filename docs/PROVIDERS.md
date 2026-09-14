@@ -17,7 +17,8 @@ provider to another and no automatic model substitution.
 ## Why a second provider
 
 The #4 live measurement and the model-mode evaluations need approved calls. A metered or free
-route lets the pipeline be exercised end to end before OpenAI credit exists. A result produced
+route lets the pipeline be exercised end to end before OpenAI credit exists; since 2026-09-14
+(ADR-0014) the free route is the project's verification provider, not a stopgap. A result produced
 this way is evidence **for that endpoint only**: `modelVersion` records
 `openrouter/<model>@<upstream provider>` so nobody mistakes it for an OpenAI observation. Latency,
 usage and quality measured on one provider do not verify another.

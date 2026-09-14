@@ -12,7 +12,7 @@ function main() {
   let output: string | undefined, baseline: string | undefined, save = true;
   const args = process.argv.slice(2);
   if (args.includes("--help")) {
-    console.log("pnpm eval [--output NEW_DIRECTORY] [--baseline REPORT_JSON] [--no-save]\nPaths are relative to repository root. Policy-only; no model, DB, or network access. Exit 0: no failed/error cases (skips are reported, not failures); 1: failed/error/empty run; 2: invalid command/baseline or no comparable cases.");
+    console.log("pnpm eval [--output NEW_DIRECTORY] [--baseline REPORT_JSON] [--no-save]\nPaths are relative to repository root. Policy-only; no model, DB, or network access. Exit 0: no failed/error cases (skips are reported, not failures); 1: failed/error/empty run; 2: invalid command/baseline or no comparable cases.\n\npnpm eval --mode model [...]   model-mode evaluation over the golden set (M5-D); see --mode model --help.");
     return;
   }
   for (let i = 0; i < args.length; i++) {
@@ -50,6 +50,16 @@ function main() {
   process.exitCode = comparison && !comparison.compatible ? 2 : report.success && !comparison?.regressions.length ? 0 : 1;
 }
 
+// M5-D: `--mode model` runs the golden-set model-mode evaluation (dry run by default). Every other
+// `--mode` value is still unsupported. Policy mode is untouched.
+const modeIndex = process.argv.indexOf("--mode");
+if (modeIndex !== -1 && process.argv[modeIndex + 1] === "model") {
+  const rest = [...process.argv.slice(2, modeIndex), ...process.argv.slice(modeIndex + 2)];
+  import("./model-mode-cli.js").then(({ runModelEvalCli }) => runModelEvalCli(rest)).then((code) => { process.exitCode = code; }).catch(() => {
+    console.error("Model-mode evaluation could not complete. Check arguments, Git checkout, and output permissions; output directories must be new.");
+    process.exitCode = 2;
+  });
+} else {
 try { main(); }
 catch (error) {
   // Do not print untrusted JSON, Zod issues, or arbitrary exception payloads.
@@ -61,4 +71,5 @@ catch (error) {
   ].includes(error.message);
   console.error(allowed ? error.message : "Evaluation could not complete. Check arguments, baseline format, Git checkout, and output permissions; output directories must be new.");
   process.exitCode = 2;
+}
 }
