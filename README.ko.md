@@ -206,6 +206,12 @@ strict JSON 스키마 출력과 `require_parameters` 라우팅으로 보낼 수 
 그대로 읽습니다. `OPENROUTER_REASONING_EFFORT`는 추론 강도를 조절하는 옵션이고 실제로 추론 토큰이 줄어드는지는
 확인하지 않았습니다. 프롬프트 버전은 `milestone-4b2-v2`입니다.
 
+### M5 (계획)
+
+근거 기반 마일스톤(합성 코퍼스 검색, 검색된 조각에 대한 인용, 모델 모드 평가 실행기, 실행 단위 관측,
+제한된 도구 사용은 마지막) 계획을 [MILESTONE_5.md](docs/MILESTONE_5.md)와 ADR-0013으로 정리했습니다.
+아직 구현된 것은 없습니다.
+
 ## 참고 문서
 
 - [Plugin 빠른 시작](https://developers.openai.com/plugins/build/app-quickstart)
