@@ -17,6 +17,7 @@
     "typecheck": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/shared typecheck && pnpm --filter @career-radar/web typecheck && pnpm --filter @career-radar/server typecheck",
     "test": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/web build && pnpm -r --if-present test",
     "eval": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/server eval",
+    "eval:retrieval": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/server eval:retrieval",
     "measure:live": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/server measure:live",
     "usage-check": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/web build && pnpm --filter @career-radar/server usage-check"
   },
@@ -24,6 +25,7 @@
     "@career-radar/shared": "workspace:*",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.8.1",
-    "typescript-eslint": "^8.42.0"
+    "typescript-eslint": "^8.42.0",
+    "zod": "^3.25.76"
   }
 }

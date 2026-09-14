@@ -222,8 +222,12 @@ in [MILESTONE_5_BASELINE.md](docs/MILESTONE_5_BASELINE.md) (code SHA, prompt/pol
 identifiers, round-1 usage-check latencies, and a verification label per feature) with the
 committed policy-eval report `evals/baselines/m5-0/report.json`; compare any later run with
 `pnpm eval --baseline evals/baselines/m5-0/report.json`. A shared-schema change is now reported as
-`schemaChanged` instead of making the comparison incompatible (report version 3). Retrieval,
-citations, model-mode evals and tools are not implemented yet.
+`schemaChanged` instead of making the comparison incompatible (report version 3). M5-A adds the
+evidence corpus layer: `EvidenceChunkSchema`, field and sentence chunkers, an in-process BM25
+index that reports missing query terms, a synthetic corpus with distractors, and
+`pnpm eval:retrieval` (Recall@3 / Recall@5 per chunker over 36 authored queries; see
+[evals/README.md](evals/README.md)). Retrieval is not on the assessment path yet (that is M5-B);
+citations to chunks, model-mode evals and tools are not implemented.
 
 ## Documentation references
 
