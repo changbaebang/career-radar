@@ -1,6 +1,7 @@
 import type { CandidateProfile, FitAssessment, JobPosting, JobRecommendations } from "@career-radar/shared";
 import { digest } from "../../../evals/evaluate.js";
 import { finalizeAssessment } from "../../src/domain/assessment/pipeline.js";
+import { retrieveEvidence, type RetrievedEvidence } from "../../src/domain/evidence/retrieve.js";
 import type { OperationRecord, Usage } from "./measured-analyzer.js";
 
 // Pure helpers over recorded operations. Nothing here performs I/O.
@@ -107,9 +108,13 @@ export function assessmentSummary(a: FitAssessment): AssessmentSummary {
     interviewRisks: a.interviewRisks.length, missingInformation: a.missingInformation.length, hash: digest(a) };
 }
 
-// Criterion 1: the saved result must equal the deterministic pipeline (policy + screening validation) applied to the captured draft.
-export function policyInspection(profile: CandidateProfile, job: JobPosting, draft: FitAssessment, final: FitAssessment) {
-  const replay = finalizeAssessment(profile, job, draft);
+// Criterion 1: the saved result must equal the deterministic pipeline (policy, M5-B citation validation,
+// screening validation) applied to the captured draft. The replay needs the retrieval the call saw:
+// the recorded one when the measured analyzer captured it, else the same deterministic retrieval
+// rebuilt from the captured inputs (the batch retrieves from exactly these). Without it every chunk
+// citation would fail closed and a correct run would read as a mismatch.
+export function policyInspection(profile: CandidateProfile, job: JobPosting, draft: FitAssessment, final: FitAssessment, evidence?: RetrievedEvidence) {
+  const replay = finalizeAssessment(profile, job, draft, evidence ?? retrieveEvidence(profile, job));
   return {
     verdictChanged: draft.verdict !== final.verdict, confidenceChanged: draft.confidence !== final.confidence,
     removedUngroundedMatches: Math.max(0, draft.strongestMatches.length - final.strongestMatches.length),

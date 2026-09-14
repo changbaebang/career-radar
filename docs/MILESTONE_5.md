@@ -144,6 +144,14 @@ stays closed until the owner decides §5.1.
 
 ### M5-B — Citations to retrieved evidence (1 PR)
 
+Status: **done, synthetic-verified** (branch `feat/m5-b-citations`). Pre-retrieval on `job_assess`
+and the recommendation batch, `EvidenceRef.source` gains `evidence`, `citations` on the fit
+result keyed by claim id, policy re-keying and orphan drops, validator with fail-closed chunk
+resolution, widget URI v7, `PROMPT_VERSION` `milestone-5b-v1`, seven citation eval cases with
+`citationCorrectness` and `unsupportedClaimRate`. Whether a live model cites resolvable chunk
+ids is still M5-D's question; the added latency of the pre-retrieval is reported by the next
+usage-check run.
+
 - **Goal.** Important claims in an assessment point at a retrieved chunk, and a pointer that does
   not resolve is not evidence.
 - **Design.** B is the first slice that puts retrieval on the assessment path: before the model
@@ -163,7 +171,9 @@ stays closed until the owner decides §5.1.
   normalizeEvidence(requirement), normalizeEvidence(evidence)]))`; a requirement claim (a gap or a
   blocker, which the policy may copy between the two arrays) has the id `"req:" + requirementId`
   when an ID exists, else `"text:" + normalizeEvidence(requirement)`, so promotion does not change
-  it. A new optional `citations` array on the fit result carries `{ claimId, ref: EvidenceRef }`.
+  it; when that text key would exceed the claim-id bound (200 chars), the id is
+  `"text-sha256:" + sha256(normalizeEvidence(requirement))` instead, since requirement text has no
+  length bound of its own. A new optional `citations` array on the fit result carries `{ claimId, ref: EvidenceRef }`.
   The M1 policy keeps citations consistent when it rewrites claims: a removed match takes its
   citations with it; `uniqueGaps` collapses a gap when its ID **or** its normalized text was already
   seen, and when it does, the citations of the collapsed gap are re-keyed to the surviving gap's

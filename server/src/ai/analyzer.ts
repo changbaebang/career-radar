@@ -1,5 +1,6 @@
 import type { CandidateProfile, FitAssessment, JobPosting } from "@career-radar/shared";
 import OpenAI from "openai";
+import type { RetrievedEvidence } from "../domain/evidence/retrieve.js";
 import { zodTextFormat } from "openai/helpers/zod";
 
 import {
@@ -17,7 +18,9 @@ export const DEFAULT_OPENAI_MODEL = "gpt-5-mini";
 export interface CareerAnalyzer {
   extractProfile(resumeText: string, profileId?: string, signal?: AbortSignal): Promise<ProfileExtraction>;
   extractJob(description: string, signal?: AbortSignal): Promise<JobExtraction>;
-  assess(profile: CandidateProfile, job: JobPosting, signal?: AbortSignal): Promise<FitAssessment>;
+  // evidence: this run's pre-retrieval (M5-B); when absent the model gets no retrievedEvidence and
+  // every chunk citation fails closed downstream.
+  assess(profile: CandidateProfile, job: JobPosting, signal?: AbortSignal, evidence?: RetrievedEvidence): Promise<FitAssessment>;
 }
 
 type ObservedResponse = {
@@ -84,9 +87,9 @@ export class OpenAICareerAnalyzer implements CareerAnalyzer {
     return toJob(requireParsed(response.output_parsed, "job posting"), description);
   }
 
-  async assess(profile: CandidateProfile, job: JobPosting, signal?: AbortSignal): Promise<FitAssessment> {
+  async assess(profile: CandidateProfile, job: JobPosting, signal?: AbortSignal, evidence?: RetrievedEvidence): Promise<FitAssessment> {
     const response = await this.#observe("assess", () => this.#client.responses.parse({
-      model: this.#model, store: false, instructions: ASSESSMENT_INSTRUCTIONS, input: assessmentInput(profile, job),
+      model: this.#model, store: false, instructions: ASSESSMENT_INSTRUCTIONS, input: assessmentInput(profile, job, evidence),
       text: { format: zodTextFormat(AssessmentDraftSchema, OUTPUT_NAMES.assess) },
     }, { signal, ...(signal ? { maxRetries: 0 } : {}) }));
     return toAssessment(requireParsed(response.output_parsed, "fit assessment"), response.model ?? this.#model);

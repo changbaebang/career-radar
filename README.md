@@ -159,7 +159,7 @@ explicit correction — it supersedes the **whole prior outcome history** for ag
 history. Stage clearing retracts previous reach; unknown stages/dates are not inferred.
 `pipeline_summary` shows stage reach, current coverage and last-update exclusions without
 changing fit verdicts or claiming probabilities. [Contract and examples](docs/MILESTONE_4C.md).
-Widget URI is now v6 (v5 for M4-B2, v6 once `company` became optional): refresh ChatGPT descriptors before testing. Local synthetic checks do
+Widget URI is now v7 (v5 for M4-B2, v6 once `company` became optional, v7 for the M5-B citations and `evidence` reference source): refresh ChatGPT descriptors before testing. Local synthetic checks do
 not establish actual host/model behavior. No API calls are required for this slice.
 
 ### M4-B1 evidence contract
@@ -204,7 +204,7 @@ models) led to three contract changes: a posting that does not name the employer
 absent instead of letting the model fill it in (widget URI v6, since the v5 widget parses strictly),
 newly generated `score` values are integers on a stated 0-100 scale while stored fractions stay
 readable, and `OPENROUTER_REASONING_EFFORT` adjusts reasoning intensity (whether it actually lowers
-reasoning tokens is unverified). Prompt version is `milestone-4b2-v2`.
+reasoning tokens is unverified). Prompt version is `milestone-5b-v1` (M5-B; `milestone-4b2-v2` before it).
 
 ### ChatGPT host check (not run yet)
 
@@ -226,8 +226,16 @@ committed policy-eval report `evals/baselines/m5-0/report.json`; compare any lat
 evidence corpus layer: `EvidenceChunkSchema`, field and sentence chunkers, an in-process BM25
 index that reports missing query terms, a synthetic corpus with distractors, and
 `pnpm eval:retrieval` (Recall@3 / Recall@5 per chunker over 36 authored queries; see
-[evals/README.md](evals/README.md)). Retrieval is not on the assessment path yet (that is M5-B);
-citations to chunks, model-mode evals and tools are not implemented.
+[evals/README.md](evals/README.md)). M5-B puts retrieval on the assessment path: before the
+model call, `job_assess` and the recommendation batch retrieve the profile's evidence sentences
+for the job's requirements and hand them to the model as `retrievedEvidence`; every match, gap
+and blocker may carry citations, a `chunk:<id>` reference resolves only against that run's
+retrieval trace (a hash alone proves nothing), quotes must equal the chunk text, the policy
+re-keys citations of merged blockers and drops those of removed claims, and invalid citations are
+dropped with a fixed note and lower confidence. Widget URI v7, `PROMPT_VERSION` `milestone-5b-v1`,
+seven citation eval cases with `citationCorrectness` and `unsupportedClaimRate`. Whether a live
+model cites resolvable chunk ids is unmeasured (M5-D); model-mode evals and tools are not
+implemented.
 
 ## Documentation references
 

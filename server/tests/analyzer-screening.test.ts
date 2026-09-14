@@ -14,7 +14,7 @@ const draftContext = {
 };
 const draft = {
   verdict: "REALISTIC", confidence: "high", resumeContortion: "low", score: null,
-  strongestMatches: [{ requirementId: "req_1", requirement: "Lead a React team", evidence: "Led a React platform team", source: { company: null, role: null, project: null }, strength: "direct" }],
+  strongestMatches: [{ requirementId: "req_1", requirement: "Lead a React team", evidence: "Led a React platform team", source: { company: null, role: null, project: null }, strength: "direct", citations: [] }],
   gaps: [], hardBlockers: [], interviewRisks: [], recommendation: "Synthetic recommendation.", missingInformation: [], screeningContext: draftContext,
 };
 function respond(output_parsed: unknown) { parse.mockResolvedValueOnce({ id: "resp_synthetic", model: "gpt-synthetic", status: "completed", output_parsed }); }
@@ -24,7 +24,7 @@ describe("M4-B2 producer: screening context in the single assessment call", () =
   it("bumps the prompt version and returns a versioned context from the same call", async () => {
     respond(draft);
     const result = await analyzer().assess(syntheticProfile, syntheticJob);
-    expect(PROMPT_VERSION).toBe("milestone-4b2-v2");
+    expect(PROMPT_VERSION).toBe("milestone-5b-v1");
     expect(result.promptVersion).toBe(PROMPT_VERSION);
     expect(result.verdict).toBe("REALISTIC");
     const { clarificationQuestion: _null, ...careerStoryRisk } = draftContext.careerStoryRisk; void _null;
@@ -37,12 +37,16 @@ describe("M4-B2 producer: screening context in the single assessment call", () =
     await analyzer().assess(syntheticProfile, syntheticJob);
     const request = parse.mock.calls.at(-1)![0] as { instructions: string; text: { format: unknown }; store: boolean };
     expect(request.store).toBe(false);
-    for (const rule of ["roles[i].evidence[j]", "required[i].text", "otherwise answer uncertain", "clarificationQuestion", "demographic", "never changes the verdict"]) {
+    for (const rule of ["roles[i].evidence[j]", "required[i].text", "otherwise answer uncertain", "clarificationQuestion", "demographic", "never changes the verdict",
+      "retrievedEvidence", "chunk:<chunkId>", "Never cite a chunkId that is not listed"]) {
       expect(request.instructions).toContain(rule);
     }
     const format = JSON.stringify(request.text.format);
     expect(format).toContain("fit_assessment");
-    for (const key of ["screeningContext", "seniorityFit", "careerStoryRisk", "screeningRisks", "unknowns", "clarificationQuestion"]) expect(format).toContain(key);
+    for (const key of ["screeningContext", "seniorityFit", "careerStoryRisk", "screeningRisks", "unknowns", "clarificationQuestion", "citations"]) expect(format).toContain(key);
+    // M5-B: refs may name a retrieved chunk; the draft carries citations per claim, never a claimId.
+    expect(format).toContain('"evidence"');
+    expect(format).not.toContain("claimId");
   });
 
   it("asks for a null employer and an integer 0-100 score, and rejects a 0-1 fraction as a schema mismatch", async () => {

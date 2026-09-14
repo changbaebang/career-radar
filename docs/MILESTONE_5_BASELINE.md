@@ -94,6 +94,15 @@ branch reports `compatible: true`, `compared: 28`, `schemaChanged: true`, `regre
 comparison rule from this slice did what it was changed for. The row for M5-A is at the bottom of
 the table below.
 
+## Second check after the freeze (M5-B)
+
+M5-B changed `packages/shared` again (the `evidence` reference source and the optional
+`citations` field) and the M1 policy file (citation re-keying). The comparison against this
+baseline on the M5-B branch reports `compatible: true`, `compared: 28`, `schemaChanged: true`,
+`policyChanged: true`, `regressions: []`, and lists the seven citation cases under `added`. The
+current tree therefore runs `PROMPT_VERSION` `milestone-5b-v1`, widget `ui://career-radar/widget-v7.html`
+and dataset `synthetic-policy-v3` (35 cases); the identifiers above stay the frozen pre-M5 values.
+
 ## Verification labels by feature
 
 | Feature | Label | Supported by |
@@ -113,6 +122,7 @@ the table below.
 | #19 contract changes: employer optional, integer `score` generation contract, `OPENROUTER_REASONING_EFFORT` | synthetic-verified; live: **not verified** | `server/tests`; post-#19 re-run pending |
 | Widget v6 strict parsing, stored pre-#19 snapshots still readable | synthetic-verified | `server/tests` (store snapshot fixture), `web` build |
 | ChatGPT host: tool discovery, widget v6 rendering, re-entry, error display | **not verified** | only the M0 status card was seen in ChatGPT (2026-09-09); runbook `docs/HOST_CHECK.md`, run pending (issue #5) |
+| Citations to retrieved evidence (M5-B): pre-retrieval before the model call, `chunk:<id>` refs resolved only against the run's trace, claim ids, policy re-keying, validator, widget v7 | synthetic-verified; live: **not verified** | `server/tests/{claims,citations,retrieve,snapshot-compat}.test.ts`, `screening.test.ts`, `httpApp.test.ts`; policy eval 35/35 with the seven citation cases: `citationCorrectness` 4/9 and `unsupportedClaimRate` 48/51 by construction (five adversarial refs are meant to be dropped); whether a live model produces resolvable chunk ids is M5-D's question |
 | Evidence corpus, field/sentence chunkers, BM25 retrieval, `pnpm eval:retrieval` (M5-A) | synthetic-verified; live: not applicable (no model call) | `server/tests/evidence-*.test.ts`, `retrieval-*.test.ts`; retrieval eval on the M5-A branch: 36 queries, field chunker Recall@3 47/55 (0.855 micro, 0.866 macro) and Recall@5 49/55 (0.891 / 0.882), sentence chunker Recall@3 46/60 (0.767 / 0.773) and Recall@5 51/60 (0.850 / 0.845), deterministic, 0 dataset problems; no query returned an empty hit list, and three queries returned hits that contained none of their relevant chunks (morphology and an abbreviation, by design) |
 
 No row above depends on anything not in the repository, in a results file named here, or in a

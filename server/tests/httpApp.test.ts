@@ -22,6 +22,9 @@ import { CareerStore } from "../src/domain/store.js";
 import { syntheticProfile } from "./fixtures.js";
 import { syntheticJob } from "./fixtures.js";
 import { JobDiscovery } from "../src/domain/jobs/search.js";
+import { CITATION_INVALID_DROPPED } from "../src/domain/assessment/citations.js";
+import { matchClaimId } from "../src/domain/assessment/claims.js";
+import type { RetrievedEvidence } from "../src/domain/evidence/retrieve.js";
 import { discoveryResult, groundedAssessment } from "./discovery-fixtures.js";
 
 const closeCallbacks: Array<() => Promise<void>> = [];
@@ -79,10 +82,12 @@ describe("Career Radar HTTP and MCP server", () => {
     const client = await connectClient(await startTestServer({ store, discovery, createAnalyzer }));
     closeCallbacks.push(async () => { discovery.close(); store.close(); });
     const tools = (await client.listTools()).tools;
-    // B2 advertises the optional screening context on assessment outputs; identity stays internal. URI is v6 since company became optional.
+    // B2 advertises the optional screening context on assessment outputs; identity stays internal. URI is v7 since
+    // M5-B added citations and the "evidence" reference source (v6 once company became optional).
     for (const name of ["job_assess", "job_recommend"]) expect(JSON.stringify(tools.find((tool) => tool.name === name)?.outputSchema)).toContain("screeningContext");
+    for (const name of ["job_assess", "job_recommend"]) expect(JSON.stringify(tools.find((tool) => tool.name === name)?.outputSchema)).toContain("citations");
     expect(JSON.stringify(tools)).not.toContain("inputIdentity");
-    expect(CAREER_RADAR_WIDGET_URI).toBe("ui://career-radar/widget-v6.html");
+    expect(CAREER_RADAR_WIDGET_URI).toBe("ui://career-radar/widget-v7.html");
     expect(tools.find((tool) => tool.name === "job_search")).toMatchObject({ annotations: { readOnlyHint: false, openWorldHint: true } });
     expect(tools.find((tool) => tool.name === "job_search")?._meta).not.toHaveProperty("ui");
     expect(tools.find((tool) => tool.name === "job_recommend")).toMatchObject({
@@ -209,10 +214,21 @@ describe("Career Radar HTTP and MCP server", () => {
           { source: "candidate", path: "skills[0]", quote: "React" }, { source: "job", path: "required[0].text", quote: "Production React experience" }] },
         screeningRisks: [], unknowns: [] },
     };
+    // M5-B: the server retrieves evidence before the call and hands it to the analyzer; the fake cites the
+    // retrieved "React" chunk for its match, plus one chunk id that was never retrieved.
+    const assess = vi.fn(async (_profile: CandidateProfile, _job: JobPosting, _signal?: AbortSignal, evidence?: RetrievedEvidence): Promise<FitAssessment> => {
+      const react = evidence?.chunks.find((chunk) => chunk.text === "React");
+      if (!react) throw new Error("expected the React skill chunk to be retrieved for the React requirement");
+      const claimId = matchClaimId(assessment.strongestMatches[0]!);
+      return { ...assessment, citations: [
+        { claimId, ref: { source: "evidence", path: `chunk:${react.id}`, quote: "React" } },
+        { claimId, ref: { source: "evidence", path: `chunk:${"f".repeat(64)}`, quote: "React" } },
+      ] };
+    });
     const analyzer: CareerAnalyzer = {
       extractProfile: async () => ({ profile, warnings: [] }),
       extractJob: async () => ({ job, warnings: [] }),
-      assess: async () => assessment,
+      assess,
     };
     const store = new CareerStore();
     const createAnalyzer = vi.fn(() => analyzer);
@@ -233,6 +249,14 @@ describe("Career Radar HTTP and MCP server", () => {
         unknowns: ["seniorityFit: missing scope references or invalid source/path/quote; marked uncertain."] } },
     });
     expect(JSON.stringify(result.structuredContent)).not.toContain("Synthetic unsupported scope claim.");
+    // M5-B: the valid chunk citation is on the tool output; the never-retrieved id was dropped, diagnosed and lowered confidence.
+    const output = JobAssessmentResultSchema.parse(result.structuredContent);
+    expect(assess).toHaveBeenCalledTimes(1);
+    expect(assess.mock.calls[0]![3]).toMatchObject({ version: "retrieval-v1" });
+    expect(output.assessment.citations).toHaveLength(1);
+    expect(output.assessment.citations?.[0]?.ref).toMatchObject({ source: "evidence", quote: "React" });
+    expect(output.assessment.confidence).toBe("low");
+    expect(output.assessment.missingInformation).toContain(CITATION_INVALID_DROPPED);
     expect(store.getProfile(profile.id)).toEqual(profile);
     expect(store.getJob(job.id)).toEqual(job);
     expect(createAnalyzer).toHaveBeenCalledTimes(1);

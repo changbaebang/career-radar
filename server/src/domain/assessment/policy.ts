@@ -1,10 +1,12 @@
-import { FitAssessmentSchema, type CandidateProfile, type EvidenceMatch, type FitAssessment, type Gap, type JobPosting } from "@career-radar/shared";
+import { FitAssessmentSchema, type CandidateProfile, type Citation, type EvidenceMatch, type FitAssessment, type Gap, type JobPosting } from "@career-radar/shared";
+import { CITATION_ORPHAN_DROPPED, CITATION_REKEYED } from "./citations.js";
+import { claimIds, requirementClaimId } from "./claims.js";
+import { normalizeEvidence } from "./normalize.js";
+
+// Re-exported so the evaluation harness compares evidence with exactly the rule the policy uses.
+export { normalizeEvidence } from "./normalize.js";
 
 const BINARY_HARD_REQUIREMENTS = new Set(["language", "location", "certification", "education"]);
-// Exact-match grounding must survive the model adding a trailing period or wrapping quotes.
-// Exported so the evaluation harness compares evidence with exactly the rule the policy uses.
-export const normalizeEvidence = (value: string) =>
-  value.trim().toLocaleLowerCase().replaceAll(/\s+/g, " ").replace(/^["'\u201c\u2018]+|["'\u201d\u2019.,;:!?]+$/g, "");
 
 function candidateEvidence(profile: CandidateProfile): string[] {
   return [profile.headline, ...profile.skills, ...profile.domains, ...profile.leadership,
@@ -19,16 +21,42 @@ function isGrounded(match: EvidenceMatch, evidence: string[]): boolean {
 }
 // Two gaps describe the same requirement when their IDs match or their normalized text matches, so a
 // model blocker reported without an ID still collapses into the promoted gap that carries one.
-function uniqueGaps(gaps: Gap[]): Gap[] {
-  const seenIds = new Set<string>();
-  const seenText = new Set<string>();
-  return gaps.filter((gap) => {
+// `merged` maps the claim id of each collapsed gap to the surviving gap's claim id, so the citations
+// of the collapsed gap can follow it (M5-B).
+function uniqueGaps(gaps: Gap[]): { gaps: Gap[]; merged: Map<string, string> } {
+  const byId = new Map<string, Gap>();
+  const byText = new Map<string, Gap>();
+  const merged = new Map<string, string>();
+  const survivors: Gap[] = [];
+  for (const gap of gaps) {
     const text = normalizeEvidence(gap.requirement);
-    if ((gap.requirementId !== undefined && seenIds.has(gap.requirementId)) || seenText.has(text)) return false;
-    if (gap.requirementId !== undefined) seenIds.add(gap.requirementId);
-    seenText.add(text);
-    return true;
-  });
+    const survivor = (gap.requirementId !== undefined ? byId.get(gap.requirementId) : undefined) ?? byText.get(text);
+    if (survivor) {
+      const from = requirementClaimId(gap), to = requirementClaimId(survivor);
+      if (from !== to) merged.set(from, to);
+      continue;
+    }
+    survivors.push(gap);
+    if (gap.requirementId !== undefined) byId.set(gap.requirementId, gap);
+    byText.set(text, gap);
+  }
+  return { gaps: survivors, merged };
+}
+
+// M5-B: citations follow the claims the policy keeps. A removed match takes its citations with it
+// (orphan, dropped), a collapsed gap hands its citations to the survivor (re-keyed), and every drop
+// or re-key is recorded as a fixed sentence. Absent citations stay absent (pre-M5-B results).
+function reconcileCitations(citations: Citation[] | undefined, surviving: Set<string>, merged: Map<string, string>): { citations?: Citation[]; notes: string[] } {
+  if (citations === undefined) return { notes: [] };
+  const kept: Citation[] = [];
+  let rekeyed = false, orphaned = false;
+  for (const citation of citations) {
+    let claimId = citation.claimId;
+    if (!surviving.has(claimId) && merged.has(claimId)) { claimId = merged.get(claimId)!; rekeyed = true; }
+    if (!surviving.has(claimId)) { orphaned = true; continue; }
+    kept.push({ ...citation, claimId });
+  }
+  return { citations: kept, notes: [...(rekeyed ? [CITATION_REKEYED] : []), ...(orphaned ? [CITATION_ORPHAN_DROPPED] : [])] };
 }
 
 export function applyAssessmentPolicy(profile: CandidateProfile, job: JobPosting, assessment: FitAssessment): FitAssessment {
@@ -60,13 +88,15 @@ export function applyAssessmentPolicy(profile: CandidateProfile, job: JobPosting
     return promotedGaps.has(gap) ? { ...gap, severity: "hard_blocker" as const } : gap;
   });
   // Promoted gaps come first so the deduped blocker keeps the requirement ID when the model omitted it.
-  const hardBlockers = uniqueGaps([...gaps.filter((gap) => gap.severity === "hard_blocker"), ...modelBlockers]);
+  const { gaps: hardBlockers, merged } = uniqueGaps([...gaps.filter((gap) => gap.severity === "hard_blocker"), ...modelBlockers]);
+  const reconciled = reconcileCitations(assessment.citations, claimIds({ strongestMatches, gaps, hardBlockers }), merged);
   let verdict = hardBlockers.length > 0 ? "PASS" as const : assessment.verdict;
   let confidence = removedUngrounded ? "low" as const : assessment.confidence;
   if (assessment.resumeContortion === "high" && verdict === "REALISTIC") verdict = "STRETCH";
   if (strongestMatches.length === 0 && verdict === "REALISTIC") { verdict = "STRETCH"; confidence = "low"; }
-  const missingInformation = [...assessment.missingInformation];
+  const missingInformation = [...assessment.missingInformation, ...reconciled.notes];
   if (removedUngrounded) missingInformation.push("One or more positive claims lacked a traceable candidate-profile evidence sentence.");
   return FitAssessmentSchema.parse({ ...assessment, verdict, confidence, strongestMatches, gaps,
-    hardBlockers, missingInformation: [...new Set(missingInformation)] });
+    hardBlockers, missingInformation: [...new Set(missingInformation)],
+    ...(reconciled.citations !== undefined ? { citations: reconciled.citations } : {}) });
 }

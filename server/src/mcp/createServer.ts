@@ -18,6 +18,7 @@ import { z } from "zod";
 import type { CareerAnalyzer } from "../ai/analyzer.js";
 import { buildCareerRadarStatus } from "../demo.js";
 import { finalizeAssessment } from "../domain/assessment/pipeline.js";
+import { retrieveEvidence } from "../domain/evidence/retrieve.js";
 import type { CareerStore } from "../domain/store.js";
 import { fetchJobUrl } from "../infra/fetch/job-url.js";
 import { registerPipelineTools } from "./pipeline-tools.js";
@@ -26,7 +27,9 @@ import type { JobDiscovery } from "../domain/jobs/search.js";
 
 // v6: job.company may be absent (usage-check follow-up); the v5 widget parses strictly and would show
 // "Waiting for Career Radar…" for such results, so hosts must refresh descriptors. v5 added screeningContext.
-export const CAREER_RADAR_WIDGET_URI = "ui://career-radar/widget-v6.html";
+// v7: EvidenceRef.source gains "evidence" and fit results gain citations (M5-B); the v6 widget parses
+// strictly and would reject the new enum value.
+export const CAREER_RADAR_WIDGET_URI = "ui://career-radar/widget-v7.html";
 
 // Both are required on purpose: an MCP server is created per request, so a per-call default store
 // would forget every profile between profile_upsert and job_assess. createHttpApp owns the shared
@@ -196,7 +199,9 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
       if (!profile) throw new Error("Candidate profile was not found or has expired. Call profile_upsert again.");
       const job = store.getJob(jobId);
       if (!job) throw new Error("Job was not found or has expired. Call job_ingest again.");
-      const assessment = finalizeAssessment(profile, job, await getAnalyzer().assess(profile, job));
+      // M5-B: deterministic pre-retrieval over the profile's evidence; its trace is what citations resolve against.
+      const evidence = retrieveEvidence(profile, job);
+      const assessment = finalizeAssessment(profile, job, await getAnalyzer().assess(profile, job, undefined, evidence), evidence);
       const assessmentId = store.saveAssessment(profile, job, assessment);
       const result = JobAssessmentResultSchema.parse({ job, assessment, assessmentId });
       return {

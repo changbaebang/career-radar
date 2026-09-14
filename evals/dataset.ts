@@ -1,7 +1,11 @@
-import type { FitAssessment } from "@career-radar/shared";
+import type { Citation, EvidenceRef, FitAssessment } from "@career-radar/shared";
+import { matchClaimId, requirementClaimId } from "../server/src/domain/assessment/claims.js";
+import { chunkId } from "../server/src/domain/evidence/chunk.js";
+import { retrieveEvidence } from "../server/src/domain/evidence/retrieve.js";
 import { evalCases as legacyCases, type EvalCase } from "./fixtures/cases.js";
 
-export const DATASET_VERSION = "synthetic-policy-v2";
+// v3: M5-B citation cases added (adversarial refs, removed-match and dedup-pair regressions).
+export const DATASET_VERSION = "synthetic-policy-v3";
 export type PolicyCase = EvalCase & {
   rationale: string;
   provenance: "synthetic-policy-contract";
@@ -9,6 +13,9 @@ export type PolicyCase = EvalCase & {
   expectedBlockerIds: string[];
   requiredEvidence: string[];
   skipReason?: string;
+  // M5-B: stated only on citation cases (valid citations after policy + validation; output claims without one).
+  expectedValidCitations?: number;
+  expectedUnsupportedClaims?: number;
 };
 
 // Expected required-requirement IDs for the legacy fixtures. Explicit per case; nothing is inferred.
@@ -119,6 +126,75 @@ const newCases: PolicyCase[] = [
     }, [], ["req_1", "req_2"]),
 ];
 
+// M5-B citation cases. Chunk ids are resolved from the fixture's own deterministic retrieval at
+// build time (never hand-copied); a case whose evidence sentence is not retrieved fails loudly.
+const chunkRef = (id: string, quote: string): EvidenceRef => ({ source: "evidence", path: `chunk:${id}`, quote });
+function retrievedChunk(fixture: EvalCase, text: string) {
+  const chunk = retrieveEvidence(fixture.profile, fixture.job).chunks.find((candidate) => candidate.text === text);
+  if (!chunk) throw new Error(`Citation case ${fixture.caseId}: '${text}' is not retrieved for its job`);
+  return chunk;
+}
+function cite(fixture: EvalCase, citations: Citation[], expectedValidCitations: number, expectedUnsupportedClaims: number, rationale: string,
+  requiredEvidence: string[] = [], expectedBlockerIds: string[] = []): PolicyCase {
+  fixture.draftAssessment.citations = citations;
+  return { ...annotate(fixture, rationale, requiredEvidence, expectedBlockerIds), expectedValidCitations, expectedUnsupportedClaims };
+}
+const realisticMatch = () => base("frontend-lead-realistic").draftAssessment.strongestMatches[0]!;
+const leadSentence = "Led a React platform team";
+const citationCases: PolicyCase[] = [
+  (() => {
+    const f = base("frontend-lead-realistic"); f.caseId = "citation-valid-chunk-kept";
+    const chunk = retrievedChunk(f, leadSentence);
+    return cite(f, [{ claimId: matchClaimId(realisticMatch()), ref: chunkRef(chunk.id, chunk.text) }], 1, 0,
+      "A citation to a chunk retrieved in this run with the exact chunk text survives policy and validation unchanged.", [leadSentence]);
+  })(),
+  (() => {
+    const f = base("frontend-lead-realistic"); f.caseId = "citation-nonexistent-chunk-dropped";
+    return cite(f, [{ claimId: matchClaimId(realisticMatch()), ref: chunkRef("0".repeat(64), leadSentence) }], 0, 1,
+      "A chunk id that no run produced is not evidence; the citation is dropped and the claim is unsupported.", [leadSentence]);
+  })(),
+  (() => {
+    const f = base("frontend-lead-realistic"); f.caseId = "citation-quote-from-other-chunk-dropped";
+    const other = retrievedChunk(f, "Frontend Lead");
+    return cite(f, [{ claimId: matchClaimId(realisticMatch()), ref: chunkRef(other.id, leadSentence) }], 0, 1,
+      "A retrieved chunk id with the quote of a different chunk is dropped: quotes must equal the cited chunk's text.", [leadSentence]);
+  })(),
+  (() => {
+    const f = base("frontend-lead-realistic"); f.caseId = "citation-negated-quote-dropped";
+    const chunk = retrievedChunk(f, leadSentence);
+    return cite(f, [{ claimId: matchClaimId(realisticMatch()), ref: chunkRef(chunk.id, `Never ${leadSentence.charAt(0).toLowerCase()}${leadSentence.slice(1)}`) }], 0, 1,
+      "A quote altered by one negation no longer equals the chunk text and is dropped.", [leadSentence]);
+  })(),
+  (() => {
+    const f = base("frontend-lead-realistic"); f.caseId = "citation-chunk-from-other-run-dropped";
+    const foreign = chunkId({ sourceType: "profile", sourceId: "profile:someone-else", locator: "roles[0].evidence[0]", text: leadSentence });
+    return cite(f, [{ claimId: matchClaimId(realisticMatch()), ref: chunkRef(foreign, leadSentence) }], 0, 1,
+      "A content hash computed for another corpus resolves nothing here: membership in this run's trace, not the hash, makes a chunk citable.", [leadSentence]);
+  })(),
+  (() => {
+    const f = base("invented-evidence-extension-rejected"); f.caseId = "citation-removed-match-keeps-valid-one";
+    const invented = f.draftAssessment.strongestMatches[0]!;
+    const valid = { ...invented, evidence: leadEvidence };
+    f.draftAssessment.strongestMatches = [invented, valid];
+    f.expectedVerdict = "REALISTIC";
+    const chunk = retrievedChunk(f, leadEvidence);
+    return cite(f, [
+      { claimId: matchClaimId(invented), ref: chunkRef(chunk.id, chunk.text) },
+      { claimId: matchClaimId(valid), ref: chunkRef(chunk.id, chunk.text) },
+    ], 1, 0, "The removed leading match takes its citation with it; the surviving match keeps its own and no citation moves to another claim.", [leadEvidence]);
+  })(),
+  (() => {
+    const f = base("duplicate-blocker-deduped"); f.caseId = "citation-dedup-pair-rekeyed";
+    const candidate: EvidenceRef = { source: "candidate", path: "roles[0].evidence[0]", quote: "Built internationalized web applications" };
+    const gap = f.draftAssessment.gaps[0]!;
+    const blocker = f.draftAssessment.hardBlockers[0]!;
+    return cite(f, [
+      { claimId: requirementClaimId(gap), ref: candidate },
+      { claimId: requirementClaimId(blocker), ref: { source: "job", path: "required[0].text", quote: "Fluent Korean required" } },
+    ], 2, 1, "An ID-less model blocker merged into the promoted gap hands its citation to the surviving req: claim; the uncited match stays unsupported.", [], ["req_1"]);
+  })(),
+];
+
 // These are explicit policy contracts, not human-reviewed hiring/fit labels.
 // New human review remains pending until a person records the review template.
 export const policyCases: PolicyCase[] = [
@@ -131,4 +207,5 @@ export const policyCases: PolicyCase[] = [
     return annotate(fixture, rationale, validMatches.map((match) => match.evidence), legacyBlockerIds[fixture.caseId] ?? []);
   }),
   ...newCases,
+  ...citationCases,
 ];

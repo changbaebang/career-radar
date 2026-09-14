@@ -6,6 +6,7 @@ import {
 import type { CareerAnalyzer } from "../../ai/analyzer.js";
 import type { JobSearchProvider, SearchHit } from "../../infra/search/greenhouse.js";
 import { finalizeAssessment } from "../assessment/pipeline.js";
+import { retrieveEvidence } from "../evidence/retrieve.js";
 import { CareerStore, stableId } from "../store.js";
 
 const TTL_MS = 30 * 60_000;
@@ -119,8 +120,9 @@ export class JobDiscovery {
             // discard a paid extraction and a retry only re-runs the assessment.
             store.upsertJob(job);
           }
-          const draft = await Promise.race([analyzer.assess(profile, job, controller.signal), aborted]);
-          const assessment = finalizeAssessment(profile, job, draft);
+          const evidence = retrieveEvidence(profile, job);
+          const draft = await Promise.race([analyzer.assess(profile, job, controller.signal, evidence), aborted]);
+          const assessment = finalizeAssessment(profile, job, draft, evidence);
           controller.signal.throwIfAborted();
           const assessmentId = store.saveAssessment(profile, job, assessment);
           items.push({ candidate: hit.candidate, jobId: job.id, assessmentId, assessment });

@@ -1,3 +1,4 @@
+import type { RetrievedEvidence } from "../../src/domain/evidence/retrieve.js";
 import type { CandidateProfile, FitAssessment, JobPosting } from "@career-radar/shared";
 import type { AnalyzerOperation, AnalyzerResponseEvent, CareerAnalyzer, JobExtraction, ProfileExtraction } from "../../src/ai/analyzer.js";
 import type { SearchHit } from "../../src/infra/search/greenhouse.js";
@@ -32,6 +33,7 @@ type Pending = { record: OperationRecord; promise: Promise<unknown>; signal?: Ab
 export class MeasuredAnalyzer implements CareerAnalyzer {
   readonly records: OperationRecord[] = [];
   readonly drafts = new Map<number, FitAssessment>();
+  readonly evidence = new Map<number, RetrievedEvidence>();
   readonly #inner: CareerAnalyzer;
   readonly #cap: number;
   readonly #clock: Clock;
@@ -108,10 +110,12 @@ export class MeasuredAnalyzer implements CareerAnalyzer {
     });
   }
 
-  assess(profile: CandidateProfile, job: JobPosting, signal?: AbortSignal): Promise<FitAssessment> {
+  assess(profile: CandidateProfile, job: JobPosting, signal?: AbortSignal, evidence?: RetrievedEvidence): Promise<FitAssessment> {
     const candidateId = this.#byJobId.get(job.id);
-    return this.#measure("assess", candidateId, signal, () => this.#inner.assess(profile, job, signal), (record, result) => {
+    return this.#measure("assess", candidateId, signal, () => this.#inner.assess(profile, job, signal, evidence), (record, result) => {
       this.drafts.set(record.seq, structuredClone(result));
+      // M5-B: the retrieval this call saw, so the policy replay resolves the same chunk citations.
+      if (evidence) this.evidence.set(record.seq, structuredClone(evidence));
     });
   }
 

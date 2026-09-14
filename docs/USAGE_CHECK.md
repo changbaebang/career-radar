@@ -44,7 +44,7 @@ with the job the app was built for.
 ## Path A — inside ChatGPT (the real product surface)
 
 Follow [Connect from ChatGPT](../README.md#connect-from-chatgpt): `pnpm dev`, a Secure MCP Tunnel,
-Developer Mode, refresh the app after a widget URI change (v6 today). Then ask ChatGPT to create the
+Developer Mode, refresh the app after a widget URI change (v7 today). Then ask ChatGPT to create the
 profile from the resume text, ingest each posting, and assess each one. Question 3 is best answered
 here, because "plain chat" is one tab away. This also exercises issue #5 (host flow), which has
 not been verified yet, so expect to hit host problems that are not about the assessments. The

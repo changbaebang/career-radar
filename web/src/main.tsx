@@ -6,6 +6,9 @@ import {
   JobAssessmentResultSchema,
   PipelineSummarySchema,
   JobRecommendationsSchema,
+  normalizeEvidence,
+  type EvidenceMatch,
+  type Gap,
   type JobRecommendations,
   type PipelineSummary,
   type CareerRadarStatus,
@@ -144,11 +147,57 @@ function AssessmentCard({ result }: { result: JobAssessmentResult }) {
         <p className="message"><strong>Missing information:</strong> {assessment.missingInformation.join(" ")}</p>
       )}
 
+      <CitationsSection assessment={assessment} />
+
       <ScreeningContextSection context={assessment.screeningContext} />
 
       <h2>Recommendation</h2>
       <p className="recommendation">{assessment.recommendation}</p>
     </article>
+  );
+}
+
+// M5-B: citations that survived validation against this run's retrieved evidence. Absent on results
+// stored before M5-B (nothing is shown); an empty list means the model cited nothing that resolved.
+// Each citation is labelled with the claim it supports. Requirement claims are keyed by requirement id
+// or normalized text (readable); match claims are a SHA-256 over the same tuple the server hashes,
+// recomputed here with Web Crypto so the label can name the match's requirement and evidence.
+const hex = (buffer: ArrayBuffer) => [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+const sha256 = (text: string) => crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)).then(hex);
+const matchClaimId = (match: EvidenceMatch) =>
+  sha256(JSON.stringify(["match", match.requirementId ?? null, normalizeEvidence(match.requirement), normalizeEvidence(match.evidence)]));
+type Assessment = JobAssessmentResult["assessment"];
+function CitationsSection({ assessment }: { assessment: Assessment }) {
+  const { citations } = assessment;
+  const [hashedLabels, setHashedLabels] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    let cancelled = false;
+    const requirements: Gap[] = [...assessment.gaps, ...assessment.hardBlockers];
+    Promise.all([
+      ...assessment.strongestMatches.map(async (match) => [await matchClaimId(match), `match: ${match.requirement} — ${match.evidence}`] as const),
+      ...requirements.map(async (gap) => [`text-sha256:${await sha256(normalizeEvidence(gap.requirement))}`, `requirement: ${gap.requirement}`] as const),
+    ]).then((entries) => { if (!cancelled) setHashedLabels(new Map(entries)); }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [assessment]);
+  if (!citations) return null;
+  const requirementByKey = (predicate: (gap: Gap) => boolean) => [...assessment.gaps, ...assessment.hardBlockers].find(predicate);
+  const label = (claimId: string) => {
+    if (claimId.startsWith("req:")) return `requirement: ${requirementByKey((gap) => gap.requirementId === claimId.slice(4))?.requirement ?? claimId.slice(4)}`;
+    if (claimId.startsWith("text:")) return `requirement: ${requirementByKey((gap) => normalizeEvidence(gap.requirement) === claimId.slice(5))?.requirement ?? claimId.slice(5)}`;
+    return hashedLabels.get(claimId) ?? (claimId.startsWith("text-sha256:") ? "requirement" : "match");
+  };
+  return (
+    <details>
+      <summary>{citations.length} validated citations</summary>
+      {citations.length === 0 ? (
+        <p className="message">No citation to retrieved evidence survived validation for this assessment.</p>
+      ) : citations.map((citation, index) => (
+        <p className="message" key={index}>
+          <strong>{label(citation.claimId)}</strong><br />
+          {citation.ref.source} · {citation.ref.path.length > 20 ? `${citation.ref.path.slice(0, 20)}…` : citation.ref.path}<br />{citation.ref.quote}
+        </p>
+      ))}
+    </details>
   );
 }
 

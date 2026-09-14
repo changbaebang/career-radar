@@ -1,7 +1,9 @@
 import {
   CandidateProfileSchema,
+  CitationSchema,
   FitAssessmentSchema,
   JobPostingSchema,
+  MAX_CITATIONS,
   MAX_PRODUCER_UNKNOWNS,
   ScreeningContextV1Schema,
   type CandidateProfile,
@@ -10,7 +12,10 @@ import {
 } from "@career-radar/shared";
 import { z } from "zod";
 
+import { CITATION_BOUNDS_DROPPED } from "../domain/assessment/citations.js";
+import { matchClaimId, requirementClaimId } from "../domain/assessment/claims.js";
 import { SCREENING_CONTEXT_DISCARDED } from "../domain/assessment/pipeline.js";
+import type { RetrievedEvidence } from "../domain/evidence/retrieve.js";
 import { hashSource, stableId } from "../domain/store.js";
 
 // Provider-neutral model contract: the prompts, the structured-output draft schemas and the mapping
@@ -19,7 +24,9 @@ import { hashSource, stableId } from "../domain/store.js";
 
 // milestone-4b2-v2: after the first usage check — an employer that the posting does not name is null,
 // never guessed, and the optional score is an integer on a stated 0-100 scale.
-export const PROMPT_VERSION = "milestone-4b2-v2";
+// milestone-5b-v1: the assessment input carries retrievedEvidence (chunks retrieved for the job's
+// requirements) and every match, gap and blocker carries citations in the chunk / input-path grammar.
+export const PROMPT_VERSION = "milestone-5b-v1";
 const nullableText = z.string().min(1).nullable();
 
 export const CandidateExtractionSchema = z.object({
@@ -53,15 +60,19 @@ export const JobExtractionSchema = z.object({
   seniority: nullableText, warnings: z.array(z.string().min(1)),
 }).strict();
 
+// Structured-output shape for references: no optional keys (nullable instead) and no length or count
+// bounds. The generation contract is kept minimal on purpose (the API does accept some bounds); the
+// read-contract bounds are applied per item after parsing so one out-of-bounds citation never fails
+// the fit. `evidence` refs name a chunk from retrievedEvidence (`chunk:<id>`) and are validated
+// against this run's retrieval trace.
+const EvidenceRefDraftSchema = z.object({
+  source: z.enum(["candidate", "job", "evidence"]), path: z.string().min(1), quote: z.string().min(1),
+}).strict();
+
 const RawGapSchema = z.object({
   requirementId: nullableText, requirement: z.string().min(1), reason: z.string().min(1),
   severity: z.enum(["minor", "material", "hard_blocker"]),
-}).strict();
-
-// Structured-output shape for the screening context: no optional keys (nullable instead) and no
-// array bounds, which strict JSON schemas reject; bounds are applied after parsing.
-const EvidenceRefDraftSchema = z.object({
-  source: z.enum(["candidate", "job"]), path: z.string().min(1), quote: z.string().min(1),
+  citations: z.array(EvidenceRefDraftSchema),
 }).strict();
 const draftConfidence = z.enum(["low", "medium", "high"]);
 const ScreeningContextDraftSchema = z.object({
@@ -90,6 +101,7 @@ export const AssessmentDraftSchema = z.object({
     requirementId: nullableText, requirement: z.string().min(1), evidence: z.string().min(1),
     source: z.object({ company: nullableText, role: nullableText, project: nullableText }).strict(),
     strength: z.enum(["direct", "adjacent", "weak"]),
+    citations: z.array(EvidenceRefDraftSchema),
   }).strict()),
   gaps: z.array(RawGapSchema), hardBlockers: z.array(RawGapSchema),
   interviewRisks: z.array(z.string().min(1)), recommendation: z.string().min(1),
@@ -137,11 +149,18 @@ export const ASSESSMENT_INSTRUCTIONS = [
   "Each screeningRisk cites both candidate and job references; omit any risk you cannot cite and do not repeat interviewRisks there.",
   "Never use age, gender, nationality, employment gaps, school prestige or other demographic proxies as evidence.",
   "Record missing facts in unknowns; uncertainty is better than a fabricated judgment.",
+  "retrievedEvidence, when present, lists evidence chunks retrieved for this job's requirements as { chunkId, text }; it is the only evidence you may cite by chunk.",
+  "Each strongestMatch, gap and hardBlocker carries citations: zero or more references that support that claim. A chunk citation uses source evidence, path chunk:<chunkId> and a quote that copies the chunk text exactly; an input citation uses the candidate or job source and path grammar above. Never cite a chunkId that is not listed; when no listed chunk supports a claim, leave its citations empty rather than inventing one.",
 ].join(" ");
 
 export const profileInput = (resumeText: string) => `<resume>\n${resumeText}\n</resume>`;
 export const jobInput = (description: string) => `<job-description>\n${description}\n</job-description>`;
-export const assessmentInput = (profile: CandidateProfile, job: JobPosting) => JSON.stringify({ candidateProfile: profile, jobPosting: job });
+// retrievedEvidence: the chunks this run retrieved for the job's requirements (M5-B), as the only
+// chunk ids the model may cite. Chunk text is candidate evidence already present in the profile.
+export const assessmentInput = (profile: CandidateProfile, job: JobPosting, evidence?: RetrievedEvidence) => JSON.stringify({
+  candidateProfile: profile, jobPosting: job,
+  ...(evidence ? { retrievedEvidence: evidence.chunks.map((chunk) => ({ chunkId: chunk.id, text: chunk.text })) } : {}),
+});
 
 export type ProfileExtraction = { profile: CandidateProfile; warnings: string[] };
 export type JobExtraction = { job: JobPosting; warnings: string[] };
@@ -182,16 +201,32 @@ export function toJob(parsed: z.infer<typeof JobExtractionSchema>, description: 
 export function toAssessment(input: z.infer<typeof AssessmentDraftSchema>, modelVersion: string): FitAssessment {
   // Re-check the generation contract (integer score etc.) regardless of which transport parsed the draft.
   const { screeningContext: rawContext, ...parsed } = AssessmentDraftSchema.parse(input);
-  const normalizeGap = (gap: (typeof parsed.gaps)[number]) => omitNull(gap);
+  // Per-claim draft citations become the top-level `citations` list keyed by claim id (claims.ts);
+  // the id is computed here, never by the model. The generation schema carries no citation bounds (kept
+  // minimal by choice), so the read-contract bounds are applied here per citation: an out-of-bounds
+  // reference or a surplus beyond MAX_CITATIONS is dropped with a fixed note and lowers confidence,
+  // exactly like an invalid citation later in validation. The fit itself never fails on a citation.
+  const rawCitations = [
+    ...parsed.strongestMatches.flatMap((match) => match.citations.map((ref) => ({
+      claimId: matchClaimId({ ...(match.requirementId === null ? {} : { requirementId: match.requirementId }), requirement: match.requirement, evidence: match.evidence }), ref,
+    }))),
+    ...[...parsed.gaps, ...parsed.hardBlockers].flatMap((gap) => gap.citations.map((ref) => ({
+      claimId: requirementClaimId({ ...(gap.requirementId === null ? {} : { requirementId: gap.requirementId }), requirement: gap.requirement }), ref,
+    }))),
+  ];
+  const citations = rawCitations.filter((citation) => CitationSchema.safeParse(citation).success).slice(0, MAX_CITATIONS);
+  const citationsDropped = citations.length !== rawCitations.length;
+  const normalizeGap = (gap: (typeof parsed.gaps)[number]) => { const { citations: _refs, ...rest } = gap; void _refs; return omitNull(rest); };
   // Producer normalization only: bounds and shape. Reference validation against the captured inputs
   // happens in finalizeAssessment. A context outside the contract is dropped, never the fit.
   const context = ScreeningContextV1Schema.safeParse({ version: "1", ...rawContext, careerStoryRisk: omitNull(rawContext.careerStoryRisk) });
   const contextKept = context.success && context.data.unknowns.length <= MAX_PRODUCER_UNKNOWNS;
   return FitAssessmentSchema.parse({
     ...parsed, ...(parsed.score === null ? { score: undefined } : { score: parsed.score }),
-    strongestMatches: parsed.strongestMatches.map((match) => ({ ...omitNull(match), source: omitNull(match.source) })),
-    gaps: parsed.gaps.map(normalizeGap), hardBlockers: parsed.hardBlockers.map(normalizeGap),
-    missingInformation: contextKept ? parsed.missingInformation : [...parsed.missingInformation, SCREENING_CONTEXT_DISCARDED],
+    strongestMatches: parsed.strongestMatches.map((match) => { const { citations: _refs, ...rest } = match; void _refs; return { ...omitNull(rest), source: omitNull(match.source) }; }),
+    gaps: parsed.gaps.map(normalizeGap), hardBlockers: parsed.hardBlockers.map(normalizeGap), citations,
+    missingInformation: [...new Set([...parsed.missingInformation, ...(contextKept ? [] : [SCREENING_CONTEXT_DISCARDED]), ...(citationsDropped ? [CITATION_BOUNDS_DROPPED] : [])])],
+    ...(citationsDropped ? { confidence: "low" as const } : {}),
     ...(contextKept ? { screeningContext: context.data } : {}),
     modelVersion, promptVersion: PROMPT_VERSION,
   });

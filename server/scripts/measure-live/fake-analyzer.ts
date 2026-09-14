@@ -1,5 +1,7 @@
 import { CandidateProfileSchema, FitAssessmentSchema, JobPostingSchema, type CandidateProfile, type FitAssessment, type JobPosting } from "@career-radar/shared";
 import type { CareerAnalyzer, JobExtraction, ProfileExtraction } from "../../src/ai/analyzer.js";
+import { matchClaimId } from "../../src/domain/assessment/claims.js";
+import type { RetrievedEvidence } from "../../src/domain/evidence/retrieve.js";
 import { hashSource, stableId } from "../../src/domain/store.js";
 import { SYNTHETIC_EVIDENCE_SENTINEL, measurementProfile } from "./synthetic-inputs.js";
 import type { Scenario } from "./gate.js";
@@ -37,17 +39,21 @@ export class FakeCareerAnalyzer implements CareerAnalyzer {
     return { job, warnings: [] };
   }
 
-  async assess(profile: CandidateProfile, job: JobPosting, signal?: AbortSignal): Promise<FitAssessment> {
+  async assess(profile: CandidateProfile, job: JobPosting, signal?: AbortSignal, evidence?: RetrievedEvidence): Promise<FitAssessment> {
     const nth = this.#nthDistinct(job.id, "assess");
     await this.#wait(signal);
     if (this.#scenario === "fail-at-3" && nth === 3 && !this.#failedOnce.has(job.id)) {
       this.#failedOnce.add(job.id);
       throw new Error("SYNTHETIC_PROVIDER_FAILURE");
     }
-    const evidence = profile.leadership[0] ?? profile.roles[0]?.evidence[0] ?? SYNTHETIC_EVIDENCE_SENTINEL;
+    const sentence = profile.leadership[0] ?? profile.roles[0]?.evidence[0] ?? SYNTHETIC_EVIDENCE_SENTINEL;
+    const match = { requirementId: job.required[0]?.id, requirement: job.required[0]?.text ?? "Lead a React team", evidence: sentence, source: {}, strength: "direct" as const };
+    // M5-B: cite the retrieved chunk that carries the evidence sentence, when this run retrieved it.
+    const chunk = evidence?.chunks.find((candidate) => candidate.text === sentence);
     return FitAssessmentSchema.parse({
       verdict: "REALISTIC", confidence: "medium", resumeContortion: "low",
-      strongestMatches: [{ requirementId: job.required[0]?.id, requirement: job.required[0]?.text ?? "Lead a React team", evidence, source: {}, strength: "direct" }],
+      strongestMatches: [match],
+      citations: chunk ? [{ claimId: matchClaimId(match), ref: { source: "evidence", path: `chunk:${chunk.id}`, quote: chunk.text } }] : [],
       gaps: [], hardBlockers: [], interviewRisks: [], missingInformation: [],
       recommendation: `${SYNTHETIC_EVIDENCE_SENTINEL} synthetic recommendation; not a model output.`,
       modelVersion: "synthetic-no-model", promptVersion: "synthetic-harness-v1",
