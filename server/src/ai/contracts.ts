@@ -60,9 +60,11 @@ export const JobExtractionSchema = z.object({
   seniority: nullableText, warnings: z.array(z.string().min(1)),
 }).strict();
 
-// Structured-output shape for references: no optional keys (nullable instead) and no array bounds,
-// which strict JSON schemas reject; bounds are applied after parsing. `evidence` refs name a chunk
-// from retrievedEvidence (`chunk:<id>`) and are validated against this run's retrieval trace.
+// Structured-output shape for references: no optional keys (nullable instead) and no length or count
+// bounds. The generation contract is kept minimal on purpose (the API does accept some bounds); the
+// read-contract bounds are applied per item after parsing so one out-of-bounds citation never fails
+// the fit. `evidence` refs name a chunk from retrievedEvidence (`chunk:<id>`) and are validated
+// against this run's retrieval trace.
 const EvidenceRefDraftSchema = z.object({
   source: z.enum(["candidate", "job", "evidence"]), path: z.string().min(1), quote: z.string().min(1),
 }).strict();
@@ -200,8 +202,8 @@ export function toAssessment(input: z.infer<typeof AssessmentDraftSchema>, model
   // Re-check the generation contract (integer score etc.) regardless of which transport parsed the draft.
   const { screeningContext: rawContext, ...parsed } = AssessmentDraftSchema.parse(input);
   // Per-claim draft citations become the top-level `citations` list keyed by claim id (claims.ts);
-  // the id is computed here, never by the model. The generation schema carries no bounds (strict JSON
-  // schemas reject them), so the read-contract bounds are applied here per citation: an out-of-bounds
+  // the id is computed here, never by the model. The generation schema carries no citation bounds (kept
+  // minimal by choice), so the read-contract bounds are applied here per citation: an out-of-bounds
   // reference or a surplus beyond MAX_CITATIONS is dropped with a fixed note and lowers confidence,
   // exactly like an invalid citation later in validation. The fit itself never fails on a citation.
   const rawCitations = [
