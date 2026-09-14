@@ -152,9 +152,24 @@ describe("saved-run comparison", () => {
     expect(compareReports(before, after).improvements).toEqual([f.caseId]);
   });
 
-  it.each(["metricVersion", "schemaHash", "mode", "reportVersion"])("refuses incompatible %s", (key) => {
+  it.each(["metricVersion", "mode", "reportVersion"])("refuses incompatible %s", (key) => {
     const report = runEvaluation([f], metadata);
     expect(compareReports(report, { ...report, [key]: "incompatible" })).toMatchObject({ compatible: false, compared: 0, incompatibleReasons: [key] });
+  });
+
+  it("reports a shared-schema change instead of refusing the comparison (M5-0)", () => {
+    const before = runEvaluation(policyCases, metadata);
+    const after = runEvaluation(policyCases, { ...metadata, schemaHash: "schema-v2" });
+    const comparison = compareReports(after, before);
+    expect(comparison).toMatchObject({ compatible: true, compared: 28, incompatibleReasons: [], schemaChanged: true, policyChanged: false, regressions: [], modified: [] });
+    expect(compareReports(before, before).schemaChanged).toBe(false);
+    expect(renderMarkdown(after, comparison)).toContain("schema changed: true");
+  });
+
+  it("still surfaces a regression when the schema and a case outcome both change", () => {
+    const before = runEvaluation([f], metadata);
+    const after = runEvaluation([f], { ...metadata, schemaHash: "schema-v2" }, (_p, _j, d) => ({ ...d, verdict: "PASS" }));
+    expect(compareReports(after, before)).toMatchObject({ compatible: true, schemaChanged: true, regressions: [f.caseId] });
   });
 
   it("separates added, removed, modified and comparable cases without an aggregate quality claim", () => {

@@ -32,7 +32,11 @@ function projectBaseline(value: unknown) {
 
 export function compareReports(current: EvalReport, baseline: unknown) {
   const previous = projectBaseline(baseline);
-  const incompatibleReasons = (["reportVersion", "metricVersion", "mode", "schemaHash"] as const)
+  // Hard incompatibilities are the report shape, the metric definitions and the run mode. The shared
+  // schema hash is not one: M5 slices add schemas to packages/shared, and a case whose executable
+  // contract (inputs, injected draft, expectations) hashes the same is still the same case. The
+  // schema difference is reported as `schemaChanged`, like `policyChanged`, never hidden.
+  const incompatibleReasons = (["reportVersion", "metricVersion", "mode"] as const)
     .filter((key) => current[key] !== previous[key]);
   const oldCases = new Map(previous.cases.map((c) => [c.caseId, c]));
   const currentIds = new Set(current.cases.map((c) => c.caseId));
@@ -47,10 +51,11 @@ export function compareReports(current: EvalReport, baseline: unknown) {
     incompatibleReasons, compared: comparable.length, added, removed, modified, annotated,
     baselineCodeSha: previous.codeSha, currentCodeSha: current.codeSha,
     policyChanged: current.policyHash !== previous.policyHash,
+    schemaChanged: current.schemaHash !== previous.schemaHash,
     datasetChanged: current.datasetHash !== previous.datasetHash || current.datasetVersion !== previous.datasetVersion,
     regressions: comparable.filter((c) => oldCases.get(c.caseId)?.status === "passed" && c.status !== "passed").map((c) => c.caseId),
     improvements: comparable.filter((c) => oldCases.get(c.caseId)?.status !== "passed" && c.status === "passed").map((c) => c.caseId),
-    note: "Case-level policy contract comparison only (inputs, injected draft, expectations). Annotation changes are listed, not compared. No aggregate quality delta across changed datasets; no live model accuracy claim.",
+    note: "Case-level policy contract comparison only (inputs, injected draft, expectations). Annotation changes are listed, not compared. A shared-schema change is reported, not treated as incompatible: per-case contract hashes decide comparability. No aggregate quality delta across changed datasets; no live model accuracy claim.",
   };
 }
 export type Comparison = ReturnType<typeof compareReports>;
@@ -86,7 +91,7 @@ export function renderMarkdown(report: EvalReport, comparison?: Comparison): str
     ...report.cases.map((c) => `| ${cell(c.caseId)} | ${c.status} | ${c.fixture.expectedVerdict} | ${c.actual?.verdict ?? "N/A"} | ${cell(c.error ?? (c.status === "skipped" ? c.fixture.skipReason ?? "skipped" : c.violations.join(", ") || "OK"))} |`), "",
   ];
   if (comparison) lines.push("## Baseline comparison", "",
-    `Compatible: ${comparison.compatible}; comparable cases: ${comparison.compared}; policy changed: ${comparison.policyChanged}; dataset changed: ${comparison.datasetChanged}.`, "",
+    `Compatible: ${comparison.compatible}; comparable cases: ${comparison.compared}; policy changed: ${comparison.policyChanged}; schema changed: ${comparison.schemaChanged}; dataset changed: ${comparison.datasetChanged}.`, "",
     ...(["incompatibleReasons", "added", "removed", "modified", "annotated", "regressions", "improvements"] as const)
       .map((key) => `- ${key}: ${comparison[key].join(", ") || "none"}`), "", comparison.note, "");
   return lines.join("\n");

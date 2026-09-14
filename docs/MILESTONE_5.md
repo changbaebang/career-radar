@@ -81,6 +81,10 @@ row or a prompt version would notice. Verification labels are what the PR may cl
 
 ### M5-0 — Freeze the baseline (1 PR, no runtime change)
 
+Status: **done** — baseline frozen at `47e7c13` (`evals/baselines/m5-0/report.json`,
+[MILESTONE_5_BASELINE.md](MILESTONE_5_BASELINE.md)); the owner's post-#19 usage-check re-run is
+still pending and the baseline page says so.
+
 - **Goal.** A comparable pre-M5 state.
 - **Contract impact.** No runtime change. Adds `evals/baselines/m5-0/report.json` (policy eval
   output at the frozen SHA, synthetic only, committed on purpose) and `docs/MILESTONE_5_BASELINE.md`.

@@ -213,11 +213,15 @@ strict JSON 스키마 출력과 `require_parameters` 라우팅으로 보낼 수 
 상태 → 프로필 → 공고 추출 → 판정 → 지원 기록 도구이고, 추천 배치는 #4 실측 뒤로 미룹니다. 기록이 남기
 전까지 호스트 동작은 `not verified`입니다.
 
-### M5 (계획)
+### M5 (진행 중)
 
 근거 기반 마일스톤(합성 코퍼스 검색, 검색된 조각에 대한 인용, 모델 모드 평가 실행기, 실행 단위 관측,
 제한된 도구 사용은 마지막) 계획을 [MILESTONE_5.md](docs/MILESTONE_5.md)와 ADR-0013으로 정리했습니다.
-아직 구현된 것은 없습니다.
+M5-0은 끝났습니다. M5 이전 기준선을 [MILESTONE_5_BASELINE.md](docs/MILESTONE_5_BASELINE.md)(코드 SHA,
+프롬프트·정책·스키마·데이터셋 식별자, 사용 확인 1차의 호출별 지연, 기능별 확인 표시)와 커밋된 정책 평가
+보고서 `evals/baselines/m5-0/report.json`으로 동결했고, 이후 실행은 `pnpm eval --baseline
+evals/baselines/m5-0/report.json`으로 비교합니다. 공유 스키마 변경은 이제 비교 불가가 아니라
+`schemaChanged`로 보고합니다(보고서 버전 3). 검색·인용·모델 모드 평가·도구는 아직 구현하지 않았습니다.
 
 ## 참고 문서
 

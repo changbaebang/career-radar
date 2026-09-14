@@ -6,7 +6,9 @@ import { DATASET_VERSION, type PolicyCase } from "./dataset.js";
 
 export const VERDICTS = ["REALISTIC", "STRETCH", "PASS"] as const;
 export const METRIC_VERSION = "policy-metrics-v2";
-export const REPORT_VERSION = 2;
+// 3: a shared-schema hash difference is reported as `schemaChanged` (per-case contract hashes decide
+// comparability), no longer as an incompatibility. Report shape is otherwise the v2 shape.
+export const REPORT_VERSION = 3;
 export type RunMetadata = { codeSha: string; dirty: boolean; policyHash: string; schemaHash: string };
 export type CaseResult = {
   // contractHash covers only what the run executes and asserts; annotationHash covers prose and
