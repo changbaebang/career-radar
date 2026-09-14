@@ -26,6 +26,12 @@ export type GoldenFakeOptions = {
   idSalt?: string;
   // Invent an employer for postings that name none (an extraction defect the runner must count).
   inventEmployer?: boolean;
+  // Cite a chunk id that this run never retrieved (the validator must drop it and note it).
+  badCitation?: boolean;
+  // Give every match an evidence sentence that is not in the profile (the policy must remove it).
+  ungroundedEvidence?: boolean;
+  // Model-written missingInformation entries to append to every draft (may equal the pipeline's fixed sentences).
+  injectNotes?: string[];
   onResponse?: (event: AnalyzerResponseEvent) => void;
   // Simulated latency per call; it ends early with an AbortError when the call's signal fires.
   delayMs?: number;
@@ -124,7 +130,7 @@ export class GoldenFakeAnalyzer implements CareerAnalyzer {
       const gaps: FitAssessment["gaps"] = [];
       for (const requirement of job.required) {
         const best = sentences.filter((s) => !negated(s)).map((s) => ({ s, n: overlap(requirement.text, s) })).sort((a, b) => b.n - a.n)[0];
-        if (best && best.n >= 1) matches.push({ requirementId: requirement.id, requirement: requirement.text, evidence: best.s, source: {}, strength: best.n >= 2 ? "direct" : "adjacent" });
+        if (best && best.n >= 1) matches.push({ requirementId: requirement.id, requirement: requirement.text, evidence: this.#options.ungroundedEvidence ? "Invented evidence sentence that the profile does not contain." : best.s, source: {}, strength: best.n >= 2 ? "direct" : "adjacent" });
         else gaps.push({ requirementId: requirement.id, requirement: requirement.text, reason: "No evidence sentence overlaps this requirement.",
           severity: /mandatory|required|years of|organization/i.test(requirement.text) ? "hard_blocker" : "material" });
       }
@@ -133,13 +139,14 @@ export class GoldenFakeAnalyzer implements CareerAnalyzer {
       }
       const chunks = new Map((evidence?.chunks ?? []).map((chunk) => [normalizeEvidence(chunk.text), chunk]));
       const citations = matches.flatMap((match) => {
+        if (this.#options.badCitation) return [{ claimId: matchClaimId(match), ref: { source: "evidence" as const, path: `chunk:${"f".repeat(64)}`, quote: match.evidence } }];
         const chunk = chunks.get(normalizeEvidence(match.evidence));
         return chunk ? [{ claimId: matchClaimId(match), ref: { source: "evidence" as const, path: `chunk:${chunk.id}`, quote: chunk.text } }] : [];
       });
       const verdict = gaps.some((gap) => gap.severity === "hard_blocker") ? "PASS" : matches.length === job.required.length && matches.length > 0 ? "REALISTIC" : "STRETCH";
       return FitAssessmentSchema.parse({
         verdict, confidence: "medium", resumeContortion: "low", strongestMatches: matches, gaps, hardBlockers: [], interviewRisks: [],
-        recommendation: "Synthetic fake recommendation; not a model output.", missingInformation: [], citations,
+        recommendation: "Synthetic fake recommendation; not a model output.", missingInformation: [...(this.#options.injectNotes ?? [])], citations,
         modelVersion: "golden-fake", promptVersion: "golden-fake-prompt",
       });
     });

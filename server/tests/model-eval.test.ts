@@ -3,6 +3,9 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { OpenAICareerAnalyzer } from "../src/ai/analyzer.js";
 import { OPENROUTER_ERRORS } from "../src/ai/openrouter.js";
+import { CITATION_BOUNDS_DROPPED, CITATION_INVALID_DROPPED, CITATION_ORPHAN_DROPPED, CITATION_REKEYED } from "../src/domain/assessment/citations.js";
+import { SCREENING_CONTEXT_DISCARDED } from "../src/domain/assessment/pipeline.js";
+import { UNGROUNDED_MATCH_REMOVED } from "../src/domain/assessment/policy.js";
 import { GoldenFakeAnalyzer, keyFor, type FakeFailure, type GoldenFakeOptions } from "../../evals/fixtures/golden/fake-analyzer.js";
 import { GOLDEN_SET_VERSION, goldenCases, goldenPostingText, goldenResumeText, type GoldenCase } from "../../evals/fixtures/golden/index.js";
 import {
@@ -57,6 +60,16 @@ describe("M5-D model-mode runner (golden fake, no network)", () => {
     expect(() => ModelEvalReportSchema.parse({ ...report, extra: 1 })).toThrow();
     expect(report).toMatchObject({ reportKind: "model-evaluation", mode: "model", execution: "dry-run", success: true, problems: [], modelCalls: goldenCases.length * 3, abortedCalls: 0, unsettledCalls: 0 });
     expect(report.metrics.outcomes).toEqual({ assessed: goldenCases.length, extractionFailed: 0, assessmentFailed: 0, notAttempted: 0 });
+    expect(report.reportVersion).toBe(3);
+    // The golden fake cites only retrieved chunks and grounds every match, so the policy changes one verdict only:
+    // it promotes the unmet core education requirement to a hard blocker (a rule without a fixed note).
+    const changed = report.cases.filter((c) => c.assessment!.draft.verdict !== c.assessment!.verdict);
+    expect(changed.map((c) => c.caseId)).toEqual(["gm-minor-education-gap"]);
+    expect(changed[0]!.assessment).toMatchObject({ draft: { verdict: "STRETCH", hardBlockers: 0 }, verdict: "PASS", final: { hardBlockers: 1 }, notes: [] });
+    for (const c of report.cases) expect(c.assessment!.notes).toEqual([]);
+    expect(report.metrics.verdictChangedByPolicy).toEqual({ numerator: 1, denominator: goldenCases.length, value: 1 / goldenCases.length });
+    expect(report.metrics.noteCounts).toEqual({ ungroundedMatchRemoved: 0, citationRekeyed: 0, citationOrphan: 0, citationInvalid: 0, screeningContextDiscarded: 0 });
+    expect(renderModelMarkdown(report)).toContain("Draft → final verdict");
     expect(report.metrics.requirementMatchRate.value).toBe(1);
     expect(report.metrics.humanVerdictAgreement).toEqual({ numerator: 0, denominator: 0, value: null });
     expect(report.responseModels).toEqual(["golden-fake"]);
@@ -174,6 +187,50 @@ describe("M5-D model-mode runner (golden fake, no network)", () => {
     const failed = await runModelEvaluation(goldenCases.slice(0, 5), options(fakeWith({ failures: new Map([[keyFor(goldenPostingText(item)), { stage: "assess", kind: "refusal" }]]) })));
     expect(compareModelReports(failed, first).outcomeChanged).toEqual([item.caseId]);
     expect(compareModelReports({ ...second, provider: "openrouter" }, first)).toMatchObject({ compatible: false, incompatibleReasons: ["provider"], compared: 0 });
+    // An older report version is incompatible, not a parse failure.
+    expect(compareModelReports(second, { ...first, reportVersion: 2 })).toMatchObject({ compatible: false, incompatibleReasons: ["reportVersion"], compared: 0, baselineCodeSha: "unknown" });
+  });
+
+  it("attributes a verdict change to the policy and names the fixed note, with counts and no text", async () => {
+    const item = byId("gm-frontend-lead-realistic");
+    const report = await runModelEvaluation([item], options(fakeWith({ ungroundedEvidence: true })));
+    const a = report.cases[0]!.assessment!;
+    expect(a.draft).toEqual({ verdict: "REALISTIC", confidence: "medium", matches: 1, gaps: 0, hardBlockers: 0, citations: 0 });
+    expect(a).toMatchObject({ verdict: "STRETCH", confidence: "low", final: { matches: 0, gaps: 0, hardBlockers: 0 }, notes: ["ungroundedMatchRemoved"] });
+    expect(report.metrics.verdictChangedByPolicy).toEqual({ numerator: 1, denominator: 1, value: 1 });
+    expect(report.metrics.noteCounts.ungroundedMatchRemoved).toBe(1);
+    expect(JSON.stringify(report)).not.toContain("Invented evidence sentence");
+  });
+
+  it("names a dropped citation through its fixed note code and keeps the verdict", async () => {
+    const item = byId("gm-frontend-lead-realistic");
+    const report = await runModelEvaluation([item], options(fakeWith({ badCitation: true })));
+    const a = report.cases[0]!.assessment!;
+    expect(a).toMatchObject({ verdict: "REALISTIC", confidence: "low", citationInvalid: true, notes: ["citationInvalid"], citations: { supplied: 1, valid: 0 } });
+    expect(a.draft).toMatchObject({ verdict: "REALISTIC", confidence: "medium", citations: 1 });
+    expect(report.metrics.verdictChangedByPolicy.value).toBe(0);
+    expect(report.metrics.noteCounts.citationInvalid).toBe(1);
+  });
+
+  const FIXED_SENTENCES = [CITATION_INVALID_DROPPED, CITATION_ORPHAN_DROPPED, CITATION_REKEYED, CITATION_BOUNDS_DROPPED, SCREENING_CONTEXT_DISCARDED, UNGROUNDED_MATCH_REMOVED];
+
+  it("does not attribute a model-written copy of the fixed sentences to any stage (review control: no real event)", async () => {
+    const item = byId("gm-frontend-lead-realistic");
+    const report = await runModelEvaluation([item], options(fakeWith({ injectNotes: FIXED_SENTENCES })));
+    const a = report.cases[0]!.assessment!;
+    expect(a).toMatchObject({ verdict: "REALISTIC", confidence: "medium", citationInvalid: false, notes: [], citations: { supplied: 1, valid: 1 }, draft: { matches: 1 }, final: { matches: 1 } });
+    expect(report.metrics.noteCounts).toEqual({ ungroundedMatchRemoved: 0, citationRekeyed: 0, citationOrphan: 0, citationInvalid: 0, screeningContextDiscarded: 0 });
+    expect(report.metrics.verdictChangedByPolicy.value).toBe(0);
+  });
+
+  it("still records a real stage event when the model wrote the same sentence alongside it", async () => {
+    const item = byId("gm-frontend-lead-realistic");
+    const invalid = await runModelEvaluation([item], options(fakeWith({ injectNotes: FIXED_SENTENCES, badCitation: true })));
+    expect(invalid.cases[0]!.assessment).toMatchObject({ citationInvalid: true, notes: ["citationInvalid"], citations: { supplied: 1, valid: 0 } });
+    expect(invalid.metrics.noteCounts).toEqual({ ungroundedMatchRemoved: 0, citationRekeyed: 0, citationOrphan: 0, citationInvalid: 1, screeningContextDiscarded: 0 });
+    const ungrounded = await runModelEvaluation([item], options(fakeWith({ injectNotes: FIXED_SENTENCES, ungroundedEvidence: true })));
+    expect(ungrounded.cases[0]!.assessment).toMatchObject({ verdict: "STRETCH", notes: ["ungroundedMatchRemoved"], draft: { verdict: "REALISTIC" } });
+    expect(ungrounded.metrics.noteCounts.ungroundedMatchRemoved).toBe(1);
   });
 });
 
