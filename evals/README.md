@@ -183,14 +183,26 @@ assigns ids at run time, the expected verdict is an allowed set, and every case 
 **Execution.** Argv alone decides. Without `--approve-transmission` the analyzer is
 `GoldenFakeAnalyzer` (a deterministic parser of the golden text format; no network; `execution:
 "dry-run"`, provider `fake`); with it, `createAnalyzerFromEnv` builds the real adapter from
-`.env.local`. The default provider is `openrouter` (owner decision 2026-09-14: the project verifies
-on the free tier); `--provider openai` additionally requires `--approve-model-cost` and is refused
-while `OPENAI_BASE_URL` is set. The environment can only refuse, never grant: approval flags are
-rejected under `CI`, `GITHUB_ACTIONS`, `VITEST` and `NODE_ENV=test`. Up to 3 calls per case, one
-HTTP attempt each (`maxRetries: 0`, SDK logging off, 300 s per call); `--max-model-calls` is at most
-150 and never below the plan, which `--cases` and `--limit` shrink. A free call is still an external
-transmission of the synthetic texts; the plan printed before the run names the destination and the
-model.
+`.env.local`, which is read before the gate so the gate judges the model the adapter would use. The
+default provider is `openrouter` (owner decision 2026-09-14: the project verifies on the free tier),
+and a live run there accepts only a `:free` model id — OpenRouter's free-endpoint variant;
+`openrouter/free`, a random router, is refused because a run must name its model — unless
+`--approve-model-cost` is given; an unset `OPENROUTER_MODEL` is refused. The `:free` check is on the
+id: the report records the upstream endpoint per call and the OpenRouter dashboard remains the
+authority on cost. `--provider openai` always requires `--approve-model-cost` and is refused while
+`OPENAI_BASE_URL` is set. The environment can only refuse, never grant: approval flags are rejected
+under `CI`, `GITHUB_ACTIONS`, `VITEST` and `NODE_ENV=test`. Golden-set integrity (unique ids,
+blockers inside the requirements, no identical inputs with different verdict sets) is checked before
+any call: a problem stops the CLI with a fixed refusal and the case ids, exit 1, no analyzer, no
+report; the library returns a zero-call report with every case `not_attempted`. Up to 3 calls per
+case, one HTTP attempt each (`maxRetries: 0`, SDK logging off), and 300 s per call covering headers
+and body: every call gets its own AbortSignal through `withCallDeadline`
+(`server/src/ai/deadline.ts`, shared with the usage check) because the SDK timeout alone stops at
+the response headers; a call cut by the deadline is a `timeout` failure and the report counts it in
+`abortedCalls` (`unsettledCalls` is what was still pending after a 10 s grace, expected 0).
+`--max-model-calls` is at most 150 and never below the plan, which `--cases` and `--limit` shrink. A
+free call is still an external transmission of the synthetic texts; the plan printed before the run
+names the destination, the model and its tier.
 
 **Scoring.** Extracted required requirements are mapped to gold by normalized-text equality only
 (`requirementMatchRate`, `matchedGold`, `unmatchedGold` with the nearest extracted text,
@@ -218,8 +230,9 @@ string or a prompt tag; gold requirement texts are the authored contract and may
 `--baseline` compares case by case on the same `provider`, `requestedModel`, `promptVersion` and
 golden-set hash (`outcomeChanged`, `verdictChanged`, `blockerRecallAllChanged`); a changed outcome
 under a live model is a model-path observation, not a policy regression. Exit `0` when every
-selected case was attempted, `1` on golden-set problems or not-attempted cases (the report is still
-written), `2` on an argument or gate refusal or an incompatible baseline.
+selected case was attempted, `1` on golden-set problems (no call, no report) or not-attempted cases
+at the call cap (the report is still written), `2` on an argument or gate refusal or an incompatible
+baseline.
 
 **What a dry run establishes.** Numbers under the fake verify the runner, not any model: the fake's
 verdicts follow a fixed token-overlap rule and are not meant to agree with the gold set. Retention

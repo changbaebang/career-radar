@@ -4,9 +4,9 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { goldenCases } from "../../evals/fixtures/golden/index.js";
-import { HARD_MAX_MODEL_EVAL_CALLS, MODEL_REFUSALS, parseModelArgs, resolveModelGate, selectCases } from "../../evals/model-mode-cli.js";
+import { HARD_MAX_MODEL_EVAL_CALLS, MODEL_REFUSALS, isFreeModelId, parseModelArgs, resolveModelGate, runModelEvalCli, selectCases } from "../../evals/model-mode-cli.js";
 import { CALLS_PER_CASE, ModelEvalReportSchema } from "../../evals/model-mode.js";
 
 const serverDirectory = fileURLToPath(new URL("../", import.meta.url));
@@ -36,7 +36,22 @@ describe("model-mode gate (argv decides execution; the environment can only refu
     for (const env of [{ CI: "1" }, { GITHUB_ACTIONS: "true" }, { VITEST: "true" }, { NODE_ENV: "test" }]) {
       expect(resolveModelGate(live, env, 3).refusal).toBe(MODEL_REFUSALS.ciEnvironment);
     }
-    expect(resolveModelGate(live, {}, 3)).toEqual({ execution: "live", cap: 9, upperBound: 9 });
+    expect(resolveModelGate(live, { OPENROUTER_MODEL: "synthetic/free-model:free" }, 3)).toEqual({ execution: "live", cap: 9, upperBound: 9 });
+  });
+
+  it("accepts only ':free' OpenRouter model ids on a live run unless the cost flag is given, and refuses an unset model", () => {
+    const live = parseModelArgs(["--approve-transmission"]);
+    expect(resolveModelGate(live, {}, 3).refusal).toBe(MODEL_REFUSALS.openrouterModelUnset);
+    expect(resolveModelGate(live, { OPENROUTER_MODEL: "  " }, 3).refusal).toBe(MODEL_REFUSALS.openrouterModelUnset);
+    expect(resolveModelGate(live, { OPENROUTER_MODEL: "synthetic/paid-model" }, 3).refusal).toBe(MODEL_REFUSALS.openrouterNotFree);
+    expect(resolveModelGate(live, { OPENROUTER_MODEL: "openrouter/free" }, 3).refusal).toBe(MODEL_REFUSALS.openrouterNotFree);
+    expect(resolveModelGate(live, { OPENROUTER_MODEL: "synthetic/free-model:free" }, 3).refusal).toBeUndefined();
+    const paid = parseModelArgs(["--approve-transmission", "--approve-model-cost"]);
+    expect(resolveModelGate(paid, { OPENROUTER_MODEL: "synthetic/paid-model" }, 3).refusal).toBeUndefined();
+    expect(resolveModelGate(paid, {}, 3).refusal).toBe(MODEL_REFUSALS.openrouterModelUnset);
+    expect([isFreeModelId("vendor/model:free"), isFreeModelId("vendor/model:free "), isFreeModelId("vendor/model"), isFreeModelId("openrouter/free")]).toEqual([true, true, false, false]);
+    // A dry run never looks at the model.
+    expect(resolveModelGate(parseModelArgs([]), {}, 3).refusal).toBeUndefined();
   });
 
   it("requires --approve-model-cost for openai only, and refuses OPENAI_BASE_URL there", () => {
@@ -44,7 +59,7 @@ describe("model-mode gate (argv decides execution; the environment can only refu
     const paid = parseModelArgs(["--provider", "openai", "--approve-transmission", "--approve-model-cost"]);
     expect(resolveModelGate(paid, { OPENAI_BASE_URL: "http://127.0.0.1:1" }, 3).refusal).toBe(MODEL_REFUSALS.baseUrlSet);
     expect(resolveModelGate(paid, {}, 3).refusal).toBeUndefined();
-    expect(resolveModelGate(parseModelArgs(["--approve-transmission"]), { OPENAI_BASE_URL: "http://127.0.0.1:1" }, 3).refusal).toBeUndefined();
+    expect(resolveModelGate(parseModelArgs(["--approve-transmission"]), { OPENAI_BASE_URL: "http://127.0.0.1:1", OPENROUTER_MODEL: "synthetic/free-model:free" }, 3).refusal).toBeUndefined();
   });
 
   it("keeps the call cap under the hard ceiling and refuses plans above the cap", () => {
@@ -120,5 +135,47 @@ describe("pnpm eval --mode model (dry run with the golden fake, no network)", ()
     expect(cli(["--cases", "nope", "--no-save"]).stderr).toContain(MODEL_REFUSALS.noCases);
     expect(cli(["--output", "x", "--no-save"]).stderr).toContain(MODEL_REFUSALS.outputWithNoSave);
     expect(cli(["--max-model-calls", "2", "--no-save"]).stderr).toContain(MODEL_REFUSALS.planAboveCap);
+  });
+});
+
+describe("runModelEvalCli live gate in process (fetch stubbed: zero real HTTP)", () => {
+  const collect = () => { const logs: string[] = [], outs: string[] = []; return { logs, outs, log: (line: string) => { logs.push(line); }, out: (line: string) => { outs.push(line); } }; };
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it("refuses a non-':free' OpenRouter model before any analyzer exists", async () => {
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    const { logs, outs, log, out } = collect();
+    const code = await runModelEvalCli(["--approve-transmission", "--limit", "1", "--no-save"], { log, out, env: { OPENROUTER_MODEL: "synthetic/paid-model" }, loadEnv: () => undefined });
+    expect(code).toBe(2);
+    expect(logs).toEqual([MODEL_REFUSALS.openrouterNotFree]);
+    expect(outs).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("lets a ':free' model through and sends that model to the OpenRouter endpoint (stubbed transport)", async () => {
+    const seen: { url: string; model: string }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: unknown, init?: { body?: unknown }) => {
+      seen.push({ url: String(url), model: JSON.parse(String(init?.body)).model });
+      return new Response(JSON.stringify({ id: "x", model: "synthetic/free-model:free", provider: "Synthetic", choices: [{ finish_reason: "length", message: { content: "" } }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }), { status: 200, headers: { "content-type": "application/json" } });
+    }));
+    vi.stubEnv("OPENROUTER_API_KEY", "synthetic-not-a-real-key"); vi.stubEnv("OPENROUTER_MODEL", "synthetic/free-model:free");
+    const { logs, outs, log, out } = collect();
+    const code = await runModelEvalCli(["--approve-transmission", "--limit", "1", "--no-save"], { log, out, env: { OPENROUTER_MODEL: "synthetic/free-model:free" }, loadEnv: () => undefined });
+    expect(code).toBe(0);
+    expect(seen).toEqual([{ url: "https://openrouter.ai/api/v1/chat/completions", model: "synthetic/free-model:free" }]);
+    expect(logs.join("\n")).toContain("model tier: ':free' variant (free endpoints only)");
+    expect(JSON.parse(outs[0]!)).toMatchObject({ execution: "live", provider: "openrouter", requestedModel: "synthetic/free-model:free", modelCalls: 1, abortedCalls: 0,
+      metrics: { outcomes: { extractionFailed: 1, assessed: 0 }, truncationRate: { numerator: 1, denominator: 1 } } });
+  });
+
+  it("refuses a golden set with integrity problems before the plan: no report, no analyzer, no call", async () => {
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    const bad = structuredClone(goldenCases[0]!); bad.expectedBlockers = ["Not a requirement"];
+    const { logs, outs, log, out } = collect();
+    const code = await runModelEvalCli(["--no-save"], { log, out, cases: [bad, structuredClone(goldenCases[1]!)] });
+    expect(code).toBe(1);
+    expect(logs).toEqual([MODEL_REFUSALS.goldenSetProblems, `  ${goldenCases[0]!.caseId}: expected blocker is not a gold requirement`]);
+    expect(outs).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

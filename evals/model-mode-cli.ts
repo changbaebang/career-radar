@@ -5,20 +5,22 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DEFAULT_OPENAI_MODEL, type AnalyzerResponseEvent } from "../server/src/ai/analyzer.js";
 import { PROMPT_VERSION } from "../server/src/ai/contracts.js";
+import { OPENROUTER_ERRORS } from "../server/src/ai/openrouter.js";
 import { createAnalyzerFromEnv, isProviderName, providerDestination, type ProviderName } from "../server/src/ai/provider.js";
 import { loadLocalEnv } from "../server/src/config.js";
 import { digest } from "./evaluate.js";
 import { GoldenFakeAnalyzer } from "./fixtures/golden/fake-analyzer.js";
 import { GOLDEN_SET_VERSION, goldenCases, type GoldenCase } from "./fixtures/golden/index.js";
 import {
-  CALLS_PER_CASE, assertModelReportRedacted, compareModelReports, renderModelMarkdown, runModelEvaluation, type ModelComparison, type ModelEvalReport,
+  CALLS_PER_CASE, assertModelReportRedacted, compareModelReports, renderModelMarkdown, runModelEvaluation, validateGoldenSet, type ModelComparison, type ModelEvalReport,
 } from "./model-mode.js";
 
 // `pnpm eval --mode model` (M5-D). Without an approval flag this is a dry run: the golden fake
 // analyzer, the full runner, zero network, a report labelled dry-run. With --approve-transmission
 // the golden texts are sent to the configured provider. The project verifies on the free tier
 // (owner decision, 2026-09-14): the default provider is openrouter and the openai path additionally
-// requires --approve-model-cost. Environment variables can refuse a run, never grant one.
+// requires --approve-model-cost, and on openrouter only a `:free` model id is accepted without it.
+// Environment variables can refuse a run, never grant one.
 const root = fileURLToPath(new URL("../", import.meta.url));
 export const HARD_MAX_MODEL_EVAL_CALLS = 150;
 export const MODEL_EVAL_TIMEOUT_MS = 300_000;
@@ -29,6 +31,9 @@ export const MODEL_REFUSALS = {
   ciEnvironment: "Refused: approval flags are not accepted under CI/test environments.",
   baseUrlSet: "Refused: unset OPENAI_BASE_URL (shell or .env.local); the model eval only sends to the destination it printed.",
   openaiNeedsCostFlag: "--provider openai requires --approve-model-cost; this project verifies on the free tier by default.",
+  openrouterModelUnset: OPENROUTER_ERRORS.missingModel,
+  openrouterNotFree: "Refused: OPENROUTER_MODEL is not a ':free' variant; the free-tier run accepts only ':free' model ids unless --approve-model-cost is given.",
+  goldenSetProblems: "Refused: the golden set has integrity problems; no model call was made and no report was written.",
   capAboveCeiling: `--max-model-calls exceeds the hard ceiling of ${HARD_MAX_MODEL_EVAL_CALLS}.`,
   planAboveCap: "Planned model calls exceed --max-model-calls; select fewer cases with --cases or --limit.",
   outputExists: "Output directory must be new.",
@@ -42,11 +47,13 @@ export const MODEL_HELP = `pnpm eval --mode model [--cases a,b] [--limit N] [--p
 Golden-set evaluation of the real model path: extraction (profile, posting) and assessment through the
 provider, then the deterministic pipeline. Without --approve-transmission it is a dry run with the golden
 fake analyzer (zero network). With it, the synthetic golden texts are transmitted to the provider; the
-default provider is openrouter (free tier, OPENROUTER_API_KEY/OPENROUTER_MODEL from .env.local) and
---provider openai also needs --approve-model-cost. Up to ${CALLS_PER_CASE} model calls per case, one HTTP
-attempt each, SDK logging off, ${MODEL_EVAL_TIMEOUT_MS / 1000}s per call; the hard ceiling is ${HARD_MAX_MODEL_EVAL_CALLS} calls.
-Reports never contain resume text, evidence sentences or posting prose. Exit 0: every selected case attempted;
-1: golden-set problems or cases not attempted (report still written); 2: argument or gate refusal.`;
+default provider is openrouter (free tier, OPENROUTER_API_KEY/OPENROUTER_MODEL from .env.local), where only a
+':free' model id is accepted unless --approve-model-cost is given; --provider openai always needs
+--approve-model-cost. Up to ${CALLS_PER_CASE} model calls per case, one HTTP attempt each, SDK logging off,
+${MODEL_EVAL_TIMEOUT_MS / 1000}s per call covering headers and body; the hard ceiling is ${HARD_MAX_MODEL_EVAL_CALLS} calls.
+Golden-set integrity problems stop the run before any call. Reports never contain resume text, evidence
+sentences or posting prose. Exit 0: every selected case attempted; 1: golden-set problems (no call, no report)
+or cases not attempted at the call cap (report still written); 2: argument or gate refusal.`;
 
 export type ModelOptions = {
   help: boolean; cases?: string[]; limit?: number; provider: ProviderName;
@@ -88,7 +95,10 @@ export function parseModelArgs(argv: string[]): ModelOptions {
   return options;
 }
 
-export type ModelGateEnv = { CI?: string; GITHUB_ACTIONS?: string; VITEST?: string; NODE_ENV?: string; OPENAI_BASE_URL?: string };
+export type ModelGateEnv = { CI?: string; GITHUB_ACTIONS?: string; VITEST?: string; NODE_ENV?: string; OPENAI_BASE_URL?: string; OPENROUTER_MODEL?: string; OPENAI_MODEL?: string };
+// OpenRouter lists free endpoints as a `:free` variant of the model id; anything else may be metered.
+// `openrouter/free` (a random router over free models) is refused on purpose: a run must name its model.
+export const isFreeModelId = (id: string) => /:free$/.test(id.trim());
 export type ModelGate = { execution: "dry-run" | "live"; cap: number; upperBound: number; refusal?: string };
 
 // Execution comes from argv alone; the environment can only refuse.
@@ -102,6 +112,11 @@ export function resolveModelGate(options: ModelOptions, env: ModelGateEnv, caseC
   if (execution === "live" && (env.CI || env.GITHUB_ACTIONS || env.VITEST || env.NODE_ENV === "test")) return refuse(MODEL_REFUSALS.ciEnvironment);
   if (execution === "live" && options.provider === "openai" && !options.approveModelCost) return refuse(MODEL_REFUSALS.openaiNeedsCostFlag);
   if (execution === "live" && options.provider === "openai" && env.OPENAI_BASE_URL) return refuse(MODEL_REFUSALS.baseUrlSet);
+  if (execution === "live" && options.provider === "openrouter") {
+    const model = env.OPENROUTER_MODEL?.trim();
+    if (!model) return refuse(MODEL_REFUSALS.openrouterModelUnset);
+    if (!options.approveModelCost && !isFreeModelId(model)) return refuse(MODEL_REFUSALS.openrouterNotFree);
+  }
   if (cap > HARD_MAX_MODEL_EVAL_CALLS) return refuse(MODEL_REFUSALS.capAboveCeiling);
   if (upperBound > cap) return refuse(MODEL_REFUSALS.planAboveCap);
   return result;
@@ -125,12 +140,21 @@ function provenance() {
   };
 }
 
-export async function runModelEvalCli(argv: string[], io: { log: (line: string) => void; out: (line: string) => void; env?: ModelGateEnv } = { log: console.error, out: console.log }): Promise<number> {
+// Test seams: `env` replaces the environment snapshot the gate judges, `cases` the golden set, `loadEnv`
+// the .env.local loader. Production uses process.env, the committed golden set and loadLocalEnv.
+export type ModelCliIo = { log: (line: string) => void; out: (line: string) => void; env?: ModelGateEnv; cases?: GoldenCase[]; loadEnv?: () => void };
+
+export async function runModelEvalCli(argv: string[], io: ModelCliIo = { log: console.error, out: console.log }): Promise<number> {
   let options: ModelOptions;
   try { options = parseModelArgs(argv); } catch (error) { io.log(error instanceof Error ? error.message : MODEL_REFUSALS.unknownOption); return 2; }
   if (options.help) { io.out(MODEL_HELP); return 0; }
-  const selected = selectCases(options);
-  const gate = resolveModelGate(options, io.env ?? process.env, selected.length);
+  const selected = selectCases(options, io.cases);
+  const problems = validateGoldenSet(selected);
+  if (problems.length) { io.log(MODEL_REFUSALS.goldenSetProblems); for (const problem of problems) io.log(`  ${problem}`); return 1; }
+  // .env.local is read before the gate for a live run, so the gate judges the model the adapter would use.
+  if (options.approveTransmission) (io.loadEnv ?? loadLocalEnv)();
+  const env = io.env ?? process.env;
+  const gate = resolveModelGate(options, env, selected.length);
   if (gate.refusal) { io.log(gate.refusal); return 2; }
   const output = options.output ? resolve(root, options.output) : undefined;
   if (output && existsSync(output)) { io.log(MODEL_REFUSALS.outputExists); return 2; }
@@ -142,9 +166,7 @@ export async function runModelEvalCli(argv: string[], io: { log: (line: string) 
   }
   let model = "golden-fake", store: false | "n/a" = "n/a";
   if (gate.execution === "live") {
-    loadLocalEnv();
-    if (options.provider === "openai" && process.env.OPENAI_BASE_URL) { io.log(MODEL_REFUSALS.baseUrlSet); return 2; }
-    model = options.provider === "openrouter" ? process.env.OPENROUTER_MODEL ?? "(OPENROUTER_MODEL unset)" : process.env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
+    model = options.provider === "openrouter" ? (env.OPENROUTER_MODEL ?? "").trim() : env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
     store = options.provider === "openrouter" ? "n/a" : false;
   }
   io.log([
@@ -153,7 +175,10 @@ export async function runModelEvalCli(argv: string[], io: { log: (line: string) 
     gate.execution === "live"
       ? `  provider: ${options.provider}   destination: ${providerDestination(options.provider)}   model: ${model}`
       : "  analyzer: golden fake (no network); add --approve-transmission for a live run",
-    `  model calls: up to ${gate.upperBound} (${CALLS_PER_CASE} per case), cap ${gate.cap}; one HTTP attempt each, SDK retries off, ${MODEL_EVAL_TIMEOUT_MS / 1000}s per call`,
+    gate.execution === "live" && options.provider === "openrouter"
+      ? `  model tier: ${isFreeModelId(model) ? "':free' variant (free endpoints only)" : "not a ':free' variant; cost approved by --approve-model-cost"}; the report records the upstream endpoint per call and the OpenRouter dashboard is the authority on cost`
+      : "",
+    `  model calls: up to ${gate.upperBound} (${CALLS_PER_CASE} per case), cap ${gate.cap}; one HTTP attempt each, SDK retries off, ${MODEL_EVAL_TIMEOUT_MS / 1000}s per call covering headers and body`,
     gate.execution === "live" ? "  The synthetic resume and posting texts are transmitted to the provider above; a free tier is still an external transmission." : "",
   ].filter(Boolean).join("\n"));
   const createAnalyzer = (onResponse: (event: AnalyzerResponseEvent) => void) => gate.execution === "live"
@@ -162,7 +187,7 @@ export async function runModelEvalCli(argv: string[], io: { log: (line: string) 
   const report: ModelEvalReport = await runModelEvaluation(selected, {
     execution: gate.execution, provider: gate.execution === "live" ? options.provider : "fake", requestedModel: model, store,
     transport: { maxRetries: 0, logLevel: "off", timeoutMs: MODEL_EVAL_TIMEOUT_MS }, approvals: { transmission: options.approveTransmission },
-    callCap: gate.cap, metadata: provenance(), goldenSetVersion: GOLDEN_SET_VERSION, createAnalyzer, log: (line) => io.log(`  ${line}`),
+    callCap: gate.cap, callTimeoutMs: MODEL_EVAL_TIMEOUT_MS, metadata: provenance(), goldenSetVersion: GOLDEN_SET_VERSION, createAnalyzer, log: (line) => io.log(`  ${line}`),
   });
   let comparison: ModelComparison | undefined;
   if (baseline !== undefined) comparison = compareModelReports(report, baseline);

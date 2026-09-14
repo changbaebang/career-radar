@@ -226,7 +226,10 @@ Status: **done, synthetic-verified** (branch `feat/m5-d-model-eval`). `pnpm eval
 (`evals/fixtures/golden/`, 33 raw-text cases, all `pending`). Dry run by default with a golden fake
 analyzer (`GoldenFakeAnalyzer`, zero network); `--approve-transmission` sends the golden texts to
 the provider, `openrouter` by default (free tier), and `--provider openai` additionally needs
-`--approve-model-cost`. Deviations from the design below, on purpose: the gate is model mode's own
+`--approve-model-cost`. From the #25 review: a live OpenRouter run accepts only a `:free` model id
+unless the cost flag is given, every call carries a deadline that covers the response body (shared
+`withCallDeadline`, `server/src/ai/deadline.ts`), and golden-set integrity problems stop the run before
+the analyzer exists. Deviations from the design below, on purpose: the gate is model mode's own
 `resolveModelGate` with the harness rules (CI/test refusal, base-URL refusal, hard ceiling of 150
 calls, fixed refusal strings) because the flags differ (no network/cost pair and no typed cost
 confirmation on the free tier), while the transport pin and `assertRedacted` are reused from the

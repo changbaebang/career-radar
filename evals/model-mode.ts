@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { FitAssessment, JobPosting } from "@career-radar/shared";
 import type { CareerAnalyzer } from "../server/src/ai/analyzer.js";
+import { withCallDeadline } from "../server/src/ai/deadline.js";
 import { OPENROUTER_ERRORS } from "../server/src/ai/openrouter.js";
 import type { AnalyzerResponseEvent } from "../server/src/ai/telemetry.js";
 import { CITATION_BOUNDS_DROPPED, CITATION_INVALID_DROPPED } from "../server/src/domain/assessment/citations.js";
@@ -19,6 +20,8 @@ import { goldenPostingText, goldenResumeText, type GoldenCase } from "./fixtures
 export const MODEL_REPORT_VERSION = 1;
 export const MODEL_METRIC_VERSION = "model-metrics-v1";
 export const CALLS_PER_CASE = 3;
+// How long to wait for calls still in flight after a deadline abort before the report is assembled.
+export const SETTLE_GRACE_MS = 10_000;
 
 export type FailureClass = "schema_failure" | "refusal" | "truncation" | "timeout" | "tool_failure" | "provider_error" | "other";
 export type CaseOutcome = "assessed" | "extraction_failed" | "assessment_failed" | "not_attempted";
@@ -82,6 +85,8 @@ export const ModelEvalReportSchema = z.object({
   codeSha: z.string().min(1), dirty: z.boolean(), generatedAt: z.string().datetime(),
   goldenSetVersion: z.string().min(1), goldenSetHash: z.string().regex(/^[a-f0-9]{64}$/),
   selectedCases: z.number().int(), callCap: z.number().int(), modelCalls: z.number().int(),
+  // Calls cut by the per-call deadline, and calls still unsettled after the grace period (expected 0).
+  abortedCalls: z.number().int(), unsettledCalls: z.number().int(),
   transport: z.object({ maxRetries: z.literal(0), logLevel: z.literal("off"), timeoutMs: z.number().int().optional() }).strict(),
   store: z.union([z.literal(false), z.literal("n/a")]),
   approvals: z.object({ transmission: z.boolean() }).strict(),
@@ -109,6 +114,9 @@ export type ModelRunOptions = {
   transport: { maxRetries: 0; logLevel: "off"; timeoutMs?: number };
   approvals: { transmission: boolean };
   callCap: number;
+  // Per-call deadline covering headers and body: each call gets its own AbortSignal (the SDK timeout
+  // alone stops at the response headers). Absent means no deadline (tests only).
+  callTimeoutMs?: number;
   metadata: { codeSha: string; dirty: boolean; policyHash: string; schemaHash: string; promptVersion: string };
   goldenSetVersion: string;
   // The analyzer is created with the runner's telemetry hook so every call is recorded without content.
@@ -188,12 +196,16 @@ const project = (event: AnalyzerResponseEvent) => ({
 export async function runModelEvaluation(cases: GoldenCase[], options: ModelRunOptions): Promise<ModelEvalReport> {
   const problems = validateGoldenSet(cases);
   const events: AnalyzerResponseEvent[] = [];
-  const analyzer = options.createAnalyzer((event) => { events.push(event); });
   const results: ModelCaseResult[] = [];
   let calls = 0;
   const log = options.log ?? (() => undefined);
+  // Integrity problems stop the run before the analyzer exists: zero calls, every case not attempted.
+  const deadline = options.callTimeoutMs ? withCallDeadline(options.callTimeoutMs) : undefined;
+  const created = problems.length ? undefined : options.createAnalyzer((event) => { events.push(event); });
+  const analyzer = created && deadline ? deadline.wrap(created) : created;
   for (const item of cases) {
     const base = { caseId: item.caseId, goldHash: goldHash(item), humanReview: item.humanReview };
+    if (!analyzer) { results.push({ ...base, outcome: "not_attempted", calls: 0, telemetry: [] }); continue; }
     const caseEvents: AnalyzerResponseEvent[] = [];
     const before = events.length;
     const attempt = async <T>(stage: Stage, call: () => Promise<T>): Promise<T> => {
@@ -269,6 +281,8 @@ export async function runModelEvaluation(cases: GoldenCase[], options: ModelRunO
       log(`${item.caseId}: not attempted (call cap ${options.callCap} reached)`);
     }
   }
+  const unsettledCalls = deadline ? await deadline.settle(SETTLE_GRACE_MS) : 0;
+  const abortedCalls = deadline?.aborted ?? 0;
   const assessed = results.filter((result) => result.assessment);
   const extracted = results.filter((result) => result.extraction);
   const attempted = results.filter((result) => result.outcome !== "not_attempted");
@@ -285,7 +299,7 @@ export async function runModelEvaluation(cases: GoldenCase[], options: ModelRunO
     promptVersion: options.metadata.promptVersion, policyHash: options.metadata.policyHash, schemaHash: options.metadata.schemaHash,
     codeSha: options.metadata.codeSha, dirty: options.metadata.dirty, generatedAt: new Date().toISOString(),
     goldenSetVersion: options.goldenSetVersion, goldenSetHash: digest(cases.map(goldHash)),
-    selectedCases: cases.length, callCap: options.callCap, modelCalls: calls,
+    selectedCases: cases.length, callCap: options.callCap, modelCalls: calls, abortedCalls, unsettledCalls,
     transport: options.transport, store: options.store, approvals: options.approvals, problems,
     cases: results,
     metrics: {
@@ -349,9 +363,9 @@ export function renderModelMarkdown(report: ModelEvalReport, comparison?: ModelC
     "# Career Radar model-mode evaluation", "",
     `${report.execution === "dry-run" ? "Dry run with the golden fake analyzer: these numbers verify the runner, not any model." : `Live run on ${report.provider} (${report.requestedModel}); numbers are live-verified for this provider and model only.`} Failures are execution outcomes, never PASS. Cost is never computed.`, "",
     `- Code: ${report.codeSha}; dirty worktree: ${report.dirty}; prompt: ${report.promptVersion}; policy ${report.policyHash.slice(0, 12)}…; schema ${report.schemaHash.slice(0, 12)}…`,
-    `- Golden set: ${report.goldenSetVersion} (${report.goldenSetHash.slice(0, 12)}…), ${report.selectedCases} cases; model calls ${report.modelCalls} / cap ${report.callCap}`,
+    `- Golden set: ${report.goldenSetVersion} (${report.goldenSetHash.slice(0, 12)}…), ${report.selectedCases} cases; model calls ${report.modelCalls} / cap ${report.callCap}; cut by the per-call deadline ${report.abortedCalls}; unsettled ${report.unsettledCalls}`,
     `- Provider: ${report.provider}; requested model ${report.requestedModel}; response models ${report.responseModels.join(", ") || "n/a"}; upstream ${report.upstreamProviders.join(", ") || "n/a"}; store ${String(report.store)}; retries ${report.transport.maxRetries}; SDK log ${report.transport.logLevel}`,
-    `- Golden-set problems: ${report.problems.length}`, "",
+    `- Golden-set problems: ${report.problems.length}${report.problems.length ? " (no model call was made)" : ""}`, "",
     "## Metrics", "", "| Measure | Value |", "| --- | --- |",
     `| Outcomes | assessed ${m.outcomes.assessed}, extraction failed ${m.outcomes.extractionFailed}, assessment failed ${m.outcomes.assessmentFailed}, not attempted ${m.outcomes.notAttempted} |`,
     `| Requirement match rate (gold matched by exact normalized text) | ${fraction(m.requirementMatchRate)} |`,

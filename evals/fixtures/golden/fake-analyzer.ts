@@ -27,6 +27,7 @@ export type GoldenFakeOptions = {
   // Invent an employer for postings that name none (an extraction defect the runner must count).
   inventEmployer?: boolean;
   onResponse?: (event: AnalyzerResponseEvent) => void;
+  // Simulated latency per call; it ends early with an AbortError when the call's signal fires.
   delayMs?: number;
 };
 
@@ -38,6 +39,13 @@ const content = (text: string) => new Set(tokenize(text).filter((token) => token
 const overlap = (a: string, b: string) => { const x = content(a), y = content(b); return [...x].filter((t) => y.has(t)).length; };
 
 function abortError(): Error { const error = new Error("The operation was aborted"); error.name = "AbortError"; return error; }
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onAbort = () => { clearTimeout(timer); reject(abortError()); };
+    const timer = setTimeout(() => { signal?.removeEventListener("abort", onAbort); resolve(); }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
 
 export class GoldenFakeAnalyzer implements CareerAnalyzer {
   readonly #options: GoldenFakeOptions;
@@ -56,10 +64,11 @@ export class GoldenFakeAnalyzer implements CareerAnalyzer {
     }
   }
 
-  async #observe<T>(operation: AnalyzerResponseEvent["operation"], key: string, call: () => T): Promise<T> {
+  async #observe<T>(operation: AnalyzerResponseEvent["operation"], key: string, signal: AbortSignal | undefined, call: () => T): Promise<T> {
     const startedAt = performance.now();
-    if (this.#options.delayMs) await new Promise((resolve) => setTimeout(resolve, this.#options.delayMs));
     try {
+      if (signal?.aborted) throw abortError();
+      if (this.#options.delayMs) await sleep(this.#options.delayMs, signal);
       this.#fail(operation, key);
       const result = call();
       this.#options.onResponse?.({ operation, requestedModel: "golden-fake", durationMs: performance.now() - startedAt, outcome: "ok",
@@ -72,8 +81,8 @@ export class GoldenFakeAnalyzer implements CareerAnalyzer {
     }
   }
 
-  extractProfile(resumeText: string, profileId?: string): Promise<ProfileExtraction> {
-    return this.#observe("extractProfile", keyFor(resumeText), () => {
+  extractProfile(resumeText: string, profileId?: string, signal?: AbortSignal): Promise<ProfileExtraction> {
+    return this.#observe("extractProfile", keyFor(resumeText), signal, () => {
       const spec = parseResume(resumeText);
       const profile = CandidateProfileSchema.parse({
         id: profileId ?? `${stableId("profile", resumeText)}${this.#options.idSalt ?? ""}`, headline: spec.headline,
@@ -86,8 +95,8 @@ export class GoldenFakeAnalyzer implements CareerAnalyzer {
     });
   }
 
-  extractJob(description: string): Promise<JobExtraction> {
-    return this.#observe("extractJob", keyFor(description), () => {
+  extractJob(description: string, signal?: AbortSignal): Promise<JobExtraction> {
+    return this.#observe("extractJob", keyFor(description), signal, () => {
       const spec = parsePosting(description);
       const id = `${stableId("job", description)}${this.#options.idSalt ?? ""}`;
       const drop = this.#options.dropRequirement?.get(keyFor(description));
@@ -107,8 +116,8 @@ export class GoldenFakeAnalyzer implements CareerAnalyzer {
     });
   }
 
-  assess(profile: CandidateProfile, job: JobPosting, _signal?: AbortSignal, evidence?: RetrievedEvidence): Promise<FitAssessment> {
-    return this.#observe("assess", keyFor(job.description), () => {
+  assess(profile: CandidateProfile, job: JobPosting, signal?: AbortSignal, evidence?: RetrievedEvidence): Promise<FitAssessment> {
+    return this.#observe("assess", keyFor(job.description), signal, () => {
       const sentences = profile.roles.flatMap((role) => role.evidence);
       const negated = (sentence: string) => /\bnever\b|\bnot\b/i.test(sentence);
       const matches: FitAssessment["strongestMatches"] = [];

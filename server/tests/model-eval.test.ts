@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { OpenAICareerAnalyzer } from "../src/ai/analyzer.js";
 import { OPENROUTER_ERRORS } from "../src/ai/openrouter.js";
 import { GoldenFakeAnalyzer, keyFor, type FakeFailure, type GoldenFakeOptions } from "../../evals/fixtures/golden/fake-analyzer.js";
 import { GOLDEN_SET_VERSION, goldenCases, goldenPostingText, goldenResumeText, type GoldenCase } from "../../evals/fixtures/golden/index.js";
@@ -52,7 +55,7 @@ describe("M5-D model-mode runner (golden fake, no network)", () => {
   it("runs extraction, assessment and the pipeline per case and produces a strict report", async () => {
     const report = await runModelEvaluation(goldenCases, options(fakeWith({})));
     expect(() => ModelEvalReportSchema.parse({ ...report, extra: 1 })).toThrow();
-    expect(report).toMatchObject({ reportKind: "model-evaluation", mode: "model", execution: "dry-run", success: true, problems: [], modelCalls: goldenCases.length * 3 });
+    expect(report).toMatchObject({ reportKind: "model-evaluation", mode: "model", execution: "dry-run", success: true, problems: [], modelCalls: goldenCases.length * 3, abortedCalls: 0, unsettledCalls: 0 });
     expect(report.metrics.outcomes).toEqual({ assessed: goldenCases.length, extractionFailed: 0, assessmentFailed: 0, notAttempted: 0 });
     expect(report.metrics.requirementMatchRate.value).toBe(1);
     expect(report.metrics.humanVerdictAgreement).toEqual({ numerator: 0, denominator: 0, value: null });
@@ -171,5 +174,54 @@ describe("M5-D model-mode runner (golden fake, no network)", () => {
     const failed = await runModelEvaluation(goldenCases.slice(0, 5), options(fakeWith({ failures: new Map([[keyFor(goldenPostingText(item)), { stage: "assess", kind: "refusal" }]]) })));
     expect(compareModelReports(failed, first).outcomeChanged).toEqual([item.caseId]);
     expect(compareModelReports({ ...second, provider: "openrouter" }, first)).toMatchObject({ compatible: false, incompatibleReasons: ["provider"], compared: 0 });
+  });
+});
+
+describe("M5-D review fixes: golden-set stop and per-call deadline", () => {
+  afterEach(() => { vi.unstubAllEnvs(); });
+
+  it("stops before the analyzer exists when the golden set has integrity problems: zero calls, nothing assessed", async () => {
+    const bad = byId("gm-frontend-lead-realistic");
+    bad.expectedBlockers = ["Not a requirement"];
+    const createAnalyzer = vi.fn(fakeWith({}));
+    const report = await runModelEvaluation([bad, byId("gm-two-required-blockers")], options(createAnalyzer));
+    expect(createAnalyzer).not.toHaveBeenCalled();
+    expect(report.problems).toEqual(["gm-frontend-lead-realistic: expected blocker is not a gold requirement"]);
+    expect(report).toMatchObject({ modelCalls: 0, abortedCalls: 0, unsettledCalls: 0, success: false });
+    expect(report.cases.map((c) => c.outcome)).toEqual(["not_attempted", "not_attempted"]);
+    expect(report.metrics.outcomes).toEqual({ assessed: 0, extractionFailed: 0, assessmentFailed: 0, notAttempted: 2 });
+    expect(renderModelMarkdown(report)).toContain("Golden-set problems: 1 (no model call was made)");
+  });
+
+  it("cuts every call at the per-call deadline, classifies it as timeout and moves on to the next case", async () => {
+    const report = await runModelEvaluation(goldenCases.slice(0, 3), options(fakeWith({ delayMs: 200 }), { callTimeoutMs: 20 }));
+    expect(report.cases.map((c) => [c.outcome, c.failedStage, c.failureClass, c.calls])).toEqual(Array(3).fill(["extraction_failed", "extractProfile", "timeout", 1]));
+    expect(report).toMatchObject({ modelCalls: 3, abortedCalls: 3, unsettledCalls: 0, success: true });
+    expect(report.metrics.timeoutRate).toEqual({ numerator: 3, denominator: 3, value: 1 });
+    for (const c of report.cases) expect(c.telemetry[0]!.durationMs).toBeLessThan(150);
+  });
+
+  it("bounds a slow response body through the real SDK where its timeout alone does not (loopback server)", async () => {
+    // Headers immediately, body completed only after 400 ms: the SDK timeout (100 ms) stops at the headers.
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.write('{"id":"resp_x","object":"response","model":"m","status":"completed","output":[],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}');
+      setTimeout(() => res.end("}"), 400);
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      vi.stubEnv("OPENAI_BASE_URL", `http://127.0.0.1:${(server.address() as AddressInfo).port}/v1`);
+      const adapter: Create = (onResponse) => new OpenAICareerAnalyzer({ apiKey: "synthetic-not-a-real-key", onResponse, transport: { maxRetries: 0, logLevel: "off", timeout: 100 } });
+      const live = { execution: "live" as const, provider: "openai", requestedModel: "synthetic-model", store: false as const };
+      const control = await runModelEvaluation(goldenCases.slice(0, 1), options(adapter, live));
+      // The body arrived after 400 ms and only then failed to parse: the SDK timeout did not bound it.
+      expect(control.cases[0]).toMatchObject({ outcome: "extraction_failed", failedStage: "extractProfile", failureClass: "schema_failure" });
+      expect(control.cases[0]!.telemetry[0]!.durationMs).toBeGreaterThanOrEqual(350);
+      expect(control.abortedCalls).toBe(0);
+      const bounded = await runModelEvaluation(goldenCases.slice(0, 2), options(adapter, { ...live, callTimeoutMs: 100 }));
+      expect(bounded.cases.map((c) => [c.outcome, c.failureClass])).toEqual([["extraction_failed", "timeout"], ["extraction_failed", "timeout"]]);
+      for (const c of bounded.cases) expect(c.telemetry[0]!.durationMs).toBeLessThan(350);
+      expect(bounded).toMatchObject({ modelCalls: 2, abortedCalls: 2, unsettledCalls: 0, success: true });
+    } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
   });
 });
