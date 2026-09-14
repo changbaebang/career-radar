@@ -306,9 +306,23 @@ live number, including whether a model cites resolvable chunk ids, is `not verif
 
 ### M5-E — Observability: one run ID through every stage (1 PR)
 
-Status: **not started**. Unchanged by the 2026-09-14 decision except that the tool-query rules below
-have no producer while M5-C is dropped; the run ID, stage records, counters and trace redaction stay
-in scope.
+Status: **done, synthetic-verified** (branch `feat/m5-e-run-trace`). `RunTracer`
+(`server/src/domain/trace/run-trace.ts`) creates one run id per `job_assess`/`job_recommend` call;
+the shared analyzer's telemetry hook attributes each model call to the running trace through
+`AsyncLocalStorage` (`traceHook`), so adapters keep their signatures and `AnalyzerResponseEvent`
+only gains an optional `runId`. Stages are `extract` (profile/job model calls), `retrieve` (query
+hashes, lengths, hit ids, missing terms), `model` (assess: SDK projection, usage, fixed failure
+class shared with the M5-D runner in `server/src/ai/failure-class.ts`), `validate` (draft vs final
+verdict/confidence, citations supplied/valid, the stage diagnostics from
+`finalizeAssessmentDetailed`) and `persist`; batch stages carry the candidate index. Counters cover
+schema/refusal/truncation/timeout/provider failures and the citation and policy diagnostics;
+`fallbacks` and `toolFailures` are reserved at 0 (M5-C dropped, so the tool-query redaction rules
+below have no producer). Traces are kept in memory (last 100) and written to
+`data/traces/<runId>.json` (0700/0600; `CAREER_RADAR_TRACE_DIR`, `CAREER_RADAR_TRACES=off`), removed
+by `pnpm traces:clear` and `pnpm db:reset`; `pnpm diagnose <runId>` prints the stage table and the
+usage-check page shows each job's run id. The run id is echoed at the end of the tool text
+(additive). Sentinel tests cover the successful and the failed path; no inspect mode exists because
+no raw query text is ever produced.
 
 - **Goal.** Explain a slow, expensive, invalid or failed assessment stage by stage.
 - **Design.** A `runId` created per tool call, threaded through analyzer telemetry (new optional

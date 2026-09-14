@@ -16,6 +16,8 @@ export type AnalyzerResponseEvent = {
   responseStatus?: string; incompleteReason?: string;
   usage?: { inputTokens: number; outputTokens: number; totalTokens: number; cachedInputTokens?: number; reasoningTokens?: number };
   error?: { name: string; status?: number; code?: string; requestId?: string };
+  // M5-E: set by the run trace hook when the call happened inside a traced tool call.
+  runId?: string;
 };
 export type ResponseProjection = Pick<AnalyzerResponseEvent, "responseId" | "responseModel" | "requestId" | "upstreamProvider" | "responseStatus" | "incompleteReason" | "usage">;
 export type ResponseHook = (event: AnalyzerResponseEvent) => void;

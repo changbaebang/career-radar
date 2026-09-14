@@ -17,9 +17,11 @@ import { z } from "zod";
 
 import type { CareerAnalyzer } from "../ai/analyzer.js";
 import { buildCareerRadarStatus } from "../demo.js";
-import { finalizeAssessment } from "../domain/assessment/pipeline.js";
+import { finalizeAssessmentDetailed } from "../domain/assessment/pipeline.js";
 import { retrieveEvidence } from "../domain/evidence/retrieve.js";
 import type { CareerStore } from "../domain/store.js";
+import { RunTracer, runWithTrace } from "../domain/trace/run-trace.js";
+import { TraceStore } from "../domain/trace/store.js";
 import { fetchJobUrl } from "../infra/fetch/job-url.js";
 import { registerPipelineTools } from "./pipeline-tools.js";
 import { registerSearchTools } from "./search-tools.js";
@@ -39,6 +41,8 @@ export type McpDependencies = {
   createAnalyzer: () => CareerAnalyzer;
   fetchJob?: typeof fetchJobUrl;
   discovery: JobDiscovery;
+  // M5-E run traces; absent means an in-memory store that is dropped with the server.
+  traces?: TraceStore;
 };
 
 function readWidgetBundle(): string {
@@ -57,6 +61,7 @@ function readWidgetBundle(): string {
 
 export function createMcpServer(dependencies: McpDependencies): McpServer {
   const { store, createAnalyzer: getAnalyzer } = dependencies;
+  const traces = dependencies.traces ?? new TraceStore();
   const server = new McpServer({ name: "career-radar", version: "0.4.0" });
 
   registerAppTool(
@@ -199,23 +204,34 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
       if (!profile) throw new Error("Candidate profile was not found or has expired. Call profile_upsert again.");
       const job = store.getJob(jobId);
       if (!job) throw new Error("Job was not found or has expired. Call job_ingest again.");
-      // M5-B: deterministic pre-retrieval over the profile's evidence; its trace is what citations resolve against.
-      const evidence = retrieveEvidence(profile, job);
-      const assessment = finalizeAssessment(profile, job, await getAnalyzer().assess(profile, job, undefined, evidence), evidence);
-      const assessmentId = store.saveAssessment(profile, job, assessment);
-      const result = JobAssessmentResultSchema.parse({ job, assessment, assessmentId });
-      return {
-        structuredContent: result,
-        content: [{
-          type: "text" as const,
-          text: `${job.company ?? "(employer not stated)"} — ${job.title}: ${assessment.verdict}. ${assessment.recommendation}`,
-        }],
-      };
+      // M5-E: one run trace per call; stages are timed and the analyzer telemetry is attributed to it.
+      const tracer = new RunTracer("job_assess");
+      try {
+        const result = await runWithTrace(tracer, async () => {
+          // M5-B: deterministic pre-retrieval over the profile's evidence; its trace is what citations resolve against.
+          const evidence = await tracer.stage("retrieve", () => retrieveEvidence(profile, job), (found) => tracer.retrieveDetail(found));
+          const draft = await tracer.wrap(getAnalyzer()).assess(profile, job, undefined, evidence);
+          const assessment = await tracer.stage("validate", () => finalizeAssessmentDetailed(profile, job, draft, evidence), (done) => tracer.validateDetail(draft, done.assessment, done.diagnostics)).then((done) => done.assessment);
+          const assessmentId = await tracer.stage("persist", () => store.saveAssessment(profile, job, assessment));
+          return JobAssessmentResultSchema.parse({ job, assessment, assessmentId });
+        });
+        traces.save(tracer.finish("ok"));
+        return {
+          structuredContent: result,
+          content: [{
+            type: "text" as const,
+            text: `${job.company ?? "(employer not stated)"} — ${job.title}: ${result.assessment.verdict}. ${result.assessment.recommendation} (run ${tracer.runId})`,
+          }],
+        };
+      } catch (error) {
+        traces.save(tracer.finish("failed", error));
+        throw error;
+      }
     },
   );
 
   registerPipelineTools(server, store, CAREER_RADAR_WIDGET_URI);
-  registerSearchTools(server, dependencies.discovery, store, getAnalyzer, CAREER_RADAR_WIDGET_URI);
+  registerSearchTools(server, dependencies.discovery, store, getAnalyzer, CAREER_RADAR_WIDGET_URI, traces);
 
   registerAppResource(
     server,

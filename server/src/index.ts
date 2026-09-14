@@ -1,5 +1,6 @@
-import { ensureDatabaseDirectory, loadLocalEnv, resolveDatabasePath } from "./config.js";
+import { ensureDatabaseDirectory, loadLocalEnv, resolveDatabasePath, resolveTraceDirectory } from "./config.js";
 import { CareerStore } from "./domain/store.js";
+import { TraceStore } from "./domain/trace/store.js";
 import { createHttpApp } from "./httpApp.js";
 
 loadLocalEnv();
@@ -8,7 +9,7 @@ const port = Number.parseInt(process.env.PORT ?? "8000", 10);
 const databasePath = resolveDatabasePath();
 ensureDatabaseDirectory(databasePath);
 const store = new CareerStore(databasePath);
-const app = createHttpApp({ store });
+const app = createHttpApp({ store, traces: new TraceStore(resolveTraceDirectory()) });
 
 const httpServer = app.listen(port, "127.0.0.1", () => {
   console.log(

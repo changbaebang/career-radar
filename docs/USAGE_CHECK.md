@@ -78,6 +78,10 @@ run without any call. The app database is not touched: the check uses an in-memo
 
 ## Record
 
+Each assessed job row on the results page shows the `job_assess` run id (M5-E) with the `pnpm diagnose <runId>`
+command that prints its stage table — timings, model call outcome and tokens, retrieval counts, and what
+the pipeline did — from `data/traces/` without any input text.
+
 Keep it short. For each posting: the verdict, whether you agree, one sentence on why. Then the
 three answers, and one line on what you would remove from the output. Provider, model and prompt
 version are in `results.json` and on the page header; copy them into the notes so the answers

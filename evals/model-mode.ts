@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { FitAssessment, JobPosting } from "@career-radar/shared";
 import type { CareerAnalyzer } from "../server/src/ai/analyzer.js";
 import { withCallDeadline } from "../server/src/ai/deadline.js";
-import { OPENROUTER_ERRORS } from "../server/src/ai/openrouter.js";
+import { classifyFailure, type FailureClass } from "../server/src/ai/failure-class.js";
 import type { AnalyzerResponseEvent } from "../server/src/ai/telemetry.js";
 import { normalizeEvidence } from "../server/src/domain/assessment/normalize.js";
 import { finalizeAssessmentDetailed, type PipelineDiagnostics } from "../server/src/domain/assessment/pipeline.js";
@@ -22,23 +22,10 @@ export const CALLS_PER_CASE = 3;
 // How long to wait for calls still in flight after a deadline abort before the report is assembled.
 export const SETTLE_GRACE_MS = 10_000;
 
-export type FailureClass = "schema_failure" | "refusal" | "truncation" | "timeout" | "tool_failure" | "provider_error" | "other";
+// The failure classifier is shared with the run trace: server/src/ai/failure-class.ts.
+export { classifyFailure, type FailureClass };
 export type CaseOutcome = "assessed" | "extraction_failed" | "assessment_failed" | "not_attempted";
 export type Stage = "extractProfile" | "extractJob" | "assess";
-
-// Fixed classes from fixed adapter messages, error names and telemetry; never from message prose.
-export function classifyFailure(error: unknown, lastEvent?: AnalyzerResponseEvent): FailureClass {
-  const name = error instanceof Error ? error.name : "";
-  const message = error instanceof Error ? error.message : "";
-  if (name === "AbortError" || name === "APIUserAbortError" || /timed? ?out/i.test(name)) return "timeout";
-  if (message === OPENROUTER_ERRORS.truncated || lastEvent?.incompleteReason === "max_output_tokens") return "truncation";
-  if (message === OPENROUTER_ERRORS.refused || /refus/i.test(name)) return "refusal";
-  if ([OPENROUTER_ERRORS.schemaMismatch, OPENROUTER_ERRORS.invalidJson, OPENROUTER_ERRORS.noContent, OPENROUTER_ERRORS.finishError].includes(message as never)
-    || /returned no parsed/.test(message) || name === "ZodError") return "schema_failure";
-  if (/Error$/.test(name) && (error as { status?: number }).status !== undefined) return "provider_error";
-  if (/request failed/.test(message)) return "provider_error";
-  return "other";
-}
 
 // Pipeline diagnostics as short codes. They come from what each stage reports it did
 // (finalizeAssessmentDetailed), never from the fixed sentences in missingInformation: the model's own

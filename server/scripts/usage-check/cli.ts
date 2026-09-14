@@ -3,6 +3,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { DEFAULT_OPENAI_MODEL, type AnalyzerResponseEvent, type CareerAnalyzer } from "../../src/ai/analyzer.js";
 import { createAnalyzerFromEnv, providerDestination, resolveProviderName, type ProviderName } from "../../src/ai/provider.js";
+import { traceHook } from "../../src/domain/trace/run-trace.js";
 import { loadLocalEnv } from "../../src/config.js";
 import { measurementResumeText } from "../measure-live/synthetic-inputs.js";
 import { DEFAULT_TOOL_TIMEOUT_MS, createResultsApp, runUsageCheck, type JobInput, type UsageCheckResults } from "./run.js";
@@ -24,7 +25,8 @@ export const USAGE_ERRORS = {
 } as const;
 
 export function usageAnalyzerFactory(provider: ProviderName, onResponse?: (event: AnalyzerResponseEvent) => void): () => CareerAnalyzer {
-  return () => createAnalyzerFromEnv({ provider, transport: { ...USAGE_TRANSPORT }, ...(onResponse ? { onResponse } : {}) });
+  // Every event also reaches the run trace of the tool call that made it (M5-E), then the runner's own log.
+  return () => createAnalyzerFromEnv({ provider, transport: { ...USAGE_TRANSPORT }, onResponse: (event) => { traceHook(event); onResponse?.(event); } });
 }
 
 const HELP = `pnpm usage-check [--resume FILE] --job URL|FILE [--job ...] [--approve-transmission] [--out DIR] [--port N]

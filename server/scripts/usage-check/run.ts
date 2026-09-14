@@ -7,6 +7,8 @@ import express, { type Express } from "express";
 import type { AnalyzerResponseEvent, CareerAnalyzer } from "../../src/ai/analyzer.js";
 import { withCallDeadline } from "../../src/ai/deadline.js";
 import { CareerStore } from "../../src/domain/store.js";
+import { resolveTraceDirectory } from "../../src/config.js";
+import { TraceStore } from "../../src/domain/trace/store.js";
 import { createHttpApp, isLoopbackHost, isLoopbackOrigin } from "../../src/httpApp.js";
 import type { fetchJobUrl } from "../../src/infra/fetch/job-url.js";
 
@@ -17,7 +19,8 @@ import type { fetchJobUrl } from "../../src/infra/fetch/job-url.js";
 export type JobInput = { label: string; text?: string; url?: string };
 // Wall-clock time of each tool call as the client saw it (model latency plus transport), in ms.
 export type JobOutcome =
-  | { label: string; status: "assessed"; ingest: JobIngestResult; assessment: JobAssessmentResult; ingestMs: number; assessMs: number }
+  // runId: the M5-E run trace of the job_assess call, read from the tool text; `pnpm diagnose <runId>` prints its stages.
+  | { label: string; status: "assessed"; ingest: JobIngestResult; assessment: JobAssessmentResult; ingestMs: number; assessMs: number; runId?: string }
   | { label: string; status: "failed"; step: "job_ingest" | "job_assess"; message: string; ingest?: JobIngestResult; ingestMs?: number; assessMs?: number };
 export type UsageCheckResults = {
   kind: "usage-check"; generatedAt: string; provider: string; model: string; promptVersion?: string;
@@ -39,6 +42,8 @@ export type UsageCheckDeps = {
   // Adapters emit one event per model call; the runner collects them so a failure can be read from
   // finish_reason and token usage rather than guessed.
   onResponse?: (register: (event: AnalyzerResponseEvent) => void) => void;
+  // Where run traces are written (default: the server's trace directory); tests pass a temporary directory.
+  traceDirectory?: string;
 };
 
 export async function runUsageCheck(deps: UsageCheckDeps): Promise<UsageCheckResults> {
@@ -53,7 +58,8 @@ export async function runUsageCheck(deps: UsageCheckDeps): Promise<UsageCheckRes
     log(`    model ${event.operation} ${event.outcome} in ${Math.round(event.durationMs)} ms · status ${event.responseStatus ?? "n/a"} · tokens in ${event.usage?.inputTokens ?? "?"} out ${event.usage?.outputTokens ?? "?"} reasoning ${event.usage?.reasoningTokens ?? "?"} · upstream ${event.upstreamProvider ?? "n/a"}${event.error ? ` · error ${event.error.name}` : ""}`);
   });
   const createAnalyzer = () => { const inner = deps.createAnalyzer(); return deadline.wrap(countCalls(inner, () => { calls += 1; })); };
-  const app = createHttpApp({ store, createAnalyzer, ...(deps.fetchJob ? { fetchJob: deps.fetchJob } : {}) });
+  // Run traces go where the server writes them so `pnpm diagnose` can read a check's stages afterwards.
+  const app = createHttpApp({ store, createAnalyzer, traces: new TraceStore(deps.traceDirectory ?? resolveTraceDirectory()), ...(deps.fetchJob ? { fetchJob: deps.fetchJob } : {}) });
   const server = app.listen(0, "127.0.0.1");
   await new Promise<void>((resolve, reject) => { server.once("listening", resolve); server.once("error", reject); });
   const port = (server.address() as AddressInfo).port;
@@ -90,7 +96,8 @@ export async function runUsageCheck(deps: UsageCheckDeps): Promise<UsageCheckRes
       if (!assessed.ok) { jobs.push({ label: job.label, status: "failed", step: "job_assess", message: toolText(assessed.content), ingest, ingestMs: ingested.ms, assessMs: assessed.ms }); continue; }
       const assessment = JobAssessmentResultSchema.parse(assessed.structured);
       promptVersion ??= assessment.assessment.promptVersion;
-      jobs.push({ label: job.label, status: "assessed", ingest, assessment, ingestMs: ingested.ms, assessMs: assessed.ms });
+      const runId = /\(run ([0-9a-f-]{36})\)/.exec(toolText(assessed.content))?.[1];
+      jobs.push({ label: job.label, status: "assessed", ingest, assessment, ingestMs: ingested.ms, assessMs: assessed.ms, ...(runId ? { runId } : {}) });
     }
     // Wait (bounded) for cancelled or late model calls so their telemetry lands in the saved file; anything
     // still pending after the grace period is counted, not awaited further.
@@ -135,7 +142,7 @@ export function renderIndex(results: UsageCheckResults): string {
       <td><strong>${a.verdict}</strong></td><td>${a.confidence}</td><td>${a.hardBlockers.length}</td>
       <td>${c ? `${escape(c.seniorityFit.value)} / ${escape(c.careerStoryRisk.value)}` : "not evaluated"}</td>
       <td>${c?.careerStoryRisk.clarificationQuestion ? escape(c.careerStoryRisk.clarificationQuestion) : ""}</td>
-      <td>${job.ingestMs} + ${job.assessMs}</td><td>${escape(a.modelVersion)}</td></tr>`;
+      <td>${job.ingestMs} + ${job.assessMs}</td><td>${escape(a.modelVersion)}${job.runId ? `<br><small>run ${escape(job.runId)} · <code>pnpm diagnose ${escape(job.runId)}</code></small>` : ""}</td></tr>`;
   }).join("");
   return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Career Radar · usage check</title>
   <body style="max-width:960px;margin:32px auto;padding:0 18px;font:14px/1.6 system-ui">
