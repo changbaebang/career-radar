@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { FitAssessmentSchema, type CandidateProfile, type Citation, type FitAssessment } from "@career-radar/shared";
 import { CITATION_INVALID_DROPPED, CITATION_ORPHAN_DROPPED, CITATION_REKEYED, validateCitations } from "../src/domain/assessment/citations.js";
 import { matchClaimId, requirementClaimId } from "../src/domain/assessment/claims.js";
-import { finalizeAssessment } from "../src/domain/assessment/pipeline.js";
+import { finalizeAssessment, finalizeAssessmentDetailed } from "../src/domain/assessment/pipeline.js";
 import { applyAssessmentPolicy } from "../src/domain/assessment/policy.js";
 import { chunkId, chunkProfile } from "../src/domain/evidence/chunk.js";
 import { retrieveEvidence } from "../src/domain/evidence/retrieve.js";
@@ -140,5 +140,45 @@ describe("M5-B chunk ids are content hashes, membership is the trace's job", () 
     const { id: _id, metadata: _m, ...base } = ledChunk;
     void _id; void _m;
     expect(chunkId(base)).toBe(ledChunk.id);
+  });
+});
+
+describe("stage diagnostics: what the pipeline did, separately from the sentences it wrote", () => {
+  const none = { ungroundedMatchesRemoved: 0, citationsRekeyed: 0, citationsOrphaned: 0, citationsInvalid: 0, screeningContextDiscarded: false };
+
+  it("returns the same assessment as finalizeAssessment and all-zero diagnostics for a clean draft", () => {
+    const draft = withCitations([{ claimId: matchId, ref: chunkRef(ledChunk.id, ledChunk.text) }]);
+    const detailed = finalizeAssessmentDetailed(syntheticProfile, syntheticJob, draft, evidence);
+    expect(detailed.assessment).toEqual(finalizeAssessment(syntheticProfile, syntheticJob, draft, evidence));
+    expect(detailed.diagnostics).toEqual(none);
+  });
+
+  it("counts a removed ungrounded match, its orphaned citation, a re-key and an unresolvable citation by stage", () => {
+    const invented = { ...match, evidence: "Led a React platform team and shipped a compiler" };
+    const draft = withCitations([
+      { claimId: matchClaimId(invented), ref: chunkRef(ledChunk.id, ledChunk.text) },
+      { claimId: matchId, ref: chunkRef("f".repeat(64), ledChunk.text) },
+    ], { strongestMatches: [invented, match] });
+    const { assessment, diagnostics } = finalizeAssessmentDetailed(syntheticProfile, syntheticJob, draft, evidence);
+    expect(diagnostics).toEqual({ ...none, ungroundedMatchesRemoved: 1, citationsOrphaned: 1, citationsInvalid: 1 });
+    expect(assessment.citations).toEqual([]);
+    expect(assessment.missingInformation).toEqual(expect.arrayContaining([CITATION_ORPHAN_DROPPED, CITATION_INVALID_DROPPED]));
+    const gap = { requirementId: "req_1", requirement: "Lead a React team", reason: "No lead evidence", severity: "hard_blocker" as const };
+    const blocker = { requirement: "lead a react team.", reason: "Model blocker", severity: "hard_blocker" as const };
+    const rekeyed = finalizeAssessmentDetailed(syntheticProfile, syntheticJob, withCitations([
+      { claimId: requirementClaimId(gap), ref: chunkRef(ledChunk.id, ledChunk.text) },
+      { claimId: requirementClaimId(blocker), ref: chunkRef(otherChunk.id, otherChunk.text) },
+    ], { strongestMatches: [], gaps: [gap], hardBlockers: [blocker], verdict: "STRETCH" }), evidence);
+    expect(rekeyed.diagnostics).toEqual({ ...none, citationsRekeyed: 1 });
+  });
+
+  it("does not report a stage from a sentence the model wrote itself, and still reports the stage when it really ran", () => {
+    const written = [CITATION_INVALID_DROPPED, CITATION_ORPHAN_DROPPED, CITATION_REKEYED, "Model-written note about missing years."];
+    const clean = finalizeAssessmentDetailed(syntheticProfile, syntheticJob, withCitations([{ claimId: matchId, ref: chunkRef(ledChunk.id, ledChunk.text) }], { missingInformation: written }), evidence);
+    expect(clean.diagnostics).toEqual(none);
+    expect(clean.assessment.missingInformation).toEqual(written); // the text is kept for the reader, unchanged
+    const real = finalizeAssessmentDetailed(syntheticProfile, syntheticJob, withCitations([{ claimId: matchId, ref: chunkRef("f".repeat(64), ledChunk.text) }], { missingInformation: written }), evidence);
+    expect(real.diagnostics).toEqual({ ...none, citationsInvalid: 1 });
+    expect(real.assessment.missingInformation).toEqual(written); // deduped: the sentence was already there
   });
 });

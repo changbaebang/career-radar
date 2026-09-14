@@ -50,20 +50,29 @@ function uniqueGaps(gaps: Gap[]): { gaps: Gap[]; merged: Map<string, string> } {
 // M5-B: citations follow the claims the policy keeps. A removed match takes its citations with it
 // (orphan, dropped), a collapsed gap hands its citations to the survivor (re-keyed), and every drop
 // or re-key is recorded as a fixed sentence. Absent citations stay absent (pre-M5-B results).
-function reconcileCitations(citations: Citation[] | undefined, surviving: Set<string>, merged: Map<string, string>): { citations?: Citation[]; notes: string[] } {
-  if (citations === undefined) return { notes: [] };
+function reconcileCitations(citations: Citation[] | undefined, surviving: Set<string>, merged: Map<string, string>): { citations?: Citation[]; notes: string[]; rekeyed: number; orphaned: number } {
+  if (citations === undefined) return { notes: [], rekeyed: 0, orphaned: 0 };
   const kept: Citation[] = [];
-  let rekeyed = false, orphaned = false;
+  let rekeyed = 0, orphaned = 0;
   for (const citation of citations) {
     let claimId = citation.claimId;
-    if (!surviving.has(claimId) && merged.has(claimId)) { claimId = merged.get(claimId)!; rekeyed = true; }
-    if (!surviving.has(claimId)) { orphaned = true; continue; }
+    if (!surviving.has(claimId) && merged.has(claimId)) { claimId = merged.get(claimId)!; rekeyed++; }
+    if (!surviving.has(claimId)) { orphaned++; continue; }
     kept.push({ ...citation, claimId });
   }
-  return { citations: kept, notes: [...(rekeyed ? [CITATION_REKEYED] : []), ...(orphaned ? [CITATION_ORPHAN_DROPPED] : [])] };
+  return { citations: kept, notes: [...(rekeyed ? [CITATION_REKEYED] : []), ...(orphaned ? [CITATION_ORPHAN_DROPPED] : [])], rekeyed, orphaned };
 }
 
+// What the policy actually did to a draft, as counts. The fixed sentences in missingInformation are
+// the user-facing trace of the same events, but they cannot be attributed from text alone because
+// the model's own missingInformation entries are kept verbatim; the evaluation reads these counts.
+export type PolicyDiagnostics = { ungroundedMatchesRemoved: number; citationsRekeyed: number; citationsOrphaned: number };
+
 export function applyAssessmentPolicy(profile: CandidateProfile, job: JobPosting, assessment: FitAssessment): FitAssessment {
+  return applyAssessmentPolicyDetailed(profile, job, assessment).assessment;
+}
+
+export function applyAssessmentPolicyDetailed(profile: CandidateProfile, job: JobPosting, assessment: FitAssessment): { assessment: FitAssessment; diagnostics: PolicyDiagnostics } {
   const evidence = candidateEvidence(profile);
   const strongestMatches = assessment.strongestMatches.filter((match) => isGrounded(match, evidence));
   const removedUngrounded = strongestMatches.length !== assessment.strongestMatches.length;
@@ -100,7 +109,8 @@ export function applyAssessmentPolicy(profile: CandidateProfile, job: JobPosting
   if (strongestMatches.length === 0 && verdict === "REALISTIC") { verdict = "STRETCH"; confidence = "low"; }
   const missingInformation = [...assessment.missingInformation, ...reconciled.notes];
   if (removedUngrounded) missingInformation.push(UNGROUNDED_MATCH_REMOVED);
-  return FitAssessmentSchema.parse({ ...assessment, verdict, confidence, strongestMatches, gaps,
+  const result = FitAssessmentSchema.parse({ ...assessment, verdict, confidence, strongestMatches, gaps,
     hardBlockers, missingInformation: [...new Set(missingInformation)],
     ...(reconciled.citations !== undefined ? { citations: reconciled.citations } : {}) });
+  return { assessment: result, diagnostics: { ungroundedMatchesRemoved: assessment.strongestMatches.length - strongestMatches.length, citationsRekeyed: reconciled.rekeyed, citationsOrphaned: reconciled.orphaned } };
 }

@@ -30,6 +30,8 @@ export type GoldenFakeOptions = {
   badCitation?: boolean;
   // Give every match an evidence sentence that is not in the profile (the policy must remove it).
   ungroundedEvidence?: boolean;
+  // Model-written missingInformation entries to append to every draft (may equal the pipeline's fixed sentences).
+  injectNotes?: string[];
   onResponse?: (event: AnalyzerResponseEvent) => void;
   // Simulated latency per call; it ends early with an AbortError when the call's signal fires.
   delayMs?: number;
@@ -144,7 +146,7 @@ export class GoldenFakeAnalyzer implements CareerAnalyzer {
       const verdict = gaps.some((gap) => gap.severity === "hard_blocker") ? "PASS" : matches.length === job.required.length && matches.length > 0 ? "REALISTIC" : "STRETCH";
       return FitAssessmentSchema.parse({
         verdict, confidence: "medium", resumeContortion: "low", strongestMatches: matches, gaps, hardBlockers: [], interviewRisks: [],
-        recommendation: "Synthetic fake recommendation; not a model output.", missingInformation: [], citations,
+        recommendation: "Synthetic fake recommendation; not a model output.", missingInformation: [...(this.#options.injectNotes ?? [])], citations,
         modelVersion: "golden-fake", promptVersion: "golden-fake-prompt",
       });
     });

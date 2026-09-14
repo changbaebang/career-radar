@@ -20,7 +20,16 @@ export const CITATION_BOUNDS_DROPPED =
 // orphaned citation is dropped, diagnosed with a fixed sentence and lowers confidence; the verdict,
 // evidence, gaps and blockers are never changed here.
 export function validateCitations(profile: CandidateProfile, job: JobPosting, assessment: FitAssessment, evidence?: RetrievedEvidence): FitAssessment {
-  if (assessment.citations === undefined) return assessment;
+  return validateCitationsDetailed(profile, job, assessment, evidence).assessment;
+}
+
+// The validator's counts, for callers that must attribute a dropped citation to this step rather
+// than infer it from the fixed sentence (which the model could also have written).
+export type CitationDiagnostics = { citationsInvalid: number; citationsOrphaned: number };
+
+export function validateCitationsDetailed(profile: CandidateProfile, job: JobPosting, assessment: FitAssessment, evidence?: RetrievedEvidence): { assessment: FitAssessment; diagnostics: CitationDiagnostics } {
+  const none = { citationsInvalid: 0, citationsOrphaned: 0 };
+  if (assessment.citations === undefined) return { assessment, diagnostics: none };
   const texts = evidenceTextById(evidence);
   const claims = claimIds(assessment);
   const kept: Citation[] = [];
@@ -30,12 +39,13 @@ export function validateCitations(profile: CandidateProfile, job: JobPosting, as
     if (!isEvidenceRefGrounded(profile, job, citation.ref, texts)) { invalid++; continue; }
     kept.push(citation);
   }
-  if (invalid === 0 && orphaned === 0) return assessment;
+  if (invalid === 0 && orphaned === 0) return { assessment, diagnostics: none };
   const missingInformation = [...assessment.missingInformation];
   if (invalid) missingInformation.push(CITATION_INVALID_DROPPED);
   if (orphaned) missingInformation.push(CITATION_ORPHAN_DROPPED);
-  return FitAssessmentSchema.parse({
+  const validated = FitAssessmentSchema.parse({
     ...assessment, citations: kept, missingInformation: [...new Set(missingInformation)],
     ...(invalid ? { confidence: "low" as const } : {}),
   });
+  return { assessment: validated, diagnostics: { citationsInvalid: invalid, citationsOrphaned: orphaned } };
 }

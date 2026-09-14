@@ -4,10 +4,8 @@ import type { CareerAnalyzer } from "../server/src/ai/analyzer.js";
 import { withCallDeadline } from "../server/src/ai/deadline.js";
 import { OPENROUTER_ERRORS } from "../server/src/ai/openrouter.js";
 import type { AnalyzerResponseEvent } from "../server/src/ai/telemetry.js";
-import { CITATION_BOUNDS_DROPPED, CITATION_INVALID_DROPPED, CITATION_ORPHAN_DROPPED, CITATION_REKEYED } from "../server/src/domain/assessment/citations.js";
 import { normalizeEvidence } from "../server/src/domain/assessment/normalize.js";
-import { SCREENING_CONTEXT_DISCARDED, finalizeAssessment } from "../server/src/domain/assessment/pipeline.js";
-import { UNGROUNDED_MATCH_REMOVED } from "../server/src/domain/assessment/policy.js";
+import { finalizeAssessmentDetailed, type PipelineDiagnostics } from "../server/src/domain/assessment/pipeline.js";
 import { tokenize } from "../server/src/domain/evidence/lexical.js";
 import { retrieveEvidence } from "../server/src/domain/evidence/retrieve.js";
 import { assertRedacted } from "../server/scripts/measure-live/report.js";
@@ -18,7 +16,7 @@ import { goldenPostingText, goldenResumeText, type GoldenCase } from "./fixtures
 // through an analyzer, then the deterministic pipeline (retrieval, policy, citation and context
 // validation). Failures are execution outcomes, never PASS. Numbers under the fake analyzer verify
 // the runner; numbers under a real provider are `live-verified` for that provider and model only.
-export const MODEL_REPORT_VERSION = 2;
+export const MODEL_REPORT_VERSION = 3;
 export const MODEL_METRIC_VERSION = "model-metrics-v1";
 export const CALLS_PER_CASE = 3;
 // How long to wait for calls still in flight after a deadline abort before the report is assembled.
@@ -42,15 +40,21 @@ export function classifyFailure(error: unknown, lastEvent?: AnalyzerResponseEven
   return "other";
 }
 
-// Fixed pipeline notes the report may name, as short codes. Only these exact sentences are looked up in
-// missingInformation; model-written entries there are never copied.
-export const NOTE_CODES = [
-  [CITATION_INVALID_DROPPED, "citationInvalid"], [CITATION_ORPHAN_DROPPED, "citationOrphan"], [CITATION_REKEYED, "citationRekeyed"],
-  [CITATION_BOUNDS_DROPPED, "citationBounds"], [SCREENING_CONTEXT_DISCARDED, "screeningContextDiscarded"], [UNGROUNDED_MATCH_REMOVED, "ungroundedMatchRemoved"],
-] as const;
-export type NoteCode = (typeof NOTE_CODES)[number][1];
-const NoteCodeSchema = z.enum(["citationInvalid", "citationOrphan", "citationRekeyed", "citationBounds", "screeningContextDiscarded", "ungroundedMatchRemoved"]);
-const NoteCountsSchema = z.object({ citationInvalid: z.number().int(), citationOrphan: z.number().int(), citationRekeyed: z.number().int(), citationBounds: z.number().int(), screeningContextDiscarded: z.number().int(), ungroundedMatchRemoved: z.number().int() }).strict();
+// Pipeline diagnostics as short codes. They come from what each stage reports it did
+// (finalizeAssessmentDetailed), never from the fixed sentences in missingInformation: the model's own
+// missingInformation entries are kept verbatim there, so a sentence match cannot prove the stage ran.
+// Notes added inside the adapter mapping (citation bounds, producer-side context discard) are not
+// attributable from the evaluation path and are not reported.
+export const NOTE_CODES = ["ungroundedMatchRemoved", "citationRekeyed", "citationOrphan", "citationInvalid", "screeningContextDiscarded"] as const;
+export type NoteCode = (typeof NOTE_CODES)[number];
+export function noteCodes(diagnostics: PipelineDiagnostics): NoteCode[] {
+  return NOTE_CODES.filter((code) => ({
+    ungroundedMatchRemoved: diagnostics.ungroundedMatchesRemoved > 0, citationRekeyed: diagnostics.citationsRekeyed > 0, citationOrphan: diagnostics.citationsOrphaned > 0,
+    citationInvalid: diagnostics.citationsInvalid > 0, screeningContextDiscarded: diagnostics.screeningContextDiscarded,
+  })[code]);
+}
+const NoteCodeSchema = z.enum(NOTE_CODES);
+const NoteCountsSchema = z.object({ ungroundedMatchRemoved: z.number().int(), citationRekeyed: z.number().int(), citationOrphan: z.number().int(), citationInvalid: z.number().int(), screeningContextDiscarded: z.number().int() }).strict();
 const RatioSchema = z.object({ numerator: z.number().int(), denominator: z.number().int(), value: z.number().nullable() }).strict();
 const TelemetrySchema = z.object({
   operation: z.enum(["extractProfile", "extractJob", "assess"]), outcome: z.enum(["ok", "error"]), durationMs: z.number(),
@@ -82,6 +86,7 @@ const CaseSchema = z.object({
     blockerRecallAll: z.object({ found: z.number().int(), all: z.number().int(), value: z.number().nullable() }).strict(),
     spuriousBlockers: z.number().int(), forbiddenClaims: z.number().int(),
     citations: z.object({ supplied: z.number().int(), valid: z.number().int(), claims: z.number().int(), unsupported: z.number().int() }).strict(),
+    // Validator-attributed: at least one supplied citation did not resolve for this run.
     citationInvalid: z.boolean(),
     retrieval: z.object({ queries: z.number().int(), chunks: z.number().int(), missingTerms: z.number().int() }).strict(),
   }).strict().optional(),
@@ -263,7 +268,7 @@ export async function runModelEvaluation(cases: GoldenCase[], options: ModelRunO
         log(`${item.caseId}: assessment failed`);
         continue;
       }
-      const final = finalizeAssessment(profile, job, draft, evidence);
+      const { assessment: final, diagnostics } = finalizeAssessmentDetailed(profile, job, draft, evidence);
       const blockerTexts = final.hardBlockers.map((blocker) => normalizeEvidence(blocker.requirement));
       const blockerIds = new Set(final.hardBlockers.map((blocker) => blocker.requirementId).filter((id): id is string => id !== undefined));
       const isFound = (gold: string) => blockerTexts.includes(normalizeEvidence(gold)) || (mapping.matchedIds.has(gold) && blockerIds.has(mapping.matchedIds.get(gold)!));
@@ -274,7 +279,7 @@ export async function runModelEvaluation(cases: GoldenCase[], options: ModelRunO
       const expectedIds = new Set(item.expectedBlockers.map((gold) => mapping.matchedIds.get(gold)).filter(Boolean));
       const spurious = final.hardBlockers.filter((blocker) => !expectedKeys.has(normalizeEvidence(blocker.requirement)) && !(blocker.requirementId && expectedIds.has(blocker.requirementId))).length;
       const forbidden = item.mustNotClaim.filter((claim) => final.strongestMatches.some((match) => normalizeEvidence(match.evidence).includes(normalizeEvidence(claim)))).length;
-      const notes = NOTE_CODES.filter(([text]) => final.missingInformation.includes(text)).map(([, code]) => code);
+      const notes = noteCodes(diagnostics);
       caseEvents.push(...events.slice(before));
       results.push({
         ...base, outcome: "assessed", calls: events.length - before, extraction,
@@ -287,7 +292,7 @@ export async function runModelEvaluation(cases: GoldenCase[], options: ModelRunO
           blockerRecallAll: { found: foundAll, all: item.expectedBlockers.length, value: item.expectedBlockers.length ? foundAll / item.expectedBlockers.length : null },
           spuriousBlockers: spurious, forbiddenClaims: forbidden,
           citations: citationCounts(draft, final),
-          citationInvalid: final.missingInformation.some((note) => note === CITATION_INVALID_DROPPED || note === CITATION_BOUNDS_DROPPED),
+          citationInvalid: diagnostics.citationsInvalid > 0,
           retrieval: { queries: evidence.traces.length, chunks: evidence.chunks.length, missingTerms: evidence.traces.reduce((n, trace) => n + trace.misses.length, 0) },
         },
         telemetry: caseEvents.map(project),
@@ -331,7 +336,7 @@ export async function runModelEvaluation(cases: GoldenCase[], options: ModelRunO
       inventedEmployers: extracted.filter((r) => r.extraction!.inventedEmployer).length,
       forbiddenClaims: sum(assessed, (r) => r.assessment!.forbiddenClaims),
       verdictChangedByPolicy: ratio(assessed.filter((r) => r.assessment!.verdict !== r.assessment!.draft.verdict).length, assessed.length),
-      noteCounts: Object.fromEntries(NOTE_CODES.map(([, code]) => [code, assessed.filter((r) => r.assessment!.notes.includes(code)).length])) as Record<NoteCode, number>,
+      noteCounts: Object.fromEntries(NOTE_CODES.map((code) => [code, assessed.filter((r) => r.assessment!.notes.includes(code)).length])) as Record<NoteCode, number>,
       schemaFailureRate: ratio(failures("schema_failure"), attempted.length), refusalRate: ratio(failures("refusal"), attempted.length),
       truncationRate: ratio(failures("truncation"), attempted.length), timeoutRate: ratio(failures("timeout"), attempted.length),
       citationCorrectness: ratio(sum(assessed, (r) => r.assessment!.citations.valid), sum(assessed, (r) => r.assessment!.citations.supplied)),
@@ -402,7 +407,7 @@ export function renderModelMarkdown(report: ModelEvalReport, comparison?: ModelC
     `| Verdict agreement over reviewed cases only | ${fraction(m.humanVerdictAgreement)} |`,
     `| Invented employers / forbidden positive claims | ${m.inventedEmployers} / ${m.forbiddenClaims} |`,
     `| Verdict changed by the policy (draft → final) | ${fraction(m.verdictChangedByPolicy)} |`,
-    `| Cases with fixed notes: citation invalid / orphan / rekeyed / bounds; screening context discarded; ungrounded match removed | ${m.noteCounts.citationInvalid} / ${m.noteCounts.citationOrphan} / ${m.noteCounts.citationRekeyed} / ${m.noteCounts.citationBounds}; ${m.noteCounts.screeningContextDiscarded}; ${m.noteCounts.ungroundedMatchRemoved} |`,
+    `| Cases with pipeline diagnostics: ungrounded match removed; citation rekeyed / orphan / invalid; screening context discarded | ${m.noteCounts.ungroundedMatchRemoved}; ${m.noteCounts.citationRekeyed} / ${m.noteCounts.citationOrphan} / ${m.noteCounts.citationInvalid}; ${m.noteCounts.screeningContextDiscarded} |`,
     `| Schema failure / refusal / truncation / timeout rates | ${percent(m.schemaFailureRate)} / ${percent(m.refusalRate)} / ${percent(m.truncationRate)} / ${percent(m.timeoutRate)} |`,
     `| Citation correctness (valid ÷ supplied) / unsupported claim rate | ${fraction(m.citationCorrectness)} / ${fraction(m.unsupportedClaimRate)} |`,
     `| Latency ms (min / median / max): extractProfile | ${m.latency.extractProfile.minMs ?? "n/a"} / ${m.latency.extractProfile.medianMs ?? "n/a"} / ${m.latency.extractProfile.maxMs ?? "n/a"} |`,
