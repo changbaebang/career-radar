@@ -42,10 +42,13 @@ on the current tree reports `compatible: true`, `compared: 28`, `schemaChanged: 
 | Unsupported claim rate | — | 48/51 |
 | Positive-evidence failures | 0 | 0 |
 
-The two new metrics describe the seven citation cases by construction: five adversarial
-references are meant to be dropped, so 4/9 and 48/51 are expected values, not scores. Every
-human-review field is still `pending`: the policy dataset is a contract on the policy, not gold
-about people.
+The table is the state of two different datasets, not a before/after measurement of the same one:
+seven citation cases were added in M5-B. `citationCorrectness` 4/9 comes from those seven only (nine
+supplied citations, five adversarial ones dropped by construction). `unsupportedClaimRate` 48/51 is
+over all 35 cases: the original 28 supply no citations at all, so their 43 claims count as
+unsupported, and the seven new cases add 5 unsupported of 8. Both are expected values for this
+dataset, not scores. Every human-review field is still `pending`: the policy dataset is a contract
+on the policy, not gold about people.
 
 ## Model-mode observations (not a baseline)
 
@@ -94,10 +97,14 @@ request limit.
 The usage check's third question — is this easier than pasting the same material into a plain
 chat — was answered "not yet" in round 1 and has not been measured side by side since. The owner's
 own judgment on 2026-09-14 was that no large advantage had shown up, which is why verification ends
-on the free tier. What the repository can show is narrower and concrete: a deterministic policy that
-never lets a model failure or an unsupported claim become a verdict, citations that resolve only
-against the inputs and retrieval of the same run, failures counted as outcomes in comparable reports,
-and a per-call trace that explains where time went. What it cannot show is that a person prioritizing
+on the free tier. What the repository can show is narrower and concrete. The M1 policy removes a
+positive match whose evidence sentence is not in the profile and promotes unmet binary core
+requirements to hard blockers. The citation validator drops a citation that does not resolve against
+this run's inputs or retrieval trace and lowers confidence, but keeps the verdict, evidence, gaps and
+blockers as they are — an unsupported claim is marked, not removed, and a located quote is not proof
+that the sentence supports the claim. A model failure of any class is an execution outcome and never
+a verdict. Reports are comparable across runs, and a per-call trace explains where time went. What
+it cannot show is that a person prioritizing
 applications ends up better off than with a plain chat. That comparison would need the same inputs
 run both ways and read by the same person; it is not scheduled.
 

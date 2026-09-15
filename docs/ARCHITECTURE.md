@@ -26,9 +26,13 @@ server/scripts/    measure:live harness, usage-check, diagnose, db:reset, traces
 Three packages in one pnpm workspace. `packages/shared` holds the **read contracts**: every
 structure the widget, the store and the evals accept (`CandidateProfile`, `JobPosting`,
 `FitAssessment` with citations and screening context, application records). The **generation
-contracts** the model is asked to fill (`server/src/ai/contracts.ts`) are deliberately looser than
-the read contracts: bounds are applied per item when a draft is mapped into a read structure, so an
-out-of-bounds item is dropped with a fixed note instead of failing the whole result (M5-B lesson).
+contracts** the model is asked to fill (`server/src/ai/contracts.ts`) differ from the read contracts
+on purpose, in both directions: `score` is an integer in generation and may be a stored fraction in
+reading; citation bounds (reference length, claim id length, count) exist only in the read contract
+and are applied per citation when a draft is mapped, so one out-of-bounds citation is dropped with a
+fixed note and lowered confidence instead of failing the assessment (M5-B lesson). A draft that
+violates the generation contract itself still fails to parse, and that failure is an execution
+outcome, not a verdict.
 
 ## One assessment, stage by stage
 
@@ -80,18 +84,35 @@ The model is asked for judgment; the code decides what counts as evidence and wh
 A model failure (schema, refusal, truncation, timeout, provider error) is an execution outcome and
 is never turned into a verdict.
 
-## Where data lives, and what never leaves
+## Where data goes
 
-- **Leaves the machine:** the resume text, the posting text and the retrieved chunks, in each
-  model call, to the configured provider only (`docs/PROVIDERS.md`). A free tier is still a
-  transmission; every live path requires an explicit approval flag and refuses under CI.
-- **Stays local:** `data/career-radar.db` (structured profile, postings, assessment snapshots,
-  applications, events), `data/traces/`, usage-check results, evaluation reports. All ignored by
-  Git; `pnpm db:reset` wipes the database and the traces.
-- **Never persisted anywhere:** the raw resume text, prompts, model-written free text in traces or
-  reports, API keys (the CLIs print fixed refusal strings, never argv or env values).
-- **Committed on purpose:** synthetic fixtures, the golden set (synthetic texts), and the policy
-  baselines under `evals/baselines/` (redacted by construction: counts, hashes and fixture ids).
+What is transmitted, by path and by call:
+
+| Path | Who receives the inputs | Gate |
+| --- | --- | --- |
+| ChatGPT host → this server | ChatGPT processes the conversation, the tool inputs and the tool results under its own terms before and after the server does; the server then sends the model calls below to the configured provider | The host's own user consent; no CLI flag and no CI refusal on this path (`server/src/index.ts` → `createHttpApp` → `createAnalyzerFromEnv`) |
+| Configured provider (`docs/PROVIDERS.md`) | OpenAI directly, or OpenRouter, which forwards to the upstream endpoint that serves the model (recorded per call as `upstreamProvider`) | Provider choice is explicit, never a silent fallback |
+| CLI runs (`measure:live`, `usage-check`, `eval --mode model`) | Same provider path | Explicit approval flags, refused under CI/test, hard call caps, OpenRouter live only with a `:free` model id unless cost is approved |
+
+Per call: `profile_upsert` sends the **raw resume text**; `job_ingest` sends the **posting text**;
+`job_assess` and the recommendation batch send the **structured profile, the structured posting and
+the retrieved chunks** (sentences from the profile). A free tier is still a transmission.
+
+What is kept, and where:
+
+| Data | Where | Removal |
+| --- | --- | --- |
+| Structured profile, postings (text included, they are public), assessment snapshots, applications, events | `data/career-radar.db` (gitignored) | `pnpm db:reset` |
+| Run traces: timings, counts, hashes, ids, fixed classes; no input text | `data/traces/` (gitignored) | `pnpm traces:clear`, `pnpm db:reset` |
+| Usage-check results and page inputs; `measure:live --inspect` inspection directory (model drafts and extraction results, 0700) | `data/usage-check/`, the run's `inspection/` (gitignored) | Delete the run directory |
+| Evaluation and measurement reports (counts, hashes, fixed strings) | `evals/reports/` (gitignored) | Delete the run directory |
+| API keys | `.env.local` (gitignored, 0600), by the owner | Rotate or delete the file |
+| Synthetic fixtures, the golden set, and the committed policy baselines — these carry the **full synthetic profile, posting and injected-draft texts** in `cases[].fixture` and the policy's output sentences in `cases[].actual` | Repository | Committed on purpose; nothing in them is about a real person |
+
+Not kept by this code: the raw resume text after extraction, prompts, and model-written free text
+in traces and aggregate reports; the CLIs print fixed refusal strings, never argv or env values.
+Local removal says nothing about retention by ChatGPT, OpenAI, OpenRouter or the upstream endpoint;
+their policies apply to everything transmitted.
 
 ## Evaluation and measurement tools
 
