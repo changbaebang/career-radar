@@ -78,6 +78,8 @@ const CaseSchema = z.object({
     retrieval: z.object({ queries: z.number().int(), chunks: z.number().int(), missingTerms: z.number().int() }).strict(),
   }).strict().optional(),
   telemetry: z.array(TelemetrySchema),
+  // Telemetry of this case's earlier attempts in a resumed run (usage and latency stay cumulative; scores use `telemetry`).
+  priorTelemetry: z.array(TelemetrySchema).optional(),
 }).strict();
 
 const LatencySchema = z.object({ count: z.number().int(), minMs: z.number().nullable(), medianMs: z.number().nullable(), maxMs: z.number().nullable() }).strict();
@@ -91,6 +93,10 @@ export const ModelEvalReportSchema = z.object({
   codeSha: z.string().min(1), dirty: z.boolean(), generatedAt: z.string().datetime(),
   goldenSetVersion: z.string().min(1), goldenSetHash: z.string().regex(/^[a-f0-9]{64}$/),
   selectedCases: z.number().int(), callCap: z.number().int(), modelCalls: z.number().int(),
+  // Model-written strings (extracted requirement texts, hard blocker texts) that equalled an input sentence and were replaced.
+  redactions: z.number().int(),
+  // Set when this report merges a rerun of the non-assessed cases of an earlier report (--resume).
+  resumed: z.object({ from: z.string().datetime(), rerunCases: z.number().int(), rounds: z.number().int() }).strict().optional(),
   // Calls cut by the per-call deadline, and calls still unsettled after the grace period (expected 0).
   abortedCalls: z.number().int(), unsettledCalls: z.number().int(),
   transport: z.object({ maxRetries: z.literal(0), logLevel: z.literal("off"), timeoutMs: z.number().int().optional() }).strict(),
@@ -185,7 +191,22 @@ function matchRequirements(item: GoldenCase, job: JobPosting) {
   return { matchedGold, matchedIds, unmatchedGold, unmatchedExtracted };
 }
 
-function latency(events: AnalyzerResponseEvent[], operation: Stage) {
+export const REDACTED_TEXT = "[redacted: equals an input sentence]";
+// Model-written strings the report keeps for readability may copy an input sentence verbatim (a
+// requirement extracted from a responsibilities line, a blocker that quotes the resume). They are
+// replaced, never dropped with the run: the count is reported and the redaction assertion still guards the rest.
+function sanitizeCase(result: ModelCaseResult, forbidden: string[]): { result: ModelCaseResult; redactions: number } {
+  let redactions = 0;
+  const clean = (text: string) => { if (forbidden.some((fragment) => fragment.length >= 8 && text.includes(fragment))) { redactions++; return REDACTED_TEXT; } return text; };
+  const extraction = result.extraction && { ...result.extraction,
+    unmatchedGold: result.extraction.unmatchedGold.map((u) => ({ ...u, nearestExtracted: u.nearestExtracted === null ? null : clean(u.nearestExtracted) })),
+    unmatchedExtracted: result.extraction.unmatchedExtracted.map(clean) };
+  const assessment = result.assessment && { ...result.assessment, hardBlockers: result.assessment.hardBlockers.map(clean) };
+  return { result: { ...result, ...(extraction ? { extraction } : {}), ...(assessment ? { assessment } : {}) }, redactions };
+}
+
+type TelemetryRecord = ModelCaseResult["telemetry"][number];
+function latency(events: TelemetryRecord[], operation: Stage) {
   const values = events.filter((event) => event.operation === operation).map((event) => event.durationMs).sort((a, b) => a - b);
   const median = values.length ? values[Math.floor((values.length - 1) / 2)]! : null;
   return { count: values.length, minMs: values.length ? Math.round(values[0]!) : null, medianMs: median === null ? null : Math.round(median), maxMs: values.length ? Math.round(values[values.length - 1]!) : null };
@@ -293,6 +314,24 @@ export async function runModelEvaluation(cases: GoldenCase[], options: ModelRunO
   }
   const unsettledCalls = deadline ? await deadline.settle(SETTLE_GRACE_MS) : 0;
   const abortedCalls = deadline?.aborted ?? 0;
+  const report = {
+    reportKind: "model-evaluation" as const, reportVersion: MODEL_REPORT_VERSION, metricVersion: MODEL_METRIC_VERSION, mode: "model" as const,
+    execution: options.execution, provider: options.provider, requestedModel: options.requestedModel,
+    promptVersion: options.metadata.promptVersion, policyHash: options.metadata.policyHash, schemaHash: options.metadata.schemaHash,
+    codeSha: options.metadata.codeSha, dirty: options.metadata.dirty, generatedAt: new Date().toISOString(),
+    goldenSetVersion: options.goldenSetVersion, goldenSetHash: digest(cases.map(goldHash)),
+    selectedCases: cases.length, callCap: options.callCap, modelCalls: calls, abortedCalls, unsettledCalls,
+    transport: options.transport, store: options.store, approvals: options.approvals, problems,
+    ...summarizeCases(results.map((result, index) => sanitizeCase(result, modelReportForbiddenFragments([cases[index]!])))),
+  };
+  return ModelEvalReportSchema.parse({ ...report, success: problems.length === 0 && report.success });
+}
+
+// Aggregates from case records only (telemetry included), so a merged report is computed the same way.
+function summarizeCases(sanitized: { result: ModelCaseResult; redactions: number }[]) {
+  const results = sanitized.map((entry) => entry.result);
+  // Usage, latency and response models cover every attempt (earlier rounds included); scores use the final attempt.
+  const events = results.flatMap((result) => [...(result.priorTelemetry ?? []), ...result.telemetry]);
   const assessed = results.filter((result) => result.assessment);
   const extracted = results.filter((result) => result.extraction);
   const attempted = results.filter((result) => result.outcome !== "not_attempted");
@@ -301,16 +340,10 @@ export async function runModelEvaluation(cases: GoldenCase[], options: ModelRunO
   const reviewed = assessed.filter((result) => result.humanReview === "reviewed");
   const usageEvents = events.filter((event) => event.usage);
   const reasoning = usageEvents.filter((event) => event.usage?.reasoningTokens !== undefined);
-  const report = {
-    reportKind: "model-evaluation" as const, reportVersion: MODEL_REPORT_VERSION, metricVersion: MODEL_METRIC_VERSION, mode: "model" as const,
-    execution: options.execution, provider: options.provider, requestedModel: options.requestedModel,
+  return {
     responseModels: [...new Set(events.map((event) => event.responseModel).filter((model): model is string => Boolean(model)))].sort(),
     upstreamProviders: [...new Set(events.map((event) => event.upstreamProvider).filter((upstream): upstream is string => Boolean(upstream)))].sort(),
-    promptVersion: options.metadata.promptVersion, policyHash: options.metadata.policyHash, schemaHash: options.metadata.schemaHash,
-    codeSha: options.metadata.codeSha, dirty: options.metadata.dirty, generatedAt: new Date().toISOString(),
-    goldenSetVersion: options.goldenSetVersion, goldenSetHash: digest(cases.map(goldHash)),
-    selectedCases: cases.length, callCap: options.callCap, modelCalls: calls, abortedCalls, unsettledCalls,
-    transport: options.transport, store: options.store, approvals: options.approvals, problems,
+    redactions: sum(sanitized, (entry) => entry.redactions),
     cases: results,
     metrics: {
       outcomes: { assessed: assessed.length, extractionFailed: results.filter((r) => r.outcome === "extraction_failed").length,
@@ -330,17 +363,67 @@ export async function runModelEvaluation(cases: GoldenCase[], options: ModelRunO
       unsupportedClaimRate: ratio(sum(assessed, (r) => r.assessment!.citations.unsupported), sum(assessed, (r) => r.assessment!.citations.claims)),
       latency: { extractProfile: latency(events, "extractProfile"), extractJob: latency(events, "extractJob"), assess: latency(events, "assess") },
       usage: { inputTokens: sum(usageEvents, (e) => e.usage!.inputTokens), outputTokens: sum(usageEvents, (e) => e.usage!.outputTokens), totalTokens: sum(usageEvents, (e) => e.usage!.totalTokens),
-        reasoningTokens: reasoning.length ? sum(reasoning, (e) => e.usage!.reasoningTokens!) : null, reportedCalls: usageEvents.length, calls },
+        reasoningTokens: reasoning.length ? sum(reasoning, (e) => e.usage!.reasoningTokens!) : null, reportedCalls: usageEvents.length, calls: sum(results, (r) => r.calls + (r.priorTelemetry?.length ?? 0)) },
     },
-    success: problems.length === 0 && results.every((result) => result.outcome !== "not_attempted"),
+    success: results.every((result) => result.outcome !== "not_attempted"),
   };
-  return ModelEvalReportSchema.parse(report);
 }
 
 class CapReached extends Error { constructor(readonly stage: Stage) { super("model call cap reached"); this.name = "CapReached"; } }
 
-// Reports never carry resume text, evidence sentences or posting prose; requirement texts are the
-// authored gold and may appear. Fragments shorter than 8 characters are ignored by assertRedacted.
+export const RESUME_ERRORS = {
+  incompatible: "The earlier report was made by another report version, provider, model, prompt or golden-set version; it cannot be resumed.",
+  goldenSetChanged: "The earlier report's cases no longer match the golden set (a case is missing or its text or expectations changed); it cannot be resumed.",
+  contractChanged: "The policy or the shared schema changed since the earlier report; it cannot be resumed into one baseline.",
+  nothingToRerun: "Every case in the earlier report was assessed; nothing to resume.",
+} as const;
+
+export type ResumeContract = { provider: string; requestedModel: string; promptVersion: string; policyHash: string; schemaHash: string; goldenSetVersion: string };
+
+// Decides before any model call whether an earlier report can be resumed under the current contract:
+// same report version, provider, model, prompt and golden-set version; the earlier selection rebuilt
+// from the current golden set by case id reproduces its golden-set hash and every per-case gold hash;
+// and the policy and shared-schema hashes are unchanged. Returns the fixed refusal, or undefined.
+export function checkResume(previous: ModelEvalReport, current: ResumeContract, all: GoldenCase[]): string | undefined {
+  if (previous.reportVersion !== MODEL_REPORT_VERSION || previous.provider !== current.provider || previous.requestedModel !== current.requestedModel
+    || previous.promptVersion !== current.promptVersion || previous.goldenSetVersion !== current.goldenSetVersion) return RESUME_ERRORS.incompatible;
+  const byId = new Map(all.map((item) => [item.caseId, item]));
+  const selection = previous.cases.map((result) => byId.get(result.caseId));
+  if (selection.some((item) => item === undefined)) return RESUME_ERRORS.goldenSetChanged;
+  const items = selection as GoldenCase[];
+  if (digest(items.map(goldHash)) !== previous.goldenSetHash || previous.cases.some((result, index) => result.goldHash !== goldHash(items[index]!))) return RESUME_ERRORS.goldenSetChanged;
+  if (previous.policyHash !== current.policyHash || previous.schemaHash !== current.schemaHash) return RESUME_ERRORS.contractChanged;
+  return undefined;
+}
+
+// Which cases a resumed run reruns: everything that did not reach an assessment.
+export function casesToRerun(previous: ModelEvalReport, all: GoldenCase[]): GoldenCase[] {
+  const ids = new Set(previous.cases.filter((result) => result.outcome !== "assessed").map((result) => result.caseId));
+  return all.filter((item) => ids.has(item.caseId));
+}
+
+// Merges a rerun of the non-assessed cases into the earlier report: rerun records replace the old
+// ones by case id and carry the old attempts as `priorTelemetry`, so usage and latency stay
+// cumulative while scores come from the final attempt; aggregates are recomputed from the case
+// records; `resumed` keeps the provenance. Refuses whatever checkResume refuses.
+export function mergeModelReports(previous: ModelEvalReport, rerun: ModelEvalReport, all: GoldenCase[]): ModelEvalReport {
+  const refusal = checkResume(previous, rerun, all);
+  if (refusal) throw new Error(refusal);
+  const replaced = new Map(rerun.cases.map((result) => [result.caseId, result]));
+  const cases = previous.cases.map((old) => {
+    const fresh = replaced.get(old.caseId);
+    return fresh ? { ...fresh, priorTelemetry: [...(old.priorTelemetry ?? []), ...old.telemetry] } : old;
+  });
+  return ModelEvalReportSchema.parse({
+    ...previous, codeSha: rerun.codeSha, dirty: rerun.dirty, generatedAt: new Date().toISOString(),
+    callCap: previous.callCap + rerun.callCap, modelCalls: previous.modelCalls + rerun.modelCalls,
+    abortedCalls: previous.abortedCalls + rerun.abortedCalls, unsettledCalls: previous.unsettledCalls + rerun.unsettledCalls,
+    problems: [...new Set([...previous.problems, ...rerun.problems])],
+    resumed: { from: previous.generatedAt, rerunCases: rerun.cases.length, rounds: (previous.resumed?.rounds ?? 1) + 1 },
+    ...summarizeCases(cases.map((result) => ({ result, redactions: 0 }))), redactions: previous.redactions + rerun.redactions,
+  });
+}
+
 export function modelReportForbiddenFragments(cases: GoldenCase[]): string[] {
   return cases.flatMap((item) => [goldenResumeText(item), goldenPostingText(item), item.resume.headline, ...item.resume.experience, ...(item.posting.responsibilities ?? [])]);
 }
@@ -384,7 +467,7 @@ export function renderModelMarkdown(report: ModelEvalReport, comparison?: ModelC
     `- Code: ${report.codeSha}; dirty worktree: ${report.dirty}; prompt: ${report.promptVersion}; policy ${report.policyHash.slice(0, 12)}…; schema ${report.schemaHash.slice(0, 12)}…`,
     `- Golden set: ${report.goldenSetVersion} (${report.goldenSetHash.slice(0, 12)}…), ${report.selectedCases} cases; model calls ${report.modelCalls} / cap ${report.callCap}; cut by the per-call deadline ${report.abortedCalls}; unsettled ${report.unsettledCalls}`,
     `- Provider: ${report.provider}; requested model ${report.requestedModel}; response models ${report.responseModels.join(", ") || "n/a"}; upstream ${report.upstreamProviders.join(", ") || "n/a"}; store ${String(report.store)}; retries ${report.transport.maxRetries}; SDK log ${report.transport.logLevel}`,
-    `- Golden-set problems: ${report.problems.length}${report.problems.length ? " (no model call was made)" : ""}`, "",
+    `- Golden-set problems: ${report.problems.length}${report.problems.length ? " (no model call was made)" : ""}; model-written strings redacted: ${report.redactions}${report.resumed ? `; resumed from ${report.resumed.from} (${report.resumed.rerunCases} cases rerun, ${report.resumed.rounds} rounds)` : ""}`, "",
     "## Metrics", "", "| Measure | Value |", "| --- | --- |",
     `| Outcomes | assessed ${m.outcomes.assessed}, extraction failed ${m.outcomes.extractionFailed}, assessment failed ${m.outcomes.assessmentFailed}, not attempted ${m.outcomes.notAttempted} |`,
     `| Requirement match rate (gold matched by exact normalized text) | ${fraction(m.requirementMatchRate)} |`,

@@ -63,6 +63,13 @@ both are partial sets.
 | Smoke, 2026-09-14 (report v1) | 3 | 9 | 3 assessed | 2 of 2 REALISTIC-expected cases came back STRETCH; 8 of 22 supplied citations resolved; all three cases lowered to `low` confidence by the citation validator; assess latency 49–86 s; 20.3k of 24.6k output tokens were reasoning |
 | `--limit 13`, 2026-09-14 (report v2) | 13 | 29 | 7 assessed, 1 assessment timeout, 5 extraction failures | Timeout: the 300 s per-call deadline cut the call and the run continued. Extraction failures: `AuthenticationError` within 75–402 ms once the key stopped being accepted mid-run (cause not established from the 401 alone). Over the 7 assessed: requirement text match 9/9 (over the 8 extracted), blocker recall 2/2, verdict inside the gold set 5/7, verdict changed by the policy 2/7 (both to PASS through blocker promotion), confidence lowered by post-processing 5/7, citations 13/35 resolved; assess median ≈54 s over 8 calls including the timeout; 54,731 output tokens (49,040 reasoning) over the 23 calls that reported usage |
 
+A third run on 2026-09-15 attempted the full set (66 calls before the key stopped being accepted from the 52nd
+call on — the count matches a daily limit, which is not established) and lost its report: the model had copied a
+posting's responsibilities line into the requirements, the report echoed it in `unmatchedExtracted`, and the
+redaction guard discarded the whole run. The runner now replaces such strings with a fixed marker and counts
+them, and `--resume` completes a cut run into one report; the attempt itself left only the per-case log lines
+(18 cases reached an outcome: 15 assessed, 3 extraction failures at the posting).
+
 The two REALISTIC-expected cases were STRETCH in the model's own draft in the second run; the
 first run recorded no draft, so its cause is not established. The baseline still to make is one
 approved run of the full golden set with report v3 (`pnpm eval --mode model --approve-transmission`),
