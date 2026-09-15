@@ -9,7 +9,7 @@ import { UNGROUNDED_MATCH_REMOVED } from "../src/domain/assessment/policy.js";
 import { GoldenFakeAnalyzer, keyFor, type FakeFailure, type GoldenFakeOptions } from "../../evals/fixtures/golden/fake-analyzer.js";
 import { GOLDEN_SET_VERSION, goldenCases, goldenPostingText, goldenResumeText, type GoldenCase } from "../../evals/fixtures/golden/index.js";
 import {
-  ModelEvalReportSchema, REDACTED_TEXT, RESUME_ERRORS, assertModelReportRedacted, casesToRerun, classifyFailure, compareModelReports, mergeModelReports, renderModelMarkdown, runModelEvaluation, validateGoldenSet,
+  ModelEvalReportSchema, REDACTED_TEXT, RESUME_ERRORS, assertModelReportRedacted, casesToRerun, checkResume, classifyFailure, compareModelReports, mergeModelReports, renderModelMarkdown, runModelEvaluation, validateGoldenSet,
   type ModelRunOptions,
 } from "../../evals/model-mode.js";
 
@@ -303,15 +303,50 @@ describe("M5-D live-run follow-up: model text that equals an input sentence, and
     const rerunCases = casesToRerun(first, cases);
     expect(rerunCases.map((c) => c.caseId)).toEqual([cases[1]!.caseId, cases[3]!.caseId]);
     const second = await runModelEvaluation(rerunCases, options(fakeWith({})));
-    const merged = mergeModelReports(first, second, metadata);
+    const merged = mergeModelReports(first, second, cases);
     expect(() => ModelEvalReportSchema.parse({ ...merged, extra: 1 })).toThrow();
     expect(merged.cases.map((c) => [c.caseId, c.outcome])).toEqual(cases.map((c) => [c.caseId, "assessed"]));
     expect(merged).toMatchObject({ goldenSetHash: first.goldenSetHash, selectedCases: 4, modelCalls: first.modelCalls + second.modelCalls, resumed: { from: first.generatedAt, rerunCases: 2, rounds: 2 }, success: true });
     expect(merged.metrics.outcomes).toEqual({ assessed: 4, extractionFailed: 0, assessmentFailed: 0, notAttempted: 0 });
-    expect(merged.metrics.usage.calls).toBe(merged.cases.reduce((n, c) => n + c.calls, 0));
-    expect(merged.metrics.latency.assess.count).toBe(4);
+    expect(merged.metrics.usage.calls).toBe(merged.cases.reduce((n, c) => n + c.calls + (c.priorTelemetry?.length ?? 0), 0)); // attempts are cumulative
+    expect(merged.metrics.latency.assess.count).toBe(5); // four final assessments plus the timed-out earlier attempt
     // A third round keeps counting rounds; a report from another model cannot be merged.
-    expect(mergeModelReports(merged, second, metadata).resumed?.rounds).toBe(3);
-    expect(() => mergeModelReports(first, { ...second, requestedModel: "other" }, metadata)).toThrow(RESUME_ERRORS.incompatible);
+    expect(mergeModelReports(merged, second, cases).resumed?.rounds).toBe(3);
+    expect(() => mergeModelReports(first, { ...second, requestedModel: "other" }, cases)).toThrow(RESUME_ERRORS.incompatible);
+  });
+});
+
+describe("M5-D resume review: checks before any call, on the real contract, with cumulative usage", () => {
+  const contract = (report: Awaited<ReturnType<typeof runModelEvaluation>>) => ({ provider: report.provider, requestedModel: report.requestedModel, promptVersion: report.promptVersion, policyHash: report.policyHash, schemaHash: report.schemaHash, goldenSetVersion: report.goldenSetVersion });
+
+  it("refuses a report whose cases no longer match the golden set, or whose policy or schema hash differs", async () => {
+    const cases = goldenCases.slice(0, 3).map((c) => structuredClone(c));
+    const first = await runModelEvaluation(cases, options(fakeWith({ failures: new Map([[keyFor(goldenPostingText(cases[2]!)), { stage: "assess", kind: "other" }]]) })));
+    expect(checkResume(first, contract(first), cases)).toBeUndefined();
+    const edited = cases.map((c) => structuredClone(c)); edited[0]!.resume.headline = "A different headline";
+    expect(checkResume(first, contract(first), edited)).toBe(RESUME_ERRORS.goldenSetChanged);
+    expect(checkResume(first, contract(first), cases.slice(1))).toBe(RESUME_ERRORS.goldenSetChanged);
+    expect(checkResume(first, { ...contract(first), policyHash: "d".repeat(64) }, cases)).toBe(RESUME_ERRORS.contractChanged);
+    expect(checkResume(first, { ...contract(first), requestedModel: "other" }, cases)).toBe(RESUME_ERRORS.incompatible);
+    const rerun = await runModelEvaluation(casesToRerun(first, cases), options(fakeWith({})));
+    expect(() => mergeModelReports(first, rerun, edited)).toThrow(RESUME_ERRORS.goldenSetChanged);
+    expect(() => mergeModelReports(first, { ...rerun, policyHash: "d".repeat(64) }, cases)).toThrow(RESUME_ERRORS.contractChanged);
+    const merged = mergeModelReports(first, rerun, cases);
+    expect(merged.goldenSetHash).toBe(first.goldenSetHash);
+    expect(merged.policyHash).toBe(rerun.policyHash);
+  });
+
+  it("keeps the earlier attempts' usage and latency after a rerun replaces a failed case", async () => {
+    const cases = goldenCases.slice(0, 2).map((c) => structuredClone(c));
+    const first = await runModelEvaluation(cases, options(fakeWith({ failures: new Map([[keyFor(goldenPostingText(cases[1]!)), { stage: "assess", kind: "provider_error" }]]) })));
+    expect(first.metrics.usage).toMatchObject({ calls: 6, reportedCalls: 5, totalTokens: 750 }); // the failed call reports no usage
+    const rerun = await runModelEvaluation(casesToRerun(first, cases), options(fakeWith({})));
+    const merged = mergeModelReports(first, rerun, cases);
+    expect(merged.modelCalls).toBe(9);
+    expect(merged.metrics.usage).toMatchObject({ calls: 9, reportedCalls: 8, totalTokens: 1200 });
+    expect(merged.metrics.latency.assess.count).toBe(3); // first case, the failed attempt, the successful rerun
+    expect(merged.cases[1]!.priorTelemetry).toHaveLength(3);
+    expect(merged.cases[1]!.telemetry).toHaveLength(3);
+    expect(merged.metrics.outcomes).toEqual({ assessed: 2, extractionFailed: 0, assessmentFailed: 0, notAttempted: 0 });
   });
 });

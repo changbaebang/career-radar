@@ -6,11 +6,10 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { goldenCases } from "../../evals/fixtures/golden/index.js";
-import { HARD_MAX_MODEL_EVAL_CALLS, MODEL_REFUSALS, isFreeModelId, parseModelArgs, resolveModelGate, runModelEvalCli, selectCases } from "../../evals/model-mode-cli.js";
+import { HARD_MAX_MODEL_EVAL_CALLS, MODEL_REFUSALS, isFreeModelId, parseModelArgs, provenance, resolveModelGate, runModelEvalCli, selectCases } from "../../evals/model-mode-cli.js";
 import { CALLS_PER_CASE, ModelEvalReportSchema, RESUME_ERRORS, runModelEvaluation } from "../../evals/model-mode.js";
 import { GoldenFakeAnalyzer, keyFor, type FakeFailure } from "../../evals/fixtures/golden/fake-analyzer.js";
 import { GOLDEN_SET_VERSION, goldenPostingText } from "../../evals/fixtures/golden/index.js";
-import { PROMPT_VERSION } from "../src/ai/contracts.js";
 
 const serverDirectory = fileURLToPath(new URL("../", import.meta.url));
 const script = fileURLToPath(new URL("../../evals/run-evals.ts", import.meta.url));
@@ -190,7 +189,7 @@ describe("pnpm eval --mode model --resume", () => {
     const failures = new Map<string, FakeFailure>([[keyFor(goldenPostingText(cases[2]!)), { stage: "assess", kind: "provider_error" }]]);
     const report = await runModelEvaluation(cases, {
       execution: "dry-run", provider: "fake", requestedModel: "golden-fake", store: "n/a", transport: { maxRetries: 0, logLevel: "off", timeoutMs: 300000 },
-      approvals: { transmission: false }, callCap: 9, metadata: { codeSha: "a".repeat(40), dirty: false, policyHash: "b".repeat(64), schemaHash: "c".repeat(64), promptVersion: PROMPT_VERSION },
+      approvals: { transmission: false }, callCap: 9, metadata: provenance(), // the CLI compares policy/schema hashes with the real tree
       goldenSetVersion: GOLDEN_SET_VERSION, createAnalyzer: (onResponse) => new GoldenFakeAnalyzer({ failures, onResponse }),
     });
     const path = join(directory, "report.json");
@@ -207,6 +206,22 @@ describe("pnpm eval --mode model --resume", () => {
     expect(logs.join("\n")).toContain("1 of 33 cases (resuming");
     const merged = JSON.parse(outs[0]!);
     expect(merged).toMatchObject({ selectedCases: 3, modelCalls: report.modelCalls + 3, resumed: { from: report.generatedAt, rerunCases: 1, rounds: 2 }, success: true, metrics: { outcomes: { assessed: 3, assessmentFailed: 0 } } });
+  });
+
+  it("refuses an incompatible earlier report before the plan and before any analyzer exists", async () => {
+    const { path, report, cases } = await partialReport(temporary());
+    const other = join(temporary(), "other-model.json");
+    writeFileSync(other, JSON.stringify({ ...report, requestedModel: "some-other-model" }));
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+    const { logs, outs, log, out } = collect();
+    expect(await runModelEvalCli(["--resume", other, "--no-save"], { log, out, cases: [...cases] })).toBe(2);
+    expect(logs).toEqual([RESUME_ERRORS.incompatible]); // no plan line: refused before the analyzer is created
+    expect(outs).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+    const tampered = cases.map((c) => structuredClone(c)); tampered[0]!.posting.title = "Changed title";
+    expect(await runModelEvalCli(["--resume", path, "--no-save"], { log, out, cases: tampered })).toBe(2);
+    expect(logs.at(-1)).toBe(RESUME_ERRORS.goldenSetChanged);
+    vi.unstubAllGlobals();
   });
 
   it("refuses a resume with a selection, an unreadable report, and a report with nothing to rerun", async () => {

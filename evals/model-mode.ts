@@ -78,6 +78,8 @@ const CaseSchema = z.object({
     retrieval: z.object({ queries: z.number().int(), chunks: z.number().int(), missingTerms: z.number().int() }).strict(),
   }).strict().optional(),
   telemetry: z.array(TelemetrySchema),
+  // Telemetry of this case's earlier attempts in a resumed run (usage and latency stay cumulative; scores use `telemetry`).
+  priorTelemetry: z.array(TelemetrySchema).optional(),
 }).strict();
 
 const LatencySchema = z.object({ count: z.number().int(), minMs: z.number().nullable(), medianMs: z.number().nullable(), maxMs: z.number().nullable() }).strict();
@@ -328,7 +330,8 @@ export async function runModelEvaluation(cases: GoldenCase[], options: ModelRunO
 // Aggregates from case records only (telemetry included), so a merged report is computed the same way.
 function summarizeCases(sanitized: { result: ModelCaseResult; redactions: number }[]) {
   const results = sanitized.map((entry) => entry.result);
-  const events = results.flatMap((result) => result.telemetry);
+  // Usage, latency and response models cover every attempt (earlier rounds included); scores use the final attempt.
+  const events = results.flatMap((result) => [...(result.priorTelemetry ?? []), ...result.telemetry]);
   const assessed = results.filter((result) => result.assessment);
   const extracted = results.filter((result) => result.extraction);
   const attempted = results.filter((result) => result.outcome !== "not_attempted");
@@ -360,16 +363,38 @@ function summarizeCases(sanitized: { result: ModelCaseResult; redactions: number
       unsupportedClaimRate: ratio(sum(assessed, (r) => r.assessment!.citations.unsupported), sum(assessed, (r) => r.assessment!.citations.claims)),
       latency: { extractProfile: latency(events, "extractProfile"), extractJob: latency(events, "extractJob"), assess: latency(events, "assess") },
       usage: { inputTokens: sum(usageEvents, (e) => e.usage!.inputTokens), outputTokens: sum(usageEvents, (e) => e.usage!.outputTokens), totalTokens: sum(usageEvents, (e) => e.usage!.totalTokens),
-        reasoningTokens: reasoning.length ? sum(reasoning, (e) => e.usage!.reasoningTokens!) : null, reportedCalls: usageEvents.length, calls: sum(results, (r) => r.calls) },
+        reasoningTokens: reasoning.length ? sum(reasoning, (e) => e.usage!.reasoningTokens!) : null, reportedCalls: usageEvents.length, calls: sum(results, (r) => r.calls + (r.priorTelemetry?.length ?? 0)) },
     },
     success: results.every((result) => result.outcome !== "not_attempted"),
   };
 }
 
+class CapReached extends Error { constructor(readonly stage: Stage) { super("model call cap reached"); this.name = "CapReached"; } }
+
 export const RESUME_ERRORS = {
-  incompatible: "The earlier report was made by another report version, provider, model, prompt or golden set; it cannot be resumed.",
+  incompatible: "The earlier report was made by another report version, provider, model, prompt or golden-set version; it cannot be resumed.",
+  goldenSetChanged: "The earlier report's cases no longer match the golden set (a case is missing or its text or expectations changed); it cannot be resumed.",
+  contractChanged: "The policy or the shared schema changed since the earlier report; it cannot be resumed into one baseline.",
   nothingToRerun: "Every case in the earlier report was assessed; nothing to resume.",
 } as const;
+
+export type ResumeContract = { provider: string; requestedModel: string; promptVersion: string; policyHash: string; schemaHash: string; goldenSetVersion: string };
+
+// Decides before any model call whether an earlier report can be resumed under the current contract:
+// same report version, provider, model, prompt and golden-set version; the earlier selection rebuilt
+// from the current golden set by case id reproduces its golden-set hash and every per-case gold hash;
+// and the policy and shared-schema hashes are unchanged. Returns the fixed refusal, or undefined.
+export function checkResume(previous: ModelEvalReport, current: ResumeContract, all: GoldenCase[]): string | undefined {
+  if (previous.reportVersion !== MODEL_REPORT_VERSION || previous.provider !== current.provider || previous.requestedModel !== current.requestedModel
+    || previous.promptVersion !== current.promptVersion || previous.goldenSetVersion !== current.goldenSetVersion) return RESUME_ERRORS.incompatible;
+  const byId = new Map(all.map((item) => [item.caseId, item]));
+  const selection = previous.cases.map((result) => byId.get(result.caseId));
+  if (selection.some((item) => item === undefined)) return RESUME_ERRORS.goldenSetChanged;
+  const items = selection as GoldenCase[];
+  if (digest(items.map(goldHash)) !== previous.goldenSetHash || previous.cases.some((result, index) => result.goldHash !== goldHash(items[index]!))) return RESUME_ERRORS.goldenSetChanged;
+  if (previous.policyHash !== current.policyHash || previous.schemaHash !== current.schemaHash) return RESUME_ERRORS.contractChanged;
+  return undefined;
+}
 
 // Which cases a resumed run reruns: everything that did not reach an assessment.
 export function casesToRerun(previous: ModelEvalReport, all: GoldenCase[]): GoldenCase[] {
@@ -378,16 +403,19 @@ export function casesToRerun(previous: ModelEvalReport, all: GoldenCase[]): Gold
 }
 
 // Merges a rerun of the non-assessed cases into the earlier report: rerun records replace the old
-// ones by case id, aggregates are recomputed from the case records, calls are summed, and the
-// provenance of the merge is kept in `resumed`. Requires the same contract on both sides.
-export function mergeModelReports(previous: ModelEvalReport, rerun: ModelEvalReport, metadata: ModelRunOptions["metadata"]): ModelEvalReport {
-  for (const key of ["reportVersion", "metricVersion", "mode", "provider", "requestedModel", "promptVersion", "goldenSetVersion"] as const) {
-    if (previous[key] !== rerun[key]) throw new Error(RESUME_ERRORS.incompatible);
-  }
+// ones by case id and carry the old attempts as `priorTelemetry`, so usage and latency stay
+// cumulative while scores come from the final attempt; aggregates are recomputed from the case
+// records; `resumed` keeps the provenance. Refuses whatever checkResume refuses.
+export function mergeModelReports(previous: ModelEvalReport, rerun: ModelEvalReport, all: GoldenCase[]): ModelEvalReport {
+  const refusal = checkResume(previous, rerun, all);
+  if (refusal) throw new Error(refusal);
   const replaced = new Map(rerun.cases.map((result) => [result.caseId, result]));
-  const cases = previous.cases.map((result) => replaced.get(result.caseId) ?? result);
+  const cases = previous.cases.map((old) => {
+    const fresh = replaced.get(old.caseId);
+    return fresh ? { ...fresh, priorTelemetry: [...(old.priorTelemetry ?? []), ...old.telemetry] } : old;
+  });
   return ModelEvalReportSchema.parse({
-    ...previous, codeSha: metadata.codeSha, dirty: metadata.dirty, generatedAt: new Date().toISOString(),
+    ...previous, codeSha: rerun.codeSha, dirty: rerun.dirty, generatedAt: new Date().toISOString(),
     callCap: previous.callCap + rerun.callCap, modelCalls: previous.modelCalls + rerun.modelCalls,
     abortedCalls: previous.abortedCalls + rerun.abortedCalls, unsettledCalls: previous.unsettledCalls + rerun.unsettledCalls,
     problems: [...new Set([...previous.problems, ...rerun.problems])],
@@ -396,10 +424,6 @@ export function mergeModelReports(previous: ModelEvalReport, rerun: ModelEvalRep
   });
 }
 
-class CapReached extends Error { constructor(readonly stage: Stage) { super("model call cap reached"); this.name = "CapReached"; } }
-
-// Reports never carry resume text, evidence sentences or posting prose; requirement texts are the
-// authored gold and may appear. Fragments shorter than 8 characters are ignored by assertRedacted.
 export function modelReportForbiddenFragments(cases: GoldenCase[]): string[] {
   return cases.flatMap((item) => [goldenResumeText(item), goldenPostingText(item), item.resume.headline, ...item.resume.experience, ...(item.posting.responsibilities ?? [])]);
 }

@@ -12,7 +12,7 @@ import { digest } from "./evaluate.js";
 import { GoldenFakeAnalyzer } from "./fixtures/golden/fake-analyzer.js";
 import { GOLDEN_SET_VERSION, goldenCases, type GoldenCase } from "./fixtures/golden/index.js";
 import {
-  CALLS_PER_CASE, ModelEvalReportSchema, RESUME_ERRORS, assertModelReportRedacted, casesToRerun, compareModelReports, mergeModelReports, renderModelMarkdown, runModelEvaluation, validateGoldenSet,
+  CALLS_PER_CASE, ModelEvalReportSchema, RESUME_ERRORS, assertModelReportRedacted, casesToRerun, checkResume, compareModelReports, mergeModelReports, renderModelMarkdown, runModelEvaluation, validateGoldenSet,
   type ModelComparison, type ModelEvalReport,
 } from "./model-mode.js";
 
@@ -138,7 +138,7 @@ export function selectCases(options: ModelOptions, all: GoldenCase[] = goldenCas
   return options.limit !== undefined ? selected.slice(0, options.limit) : selected;
 }
 
-function provenance() {
+export function provenance() {
   const git = (args: string[]) => execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   let codeSha = "unknown", dirty = true;
   try { codeSha = git(["rev-parse", "HEAD"]); dirty = git(["status", "--porcelain"]) !== ""; } catch { /* not a git checkout */ }
@@ -188,6 +188,13 @@ export async function runModelEvalCli(argv: string[], io: ModelCliIo = { log: co
     model = options.provider === "openrouter" ? (env.OPENROUTER_MODEL ?? "").trim() : env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL;
     store = options.provider === "openrouter" ? "n/a" : false;
   }
+  const metadata = provenance();
+  // --resume: the earlier report must match the contract of this run before a single call is made.
+  if (previous) {
+    const refusal = checkResume(previous, { provider: gate.execution === "live" ? options.provider : "fake", requestedModel: model, promptVersion: metadata.promptVersion,
+      policyHash: metadata.policyHash, schemaHash: metadata.schemaHash, goldenSetVersion: GOLDEN_SET_VERSION }, io.cases ?? goldenCases);
+    if (refusal) { io.log(refusal); return 2; }
+  }
   io.log([
     `Model-mode evaluation plan (${gate.execution})`,
     `  golden set: ${GOLDEN_SET_VERSION}, ${selected.length} of ${goldenCases.length} cases${previous ? ` (resuming ${options.resume}: cases without an assessment)` : ""}`,
@@ -203,7 +210,6 @@ export async function runModelEvalCli(argv: string[], io: ModelCliIo = { log: co
   const createAnalyzer = (onResponse: (event: AnalyzerResponseEvent) => void) => gate.execution === "live"
     ? createAnalyzerFromEnv({ provider: options.provider, transport: { ...MODEL_TRANSPORT }, onResponse })
     : new GoldenFakeAnalyzer({ onResponse });
-  const metadata = provenance();
   const rerun: ModelEvalReport = await runModelEvaluation(selected, {
     execution: gate.execution, provider: gate.execution === "live" ? options.provider : "fake", requestedModel: model, store,
     transport: { maxRetries: 0, logLevel: "off", timeoutMs: MODEL_EVAL_TIMEOUT_MS }, approvals: { transmission: options.approveTransmission },
@@ -211,7 +217,7 @@ export async function runModelEvalCli(argv: string[], io: ModelCliIo = { log: co
   });
   let report = rerun;
   if (previous) {
-    try { report = mergeModelReports(previous, rerun, metadata); } catch (error) { io.log(error instanceof Error ? error.message : RESUME_ERRORS.incompatible); return 2; }
+    try { report = mergeModelReports(previous, rerun, io.cases ?? goldenCases); } catch (error) { io.log(error instanceof Error ? error.message : RESUME_ERRORS.incompatible); return 2; }
   }
   let comparison: ModelComparison | undefined;
   if (baseline !== undefined) comparison = compareModelReports(report, baseline);
