@@ -1,0 +1,5047 @@
+{
+  "reportVersion": 3,
+  "metricVersion": "policy-metrics-v2",
+  "mode": "policy",
+  "datasetVersion": "synthetic-policy-v3",
+  "datasetHash": "06f591305c68eb91b417c4b9240a26cb89d0b0657934bcdc327363a7d0dccb3f",
+  "generatedAt": "2026-09-15T00:41:03.107Z",
+  "codeSha": "99b2eede8421103770f1683dba0ddb6595120315",
+  "dirty": false,
+  "policyHash": "0ea62b26888a4e1a0cf2b5e979b05bfe3863a741bbe1e356d99b13a436c92fb0",
+  "schemaHash": "2b73bd1a46f3d6aa548353b2917a01e768e0b8433ba0d90eb89e78a816318924",
+  "modelCalls": 0,
+  "modelVersions": [
+    "eval-model"
+  ],
+  "promptVersions": [
+    "eval-prompt"
+  ],
+  "totals": {
+    "cases": 35,
+    "evaluated": 35,
+    "passed": 35,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "humanReviewPending": 35
+  },
+  "metrics": {
+    "coverage": {
+      "numerator": 35,
+      "denominator": 35,
+      "value": 1
+    },
+    "policyVerdictAgreement": {
+      "numerator": 35,
+      "denominator": 35,
+      "value": 1
+    },
+    "humanReviewedVerdictAgreement": {
+      "numerator": 0,
+      "denominator": 0,
+      "value": null
+    },
+    "requiredBlockerRecall": {
+      "numerator": 10,
+      "denominator": 10,
+      "value": 1
+    },
+    "passToRealistic": {
+      "numerator": 0,
+      "denominator": 9,
+      "value": 0
+    },
+    "nonRealisticToRealistic": {
+      "numerator": 0,
+      "denominator": 17,
+      "value": 0
+    },
+    "legacyPassToRealisticOverAllCases": {
+      "numerator": 0,
+      "denominator": 35,
+      "value": 0
+    },
+    "textResolvedBlockers": 1,
+    "citationCorrectness": {
+      "numerator": 4,
+      "denominator": 9,
+      "value": 0.4444444444444444
+    },
+    "unsupportedClaimRate": {
+      "numerator": 48,
+      "denominator": 51,
+      "value": 0.9411764705882353
+    },
+    "positiveEvidenceFailures": 0
+  },
+  "confusionMatrix": [
+    {
+      "expected": "REALISTIC",
+      "actual": {
+        "REALISTIC": 18,
+        "STRETCH": 0,
+        "PASS": 0
+      }
+    },
+    {
+      "expected": "STRETCH",
+      "actual": {
+        "REALISTIC": 0,
+        "STRETCH": 8,
+        "PASS": 0
+      }
+    },
+    {
+      "expected": "PASS",
+      "actual": {
+        "REALISTIC": 0,
+        "STRETCH": 0,
+        "PASS": 9
+      }
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "trailing-period-evidence-grounded",
+      "contractHash": "419573a3792b3c12b8b29c3e204e1fa74a12050663540dc87488f7fa5fa3b474",
+      "annotationHash": "764ebba17fe3504d236af2069a63f144f410040ff25831f456eee4a193d839af",
+      "inputHash": "fbcea5c72f1219745d62869155eb40a3f5bd260201377035b1fa8faf270b0fa2",
+      "fixture": {
+        "caseId": "trailing-period-evidence-grounded",
+        "profile": {
+          "id": "profile_period",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Led a React platform team for three years"
+              ],
+              "evidence": [
+                "Led a React platform team for three years"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_period",
+          "company": "Example Employer",
+          "title": "Frontend Lead",
+          "description": "Frontend Lead: Lead a React team",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Lead a React team",
+              "type": "leadership",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Lead",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Led a React platform team for three years.",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "ten years"
+        ],
+        "rationale": "A trailing period must preserve an otherwise exact evidence sentence.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Led a React platform team for three years."
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 1,
+        "unsupported": 1
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Led a React platform team for three years.",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "invented-evidence-extension-rejected",
+      "contractHash": "2338072dd2b8c4929821a080d0e3e5617fec0805b852232b8800557e48e6ba68",
+      "annotationHash": "c341011e8a343fc1ad59780585b1eef8cd67f49f8a29fe15354b50d040e8d71c",
+      "inputHash": "2c511a1debba4c9d65617489c9937744d63c32dfab0ec2a01f50b3b451ea7dbb",
+      "fixture": {
+        "caseId": "invented-evidence-extension-rejected",
+        "profile": {
+          "id": "profile_inflated",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Led a React platform team for three years"
+              ],
+              "evidence": [
+                "Led a React platform team for three years"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_inflated",
+          "company": "Example Employer",
+          "title": "Frontend Lead",
+          "description": "Frontend Lead: Lead a React team",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Lead a React team",
+              "type": "leadership",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Lead",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Led a React platform team for three years and owned company-wide architecture",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "STRETCH",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "owned company-wide architecture"
+        ],
+        "rationale": "An invented extension invalidates the sole match; unsupported REALISTIC becomes STRETCH.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": []
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 0,
+        "unsupported": 0
+      },
+      "actual": {
+        "verdict": "STRETCH",
+        "confidence": "low",
+        "resumeContortion": "low",
+        "strongestMatches": [],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [
+          "One or more positive claims lacked a traceable candidate-profile evidence sentence."
+        ],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "preferred-hard-blocker-unlinked-excluded",
+      "contractHash": "d771fa799989fbaa850d2b70534a58f006bc8d612005b581b1a8baf33821b240",
+      "annotationHash": "c164a02842464552251372c1837a5643c1e3c5b9fdf2b41892bdc4bac9d0dc0e",
+      "inputHash": "4cf3c05c7b5daff00ace72251ca01ff4b114b5c249edd67cf357e8737ee7bbc5",
+      "fixture": {
+        "caseId": "preferred-hard-blocker-unlinked-excluded",
+        "profile": {
+          "id": "profile_preferred",
+          "headline": "Frontend Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Engineer",
+              "responsibilities": [
+                "Built reliable React applications"
+              ],
+              "evidence": [
+                "Built reliable React applications"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_preferred",
+          "company": "Example Employer",
+          "title": "Frontend Engineer",
+          "description": "Frontend Engineer: Build React applications",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Build React applications",
+              "type": "technology",
+              "importance": "core"
+            }
+          ],
+          "preferred": [
+            {
+              "id": "preferred_1",
+              "text": "AWS certification preferred",
+              "type": "certification",
+              "importance": "nice_to_have"
+            }
+          ],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Built reliable React applications",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirement": "AWS certification preferred",
+              "reason": "Not listed",
+              "severity": "hard_blocker"
+            }
+          ],
+          "hardBlockers": [
+            {
+              "requirement": "AWS certification preferred",
+              "reason": "Not listed",
+              "severity": "hard_blocker"
+            }
+          ],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "expectedHardBlockerCount": 0,
+        "mustNotClaim": [
+          "AWS certified"
+        ],
+        "rationale": "A preferred qualification is excluded by its text when no ID is supplied.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Built reliable React applications"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 2,
+        "unsupported": 2
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Built reliable React applications",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirement": "AWS certification preferred",
+            "reason": "Not listed",
+            "severity": "material"
+          }
+        ],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "preferred-hard-blocker-preferred_1-excluded",
+      "contractHash": "04457cf6b2705861ab37753475e546bbdc795be6cf799e1329a44ea3832230ce",
+      "annotationHash": "3cb031d3d34291e5b983ccf75ecfeada67e2f7dedbf5228da93846083d4c5799",
+      "inputHash": "a155c522f76c45b353dbb435be42e83208bf76bfb2c1e855c072650059ac800f",
+      "fixture": {
+        "caseId": "preferred-hard-blocker-preferred_1-excluded",
+        "profile": {
+          "id": "profile_preferred",
+          "headline": "Frontend Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Engineer",
+              "responsibilities": [
+                "Built reliable React applications"
+              ],
+              "evidence": [
+                "Built reliable React applications"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_preferred",
+          "company": "Example Employer",
+          "title": "Frontend Engineer",
+          "description": "Frontend Engineer: Build React applications",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Build React applications",
+              "type": "technology",
+              "importance": "core"
+            }
+          ],
+          "preferred": [
+            {
+              "id": "preferred_1",
+              "text": "AWS certification preferred",
+              "type": "certification",
+              "importance": "nice_to_have"
+            }
+          ],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Built reliable React applications",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "preferred_1",
+              "requirement": "AWS certification preferred",
+              "reason": "Not listed",
+              "severity": "hard_blocker"
+            }
+          ],
+          "hardBlockers": [
+            {
+              "requirementId": "preferred_1",
+              "requirement": "AWS certification preferred",
+              "reason": "Not listed",
+              "severity": "hard_blocker"
+            }
+          ],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "expectedHardBlockerCount": 0,
+        "mustNotClaim": [
+          "AWS certified"
+        ],
+        "rationale": "A preferred requirement ID cannot become a hard blocker.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Built reliable React applications"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 2,
+        "unsupported": 2
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Built reliable React applications",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "preferred_1",
+            "requirement": "AWS certification preferred",
+            "reason": "Not listed",
+            "severity": "material"
+          }
+        ],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "frontend-lead-realistic",
+      "contractHash": "feea1fb9b52ed35611fce52639aaf15bb35998cdfceb34ae88a9262df04af458",
+      "annotationHash": "9af6b93604904102c430a846a163ff9177a904731f0a24ccf5d73fdfae76f533",
+      "inputHash": "3a8b92eaee1224a3eff93d1840bee746f16c6a40c102cb902400a3ce1069bb52",
+      "fixture": {
+        "caseId": "frontend-lead-realistic",
+        "profile": {
+          "id": "profile_frontend",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Led a React platform team"
+              ],
+              "evidence": [
+                "Led a React platform team"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_frontend",
+          "company": "Example Employer",
+          "title": "Frontend Engineering Lead",
+          "description": "Frontend Engineering Lead: Lead a React team",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Lead a React team",
+              "type": "leadership",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineering Lead",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Led a React platform team",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "10 years of React"
+        ],
+        "rationale": "Preserve a supported draft with no blocker and low contortion.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Led a React platform team"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 1,
+        "unsupported": 1
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Led a React platform team",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "solution-architect-stretch",
+      "contractHash": "9fb7d83f2cbfd1a69f713c9c19c4c96baabea2ddef01ccd35f39d34ed3634b53",
+      "annotationHash": "ce25732ecba67143a03a390165dc35b8bebcfc013c722f6633fd5266298ccce0",
+      "inputHash": "b0645c4d3769fe3eb2a63191717d80c98cc6c46591c5e65dc35986344397a7a1",
+      "fixture": {
+        "caseId": "solution-architect-stretch",
+        "profile": {
+          "id": "profile_sa",
+          "headline": "Cloud-facing Application Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Cloud-facing Application Engineer",
+              "responsibilities": [
+                "Advised enterprise customers on Azure application incidents"
+              ],
+              "evidence": [
+                "Advised enterprise customers on Azure application incidents"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_sa",
+          "company": "Example Employer",
+          "title": "Solutions Architect",
+          "description": "Solutions Architect: Design customer cloud architectures",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Design customer cloud architectures",
+              "type": "customer",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Solutions Architect",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "STRETCH",
+          "confidence": "medium",
+          "resumeContortion": "medium",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Advised enterprise customers on Azure application incidents",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Formal solution architecture history",
+              "reason": "No direct evidence",
+              "severity": "material"
+            }
+          ],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "STRETCH",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "AWS architect for five years"
+        ],
+        "rationale": "Preserve the draft's material role gap and medium-contortion STRETCH; no new expertise is inferred.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Advised enterprise customers on Azure application incidents"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 2,
+        "unsupported": 2
+      },
+      "actual": {
+        "verdict": "STRETCH",
+        "confidence": "medium",
+        "resumeContortion": "medium",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Advised enterprise customers on Azure application incidents",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Formal solution architecture history",
+            "reason": "No direct evidence",
+            "severity": "material"
+          }
+        ],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "security-specialist-pass",
+      "contractHash": "b809de0d23943c99f68801eda7b02edaa309921f402b0ec3f6875c5c1ab44f0f",
+      "annotationHash": "7f98b8259693fe96f7acdb5a1ba8e371b0a33de76f533c035e309b59e8eaf442",
+      "inputHash": "96d218c490b80642dbb038029cc85c07fe92b6dd2437be4c6f734cf984457f02",
+      "fixture": {
+        "caseId": "security-specialist-pass",
+        "profile": {
+          "id": "profile_security",
+          "headline": "Frontend Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Engineer",
+              "responsibilities": [
+                "Built authentication user interfaces"
+              ],
+              "evidence": [
+                "Built authentication user interfaces"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_security",
+          "company": "Example Employer",
+          "title": "Security Cloud Architect",
+          "description": "Security Cloud Architect: Deep security architecture experience is mandatory",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Deep security architecture experience is mandatory",
+              "type": "role_experience",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Security Cloud Architect",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "STRETCH",
+          "confidence": "medium",
+          "resumeContortion": "high",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Built authentication user interfaces",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Deep security architecture experience",
+              "reason": "No direct evidence",
+              "severity": "hard_blocker"
+            }
+          ],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "PASS",
+        "expectHardBlocker": true,
+        "mustNotClaim": [
+          "Led security architecture"
+        ],
+        "rationale": "The draft explicitly identifies a core specialist hard blocker; policy must force PASS.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [
+          "req_1"
+        ],
+        "requiredEvidence": [
+          "Built authentication user interfaces"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [
+          "req_1"
+        ],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 2,
+        "unsupported": 2
+      },
+      "actual": {
+        "verdict": "PASS",
+        "confidence": "medium",
+        "resumeContortion": "high",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Built authentication user interfaces",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Deep security architecture experience",
+            "reason": "No direct evidence",
+            "severity": "hard_blocker"
+          }
+        ],
+        "hardBlockers": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Deep security architecture experience",
+            "reason": "No direct evidence",
+            "severity": "hard_blocker"
+          }
+        ],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "ai-application-stretch",
+      "contractHash": "523ab0dfd05e929976d8e31b4571637a0135d63803391f5125c6c966f821ce23",
+      "annotationHash": "5236c668edf3b5cb911cc536e43b61b0787bad30c37500052baa8bc7331dc87a",
+      "inputHash": "bc23ef2ffbf42d8f2b8cfbbb968b580d9a43bbc52dc5045f63f33799b54ae7f0",
+      "fixture": {
+        "caseId": "ai-application-stretch",
+        "profile": {
+          "id": "profile_ai",
+          "headline": "Application Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Application Engineer",
+              "responsibilities": [
+                "Built a local LLM evaluation prototype"
+              ],
+              "evidence": [
+                "Built a local LLM evaluation prototype"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_ai",
+          "company": "Example Employer",
+          "title": "AI Application Engineer",
+          "description": "AI Application Engineer: Ship production LLM applications",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Ship production LLM applications",
+              "type": "technology",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "AI Application Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "STRETCH",
+          "confidence": "medium",
+          "resumeContortion": "medium",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Built a local LLM evaluation prototype",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Production LLM delivery",
+              "reason": "No direct evidence",
+              "severity": "material"
+            }
+          ],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "STRETCH",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "Production LLM platform owner"
+        ],
+        "rationale": "Prototype evidence does not invent production delivery; preserve the draft's material gap.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Built a local LLM evaluation prototype"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 2,
+        "unsupported": 2
+      },
+      "actual": {
+        "verdict": "STRETCH",
+        "confidence": "medium",
+        "resumeContortion": "medium",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Built a local LLM evaluation prototype",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Production LLM delivery",
+            "reason": "No direct evidence",
+            "severity": "material"
+          }
+        ],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "formal-tpm-pass",
+      "contractHash": "c8ff748890a9b66a79bdd33b4031dd0f44878a14c09ef0cbdc57ea118f7709cc",
+      "annotationHash": "5b3ce94a709231ef9e8c9f5a39baec362c720ee6f670c332766e2c4e037a9057",
+      "inputHash": "ab396d2a846cbe671a77e22b3a6ad790a27ac5b78fe5a3028126d80ea9109f12",
+      "fixture": {
+        "caseId": "formal-tpm-pass",
+        "profile": {
+          "id": "profile_tpm",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Coordinated a cross-team frontend migration"
+              ],
+              "evidence": [
+                "Coordinated a cross-team frontend migration"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_tpm",
+          "company": "Example Employer",
+          "title": "Senior Technical Program Manager",
+          "description": "Senior Technical Program Manager: Five years of formal TPM ownership required",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Five years of formal TPM ownership required",
+              "type": "role_experience",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Senior Technical Program Manager",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "STRETCH",
+          "confidence": "medium",
+          "resumeContortion": "high",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Coordinated a cross-team frontend migration",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Five years of formal TPM ownership",
+              "reason": "No direct evidence",
+              "severity": "hard_blocker"
+            }
+          ],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "PASS",
+        "expectHardBlocker": true,
+        "mustNotClaim": [
+          "Five years as a TPM"
+        ],
+        "rationale": "An explicit specialist-tenure hard blocker forces PASS despite adjacent coordination evidence.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [
+          "req_1"
+        ],
+        "requiredEvidence": [
+          "Coordinated a cross-team frontend migration"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [
+          "req_1"
+        ],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 2,
+        "unsupported": 2
+      },
+      "actual": {
+        "verdict": "PASS",
+        "confidence": "medium",
+        "resumeContortion": "high",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Coordinated a cross-team frontend migration",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Five years of formal TPM ownership",
+            "reason": "No direct evidence",
+            "severity": "hard_blocker"
+          }
+        ],
+        "hardBlockers": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Five years of formal TPM ownership",
+            "reason": "No direct evidence",
+            "severity": "hard_blocker"
+          }
+        ],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "developer-tooling-realistic",
+      "contractHash": "4fd02006bea659cdfa3623c966f3cd55507a01ff6699049469271b73a7d68fdc",
+      "annotationHash": "1c3bd8c54a86ddd5260dda198c72045178676b9822d3e2b5e532e74effd40b31",
+      "inputHash": "48169171f11e925a0b58087bd0bd92d3c36a1a42ab184584afa1ec6565567ca6",
+      "fixture": {
+        "caseId": "developer-tooling-realistic",
+        "profile": {
+          "id": "profile_tooling",
+          "headline": "Frontend Platform Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Platform Engineer",
+              "responsibilities": [
+                "Built lint rules and developer workflow automation"
+              ],
+              "evidence": [
+                "Built lint rules and developer workflow automation"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_tooling",
+          "company": "Example Employer",
+          "title": "Developer Tooling Engineer",
+          "description": "Developer Tooling Engineer: Build developer productivity tooling",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Build developer productivity tooling",
+              "type": "technology",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Developer Tooling Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Built lint rules and developer workflow automation",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "Maintained a compiler"
+        ],
+        "rationale": "Preserve direct tooling evidence without inventing compiler experience.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Built lint rules and developer workflow automation"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 1,
+        "unsupported": 1
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Built lint rules and developer workflow automation",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "preferred-certification-not-pass",
+      "contractHash": "cc08074319b0eb7a832f07ca4662e760adeaf30160cd3d8e23da795ac405bbbc",
+      "annotationHash": "edc3287cdedc9b4f9f633a2de9577a3416918d0efe9112266cf7306be1f5c8ce",
+      "inputHash": "ce76107f0da01a4789136be04e7ea89a82528744ffdddae63581f94fe9852ce6",
+      "fixture": {
+        "caseId": "preferred-certification-not-pass",
+        "profile": {
+          "id": "profile_cert",
+          "headline": "Cloud Application Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Cloud Application Engineer",
+              "responsibilities": [
+                "Troubleshot Azure applications for customers"
+              ],
+              "evidence": [
+                "Troubleshot Azure applications for customers"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_cert",
+          "company": "Example Employer",
+          "title": "Cloud Application Engineer",
+          "description": "Cloud Application Engineer: Troubleshoot cloud applications",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Troubleshoot cloud applications",
+              "type": "customer",
+              "importance": "core"
+            }
+          ],
+          "preferred": [
+            {
+              "id": "preferred_1",
+              "text": "AWS certification preferred",
+              "type": "certification",
+              "importance": "nice_to_have"
+            }
+          ],
+          "responsibilities": [],
+          "roleFamily": "Cloud Application Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Troubleshot Azure applications for customers",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "preferred_1",
+              "requirement": "AWS certification preferred",
+              "reason": "Not listed",
+              "severity": "material"
+            }
+          ],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "AWS certified"
+        ],
+        "rationale": "A material preferred-certification gap alone cannot force PASS.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Troubleshot Azure applications for customers"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 2,
+        "unsupported": 2
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Troubleshot Azure applications for customers",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "preferred_1",
+            "requirement": "AWS certification preferred",
+            "reason": "Not listed",
+            "severity": "material"
+          }
+        ],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "mandatory-language-pass",
+      "contractHash": "fb732cdf61b353e0616fee5ca9d2a104ea57a3d3434650e6b4b0c9adc6658af2",
+      "annotationHash": "2aea8bcbc710d10fe00ce76e0d720470aef67cf46c6651858eacb291848cbfd3",
+      "inputHash": "1463004b47ded1a3a3f3522e4941b6b528a170e5ff8453e711817ccf1e927f5a",
+      "fixture": {
+        "caseId": "mandatory-language-pass",
+        "profile": {
+          "id": "profile_language",
+          "headline": "Frontend Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Engineer",
+              "responsibilities": [
+                "Built internationalized web applications"
+              ],
+              "evidence": [
+                "Built internationalized web applications"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_language",
+          "company": "Example Employer",
+          "title": "Frontend Engineer",
+          "description": "Frontend Engineer: Native Japanese is mandatory",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Native Japanese is mandatory",
+              "type": "language",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "STRETCH",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Built internationalized web applications",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Native Japanese is mandatory",
+              "reason": "No direct evidence",
+              "severity": "material"
+            }
+          ],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "PASS",
+        "expectHardBlocker": true,
+        "mustNotClaim": [
+          "Native Japanese"
+        ],
+        "rationale": "Promote a material gap on a core binary language requirement.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [
+          "req_1"
+        ],
+        "requiredEvidence": [
+          "Built internationalized web applications"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [
+          "req_1"
+        ],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 2,
+        "unsupported": 2
+      },
+      "actual": {
+        "verdict": "PASS",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Built internationalized web applications",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Native Japanese is mandatory",
+            "reason": "No direct evidence",
+            "severity": "hard_blocker"
+          }
+        ],
+        "hardBlockers": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Native Japanese is mandatory",
+            "reason": "No direct evidence",
+            "severity": "hard_blocker"
+          }
+        ],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "negated-short-claim-not-grounded",
+      "contractHash": "a408e01faab40b9a6b6c5d54c9922b9b8353c7420bc37cdac9d32a789594b11f",
+      "annotationHash": "6b38892eda0aaf0a1e8d4e8ad16c95b86cfd82192841d9a02cffce18b367d54c",
+      "inputHash": "d581fb8ef5c64032f1cfa43d961680056d0de929d2fcb016f33c494e7ee2d780",
+      "fixture": {
+        "caseId": "negated-short-claim-not-grounded",
+        "profile": {
+          "id": "profile_negated",
+          "headline": "Frontend Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Engineer",
+              "responsibilities": [
+                "Never used Kubernetes in production at any point"
+              ],
+              "evidence": [
+                "Never used Kubernetes in production at any point"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_negated",
+          "company": "Example Employer",
+          "title": "Platform Engineer",
+          "description": "Platform Engineer: Kubernetes",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Kubernetes",
+              "type": "technology",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Platform Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Kubernetes",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "STRETCH",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "Kubernetes"
+        ],
+        "rationale": "A technology name cut from a negative sentence is not an exact evidence match.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": []
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 0,
+        "unsupported": 0
+      },
+      "actual": {
+        "verdict": "STRETCH",
+        "confidence": "low",
+        "resumeContortion": "low",
+        "strongestMatches": [],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [
+          "One or more positive claims lacked a traceable candidate-profile evidence sentence."
+        ],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "unlinked-hard-blocker-gap-pass",
+      "contractHash": "b9bc114a201135b0b0e2905a6d191a29216b1ee2440148b3b0db2da256b2b16f",
+      "annotationHash": "2fa2d34c6899dc1e28b6c4e99475eafa9d8ce18048ba0c8c63e89cea0e6fef71",
+      "inputHash": "52b8332493855636b0a38ddf890d84b29567587972c62b879511307d992e5fe3",
+      "fixture": {
+        "caseId": "unlinked-hard-blocker-gap-pass",
+        "profile": {
+          "id": "profile_unlinked",
+          "headline": "Frontend Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Engineer",
+              "responsibilities": [
+                "Built authentication user interfaces"
+              ],
+              "evidence": [
+                "Built authentication user interfaces"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_unlinked",
+          "company": "Example Employer",
+          "title": "Security Architect",
+          "description": "Security Architect: Ten years of security architecture",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Ten years of security architecture",
+              "type": "role_experience",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Security Architect",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Built authentication user interfaces",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirement": "Ten years of security architecture",
+              "reason": "No security architecture history",
+              "severity": "hard_blocker"
+            }
+          ],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "PASS",
+        "expectHardBlocker": true,
+        "expectedHardBlockerCount": 1,
+        "mustNotClaim": [
+          "Security architect"
+        ],
+        "rationale": "Preserve an explicit unlinked hard blocker; absence of ID must not suppress PASS.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [
+          "req_1"
+        ],
+        "requiredEvidence": [
+          "Built authentication user interfaces"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [
+          "req_1"
+        ],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 1
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 2,
+        "unsupported": 2
+      },
+      "actual": {
+        "verdict": "PASS",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Built authentication user interfaces",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirement": "Ten years of security architecture",
+            "reason": "No security architecture history",
+            "severity": "hard_blocker"
+          }
+        ],
+        "hardBlockers": [
+          {
+            "requirement": "Ten years of security architecture",
+            "reason": "No security architecture history",
+            "severity": "hard_blocker"
+          }
+        ],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "minor-education-gap-not-pass",
+      "contractHash": "144f533859631bf58fe255fc8106a173d15a343f0a08031db970ce924dfba827",
+      "annotationHash": "8c1f4e6595f8fd5bc543db7cb290b36158a21244cb793f7ea7fd0c5ff5f585ff",
+      "inputHash": "7c44884a2865e8e631efc1e69b280b64fffe440f65acb044e17091519ce02870",
+      "fixture": {
+        "caseId": "minor-education-gap-not-pass",
+        "profile": {
+          "id": "profile_education",
+          "headline": "Frontend Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Engineer",
+              "responsibilities": [
+                "Shipped accessible React products for eight years"
+              ],
+              "evidence": [
+                "Shipped accessible React products for eight years"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_education",
+          "company": "Example Employer",
+          "title": "Frontend Engineer",
+          "description": "Frontend Engineer: Bachelor's degree or equivalent experience",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Bachelor's degree or equivalent experience",
+              "type": "education",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Shipped accessible React products for eight years",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Bachelor's degree",
+              "reason": "No direct evidence",
+              "severity": "minor"
+            }
+          ],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "expectedHardBlockerCount": 0,
+        "mustNotClaim": [
+          "Computer science degree"
+        ],
+        "rationale": "A minor gap is not promoted even for a core binary requirement.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Shipped accessible React products for eight years"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 2,
+        "unsupported": 2
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Shipped accessible React products for eight years",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Bachelor's degree",
+            "reason": "No direct evidence",
+            "severity": "minor"
+          }
+        ],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "duplicate-blocker-deduped",
+      "contractHash": "2a06216009bb3852f409d8ae48bc81a1c9c01a546dc473f27e86e048cddec298",
+      "annotationHash": "8ee9c45b9f78456661f2fb00e079e58da126380712188e94036f8ca71719478c",
+      "inputHash": "34071299d8c051049485f2c9adc0f6dc6287d611ab3db21a85dd867ab92d7491",
+      "fixture": {
+        "caseId": "duplicate-blocker-deduped",
+        "profile": {
+          "id": "profile_duplicate",
+          "headline": "Frontend Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Engineer",
+              "responsibilities": [
+                "Built internationalized web applications"
+              ],
+              "evidence": [
+                "Built internationalized web applications"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_duplicate",
+          "company": "Example Employer",
+          "title": "Frontend Engineer",
+          "description": "Frontend Engineer: Fluent Korean required",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Fluent Korean required",
+              "type": "language",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "STRETCH",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Built internationalized web applications",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Fluent Korean required",
+              "reason": "No direct evidence",
+              "severity": "material"
+            }
+          ],
+          "hardBlockers": [
+            {
+              "requirement": "Fluent Korean required",
+              "reason": "No Korean evidence",
+              "severity": "hard_blocker"
+            }
+          ],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "PASS",
+        "expectHardBlocker": true,
+        "expectedHardBlockerCount": 1,
+        "mustNotClaim": [
+          "Fluent Korean"
+        ],
+        "rationale": "An unlinked model blocker and a linked promoted gap for the same requirement yield one blocker.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [
+          "req_1"
+        ],
+        "requiredEvidence": [
+          "Built internationalized web applications"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [
+          "req_1"
+        ],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 2,
+        "unsupported": 2
+      },
+      "actual": {
+        "verdict": "PASS",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Built internationalized web applications",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Fluent Korean required",
+            "reason": "No direct evidence",
+            "severity": "hard_blocker"
+          }
+        ],
+        "hardBlockers": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Fluent Korean required",
+            "reason": "No direct evidence",
+            "severity": "hard_blocker"
+          }
+        ],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "case-whitespace-evidence-preserved",
+      "contractHash": "359af8c10ffa121bf016ec3a8c6f8f4832d30f6c24125b40fe6ef9be015ef1e9",
+      "annotationHash": "449276f933c994d7dee62b44cd6c184347894d21e32183bf9379d37f8f665ee7",
+      "inputHash": "64912645c5223e65c4d815c8d60c355a4351ddf21dcb3b95abbeee1fbf83765b",
+      "fixture": {
+        "caseId": "case-whitespace-evidence-preserved",
+        "profile": {
+          "id": "profile_period",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Led a React platform team for three years"
+              ],
+              "evidence": [
+                "Led a React platform team for three years"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_period",
+          "company": "Example Employer",
+          "title": "Frontend Lead",
+          "description": "Frontend Lead: Lead a React team",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Lead a React team",
+              "type": "leadership",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Lead",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "  LED a React   platform team for three years  ",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "ten years"
+        ],
+        "rationale": "Case and whitespace changes preserve exact evidence after normalization.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Led a React platform team for three years"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 1,
+        "unsupported": 1
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "  LED a React   platform team for three years  ",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "curly-quotes-evidence-preserved",
+      "contractHash": "d8056cbd82e6dfa1f6c8588a4b1b0b08c67f43b63fe6ad04c3b4ca7dabf419a3",
+      "annotationHash": "c19a236cfc9323ff933f736b16d011b490de9e0ef129ce1895a7409d118b02c7",
+      "inputHash": "622d56c2cd86057419e626d10e51e7c3fd030ccef71971da85cd7a2eb1ebd691",
+      "fixture": {
+        "caseId": "curly-quotes-evidence-preserved",
+        "profile": {
+          "id": "profile_period",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Led a React platform team for three years"
+              ],
+              "evidence": [
+                "Led a React platform team for three years"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_period",
+          "company": "Example Employer",
+          "title": "Frontend Lead",
+          "description": "Frontend Lead: Lead a React team",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Lead a React team",
+              "type": "leadership",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Lead",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "“Led a React platform team for three years.”",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "ten years"
+        ],
+        "rationale": "Wrapping quotes and trailing punctuation must not discard a valid sentence.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Led a React platform team for three years"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 1,
+        "unsupported": 1
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "“Led a React platform team for three years.”",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "positive-production-evidence-control",
+      "contractHash": "a654b2981589a273c650d15f51bfc3213734c2afa2bdc074b38c597d80cf965c",
+      "annotationHash": "92fed366452f8fee3a446749c050fe694881eaa395d3caa2ebcce3667e1b9e89",
+      "inputHash": "0e2098b89e326eeba8852718622f221ffe50e17f5abcaf683b40bd47bbd82f85",
+      "fixture": {
+        "caseId": "positive-production-evidence-control",
+        "profile": {
+          "id": "profile_negated",
+          "headline": "Frontend Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Engineer",
+              "responsibilities": [
+                "Operated Kubernetes services in production"
+              ],
+              "evidence": [
+                "Operated Kubernetes services in production"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_negated",
+          "company": "Example Employer",
+          "title": "Platform Engineer",
+          "description": "Platform Engineer: Kubernetes",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Kubernetes",
+              "type": "technology",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Platform Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Operated Kubernetes services in production",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "Never used Kubernetes"
+        ],
+        "rationale": "Normal control: an explicit production statement survives; policy does not ban the technology itself.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Operated Kubernetes services in production"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 1,
+        "unsupported": 1
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Operated Kubernetes services in production",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "mixed-evidence-preserves-valid-match",
+      "contractHash": "2f2c994ba6ac158030815f15f8f5a696c883c17ba3eaf6a36f9c6a984c54aebf",
+      "annotationHash": "fd34409539c5b227be744a781b8f4a7df7b25eb8ae7b9dc49f7f9ae2ae8fdc14",
+      "inputHash": "4d03a96cce8cec5ff348690b0b6eac6b78c4e4bf9dbf7c765447769c8ed53684",
+      "fixture": {
+        "caseId": "mixed-evidence-preserves-valid-match",
+        "profile": {
+          "id": "profile_inflated",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Led a React platform team for three years"
+              ],
+              "evidence": [
+                "Led a React platform team for three years"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_inflated",
+          "company": "Example Employer",
+          "title": "Frontend Lead",
+          "description": "Frontend Lead: Lead a React team",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Lead a React team",
+              "type": "leadership",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Lead",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Led a React platform team for three years and owned company-wide architecture",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            },
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Led a React platform team for three years",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "owned company-wide architecture"
+        ],
+        "rationale": "Remove the invented match but preserve the valid one; one bad claim must not erase all support.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Led a React platform team for three years"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 1,
+        "unsupported": 1
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "low",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Led a React platform team for three years",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [
+          "One or more positive claims lacked a traceable candidate-profile evidence sentence."
+        ],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "high-contortion-downgrades-realistic",
+      "contractHash": "fe71c746ea15afac5a27863c0a4b014b23edc60a088b33a6717d474a04ff3c45",
+      "annotationHash": "f450b22e92ec91b632faa46b9d67b05cefa38e8a098fa3635970abb337509712",
+      "inputHash": "24002e66ee4c74b055b6ac172e4ef76958cc1fe4263958982f9014a38199647e",
+      "fixture": {
+        "caseId": "high-contortion-downgrades-realistic",
+        "profile": {
+          "id": "profile_frontend",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Led a React platform team"
+              ],
+              "evidence": [
+                "Led a React platform team"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_frontend",
+          "company": "Example Employer",
+          "title": "Frontend Engineering Lead",
+          "description": "Frontend Engineering Lead: Lead a React team",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Lead a React team",
+              "type": "leadership",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineering Lead",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "high",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Led a React platform team",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "STRETCH",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "10 years of React"
+        ],
+        "rationale": "High contortion changes REALISTIC to STRETCH even with grounded evidence.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Led a React platform team"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 1,
+        "unsupported": 1
+      },
+      "actual": {
+        "verdict": "STRETCH",
+        "confidence": "medium",
+        "resumeContortion": "high",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Led a React platform team",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "medium-contortion-keeps-supported-verdict",
+      "contractHash": "042ca806c410b0c6859b33418df9e8f12b67d5bd8517f0f98941191ccebaffe7",
+      "annotationHash": "47608720c3365629962fd134d53be7ae39714ed5f2e224d9ab0067da10818142",
+      "inputHash": "d93b0029cf5a3e0d0f2a6695119f5a6288ffeefd518f78ff4906f147729aa549",
+      "fixture": {
+        "caseId": "medium-contortion-keeps-supported-verdict",
+        "profile": {
+          "id": "profile_frontend",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Led a React platform team"
+              ],
+              "evidence": [
+                "Led a React platform team"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_frontend",
+          "company": "Example Employer",
+          "title": "Frontend Engineering Lead",
+          "description": "Frontend Engineering Lead: Lead a React team",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Lead a React team",
+              "type": "leadership",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineering Lead",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "medium",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Led a React platform team",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "10 years of React"
+        ],
+        "rationale": "Normal control: medium contortion alone does not trigger the high-contortion policy.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Led a React platform team"
+        ]
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 1,
+        "unsupported": 1
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "medium",
+        "resumeContortion": "medium",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Led a React platform team",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "mandatory-location-pass",
+      "contractHash": "01d925f81e5f5c5bf87f7c9a9139508d02822e40cbe23b485d9f7d9820d0823d",
+      "annotationHash": "878fe6af215b7c0d16700d4aa1bd0f9cbe2c7acb7b84bd76dcc87ff8db5916de",
+      "inputHash": "015580825520812dae16e0cc335e1f148fbf7fc0bb501f60020ff57cc717e9ef",
+      "fixture": {
+        "caseId": "mandatory-location-pass",
+        "profile": {
+          "id": "profile_language",
+          "headline": "Frontend Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Engineer",
+              "responsibilities": [
+                "Built internationalized web applications"
+              ],
+              "evidence": [
+                "Built internationalized web applications"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_language",
+          "company": "Example Employer",
+          "title": "Frontend Engineer",
+          "description": "On-site presence in Example City required",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "On-site presence in Example City required",
+              "type": "location",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "STRETCH",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Built internationalized web applications",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "req_1",
+              "requirement": "On-site presence in Example City required",
+              "reason": "No direct evidence",
+              "severity": "material"
+            }
+          ],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "PASS",
+        "expectHardBlocker": true,
+        "mustNotClaim": [
+          "Native Japanese"
+        ],
+        "rationale": "A material unmet core location requirement is another binary hard blocker.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [
+          "req_1"
+        ],
+        "requiredEvidence": []
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [
+          "req_1"
+        ],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 2,
+        "unsupported": 2
+      },
+      "actual": {
+        "verdict": "PASS",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Built internationalized web applications",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "req_1",
+            "requirement": "On-site presence in Example City required",
+            "reason": "No direct evidence",
+            "severity": "hard_blocker"
+          }
+        ],
+        "hardBlockers": [
+          {
+            "requirementId": "req_1",
+            "requirement": "On-site presence in Example City required",
+            "reason": "No direct evidence",
+            "severity": "hard_blocker"
+          }
+        ],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "important-language-not-promoted",
+      "contractHash": "7e0ea6cc88d2984301c6b7e462b28135fe3e1a650e6504fc6e5194db11cff8f7",
+      "annotationHash": "6a69fcfe3bffd7edcc2b5f50b1eeb9f499a8bf83a744593862614c662f5bd1df",
+      "inputHash": "5ca15b6305f8a3c76ec83be07f506cf46dcefcf3f7e5bf3c3a4a6de4608de7ee",
+      "fixture": {
+        "caseId": "important-language-not-promoted",
+        "profile": {
+          "id": "profile_language",
+          "headline": "Frontend Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Engineer",
+              "responsibilities": [
+                "Built internationalized web applications"
+              ],
+              "evidence": [
+                "Built internationalized web applications"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_language",
+          "company": "Example Employer",
+          "title": "Frontend Engineer",
+          "description": "Frontend Engineer: Native Japanese is mandatory",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Native Japanese is mandatory",
+              "type": "language",
+              "importance": "important"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "STRETCH",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Built internationalized web applications",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Native Japanese is mandatory",
+              "reason": "No direct evidence",
+              "severity": "material"
+            }
+          ],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "STRETCH",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "Native Japanese"
+        ],
+        "expectedHardBlockerCount": 0,
+        "rationale": "Only core binary requirements are automatically promoted; an important material gap stays STRETCH.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": []
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 2,
+        "unsupported": 2
+      },
+      "actual": {
+        "verdict": "STRETCH",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Built internationalized web applications",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Native Japanese is mandatory",
+            "reason": "No direct evidence",
+            "severity": "material"
+          }
+        ],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "required-certification-control",
+      "contractHash": "b634e94ca7d038448e34b06254230ac2bb044895aadee96537f61a9a7ff9e05c",
+      "annotationHash": "c52bedf94bfbdf8452de974d599daa583daee6cd38df029dcc4092d2a3fcd24a",
+      "inputHash": "353288ff784bcd977b93144e0a6df7a84783d1233b1722ca688bf9ec4915c6e1",
+      "fixture": {
+        "caseId": "required-certification-control",
+        "profile": {
+          "id": "profile_cert",
+          "headline": "Cloud Application Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Cloud Application Engineer",
+              "responsibilities": [
+                "Troubleshot Azure applications for customers"
+              ],
+              "evidence": [
+                "Troubleshot Azure applications for customers"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_cert",
+          "company": "Example Employer",
+          "title": "Cloud Application Engineer",
+          "description": "Cloud Application Engineer: Troubleshoot cloud applications",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Troubleshoot cloud applications",
+              "type": "customer",
+              "importance": "core"
+            },
+            {
+              "id": "preferred_1",
+              "text": "AWS certification preferred",
+              "type": "certification",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Cloud Application Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Troubleshot Azure applications for customers",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "preferred_1",
+              "requirement": "AWS certification preferred",
+              "reason": "Not listed",
+              "severity": "material"
+            }
+          ],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "PASS",
+        "expectHardBlocker": true,
+        "mustNotClaim": [
+          "AWS certified"
+        ],
+        "rationale": "Paired requirement change: the same certification gap becomes core/required and must force PASS.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [
+          "preferred_1"
+        ],
+        "requiredEvidence": []
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [
+          "preferred_1"
+        ],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 2,
+        "unsupported": 2
+      },
+      "actual": {
+        "verdict": "PASS",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Troubleshot Azure applications for customers",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "preferred_1",
+            "requirement": "AWS certification preferred",
+            "reason": "Not listed",
+            "severity": "hard_blocker"
+          }
+        ],
+        "hardBlockers": [
+          {
+            "requirementId": "preferred_1",
+            "requirement": "AWS certification preferred",
+            "reason": "Not listed",
+            "severity": "hard_blocker"
+          }
+        ],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "formal-tpm-preferred-control",
+      "contractHash": "b0289eea829a5831ef26d22773e6e7b27192da2c1896eadcdbc370f6e0b4803a",
+      "annotationHash": "22f1d79f548194845ba436dcc5732a289d32cfbddd0650c63e854dbaba58d34e",
+      "inputHash": "e5485e4320bf5b81c57d233b4f1c58534f7e1c045c5ceaa6eaaea46c06a171fd",
+      "fixture": {
+        "caseId": "formal-tpm-preferred-control",
+        "profile": {
+          "id": "profile_tpm",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Coordinated a cross-team frontend migration"
+              ],
+              "evidence": [
+                "Coordinated a cross-team frontend migration"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_tpm",
+          "company": "Example Employer",
+          "title": "Senior Technical Program Manager",
+          "description": "Senior Technical Program Manager: Five years of formal TPM ownership required",
+          "required": [],
+          "preferred": [
+            {
+              "id": "req_1",
+              "text": "Five years of formal TPM ownership required",
+              "type": "role_experience",
+              "importance": "nice_to_have"
+            }
+          ],
+          "responsibilities": [],
+          "roleFamily": "Senior Technical Program Manager",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "STRETCH",
+          "confidence": "medium",
+          "resumeContortion": "high",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Coordinated a cross-team frontend migration",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Five years of formal TPM ownership",
+              "reason": "No direct evidence",
+              "severity": "hard_blocker"
+            }
+          ],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "STRETCH",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "Five years as a TPM"
+        ],
+        "expectedHardBlockerCount": 0,
+        "rationale": "Paired preferred classification removes the explicit blocker; high contortion still prevents REALISTIC.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": []
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 2,
+        "unsupported": 2
+      },
+      "actual": {
+        "verdict": "STRETCH",
+        "confidence": "medium",
+        "resumeContortion": "high",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Coordinated a cross-team frontend migration",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Five years of formal TPM ownership",
+            "reason": "No direct evidence",
+            "severity": "material"
+          }
+        ],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "prototype-invented-production-claim",
+      "contractHash": "a2c44803e992d90f52c3f0e90b03c9810442c90de59228c2ac240c75411be774",
+      "annotationHash": "fd9806ee4654a4f810314951de18c9de1721ac820c05039fdaddc6c910584e80",
+      "inputHash": "f1c781d9430d8cf8604b3de5235374a46664fa79177d5880ac2738bb09fefdf5",
+      "fixture": {
+        "caseId": "prototype-invented-production-claim",
+        "profile": {
+          "id": "profile_ai",
+          "headline": "Application Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Application Engineer",
+              "responsibilities": [
+                "Built a local LLM evaluation prototype"
+              ],
+              "evidence": [
+                "Built a local LLM evaluation prototype"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_ai",
+          "company": "Example Employer",
+          "title": "AI Application Engineer",
+          "description": "AI Application Engineer: Ship production LLM applications",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Ship production LLM applications",
+              "type": "technology",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "AI Application Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "medium",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Production LLM platform owner",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Production LLM delivery",
+              "reason": "No direct evidence",
+              "severity": "material"
+            }
+          ],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "STRETCH",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "Production LLM platform owner"
+        ],
+        "rationale": "An injected claim of production ownership is absent from prototype evidence and must be removed.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": []
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 1,
+        "unsupported": 1
+      },
+      "actual": {
+        "verdict": "STRETCH",
+        "confidence": "low",
+        "resumeContortion": "medium",
+        "strongestMatches": [],
+        "gaps": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Production LLM delivery",
+            "reason": "No direct evidence",
+            "severity": "material"
+          }
+        ],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [
+          "One or more positive claims lacked a traceable candidate-profile evidence sentence."
+        ],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "two-required-blockers-preserved",
+      "contractHash": "a34aa0362b0a29fb2905c36402c88a16eb4f3c5e45e5a90e19815e5f0aae71ed",
+      "annotationHash": "f555df08d9cc2291bead99df8cbc5aef83afada122cf4ba86e2f55db2a3f8b43",
+      "inputHash": "71353f31b7de60d685175acdbd7a6f553bdb55133cc495e0381a4b15e624338e",
+      "fixture": {
+        "caseId": "two-required-blockers-preserved",
+        "profile": {
+          "id": "profile_language",
+          "headline": "Frontend Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Engineer",
+              "responsibilities": [
+                "Built internationalized web applications"
+              ],
+              "evidence": [
+                "Built internationalized web applications"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_language",
+          "company": "Example Employer",
+          "title": "Frontend Engineer",
+          "description": "Frontend Engineer: Native Japanese is mandatory",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Native Japanese is mandatory",
+              "type": "language",
+              "importance": "core"
+            },
+            {
+              "id": "req_2",
+              "text": "Example certification required",
+              "type": "certification",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "STRETCH",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Built internationalized web applications",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Native Japanese is mandatory",
+              "reason": "No direct evidence",
+              "severity": "material"
+            },
+            {
+              "requirementId": "req_2",
+              "requirement": "Example certification required",
+              "reason": "No certification evidence",
+              "severity": "material"
+            }
+          ],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt"
+        },
+        "expectedVerdict": "PASS",
+        "expectHardBlocker": true,
+        "mustNotClaim": [
+          "Native Japanese"
+        ],
+        "expectedHardBlockerCount": 2,
+        "rationale": "Both distinct unmet core requirements must survive; detecting just any blocker is insufficient.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [
+          "req_1",
+          "req_2"
+        ],
+        "requiredEvidence": []
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [
+          "req_1",
+          "req_2"
+        ],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 0,
+        "valid": 0,
+        "claims": 3,
+        "unsupported": 3
+      },
+      "actual": {
+        "verdict": "PASS",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Built internationalized web applications",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Native Japanese is mandatory",
+            "reason": "No direct evidence",
+            "severity": "hard_blocker"
+          },
+          {
+            "requirementId": "req_2",
+            "requirement": "Example certification required",
+            "reason": "No certification evidence",
+            "severity": "hard_blocker"
+          }
+        ],
+        "hardBlockers": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Native Japanese is mandatory",
+            "reason": "No direct evidence",
+            "severity": "hard_blocker"
+          },
+          {
+            "requirementId": "req_2",
+            "requirement": "Example certification required",
+            "reason": "No certification evidence",
+            "severity": "hard_blocker"
+          }
+        ],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt"
+      }
+    },
+    {
+      "caseId": "citation-valid-chunk-kept",
+      "contractHash": "95cfbba86e57fcb8416736576f28302c687a270c86c76e97f640e2037a07cd06",
+      "annotationHash": "a9a6b33dc704a0f97f7aa79bc3d5d7ee92f75b9e3a2ae0de20ec7532a9fafda7",
+      "inputHash": "568fb02e68c772155ddaf467b3c745a294c5339a4d33f5ec4df24a17967a1774",
+      "fixture": {
+        "caseId": "citation-valid-chunk-kept",
+        "profile": {
+          "id": "profile_frontend",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Led a React platform team"
+              ],
+              "evidence": [
+                "Led a React platform team"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_frontend",
+          "company": "Example Employer",
+          "title": "Frontend Engineering Lead",
+          "description": "Frontend Engineering Lead: Lead a React team",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Lead a React team",
+              "type": "leadership",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineering Lead",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Led a React platform team",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt",
+          "citations": [
+            {
+              "claimId": "557a71f0ef13c43c14e2b78d93ff493afe2786d42a28c77eff69237ccc1f5064",
+              "ref": {
+                "source": "evidence",
+                "path": "chunk:4325e200e80d5a46a5370be5ea68fb25cbf72eee62b0f1a6ff12fee6a5c34982",
+                "quote": "Led a React platform team"
+              }
+            }
+          ]
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "10 years of React"
+        ],
+        "rationale": "A citation to a chunk retrieved in this run with the exact chunk text survives policy and validation unchanged.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Led a React platform team"
+        ],
+        "expectedValidCitations": 1,
+        "expectedUnsupportedClaims": 0
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 1,
+        "valid": 1,
+        "claims": 1,
+        "unsupported": 0
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Led a React platform team",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt",
+        "citations": [
+          {
+            "claimId": "557a71f0ef13c43c14e2b78d93ff493afe2786d42a28c77eff69237ccc1f5064",
+            "ref": {
+              "source": "evidence",
+              "path": "chunk:4325e200e80d5a46a5370be5ea68fb25cbf72eee62b0f1a6ff12fee6a5c34982",
+              "quote": "Led a React platform team"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "citation-nonexistent-chunk-dropped",
+      "contractHash": "1f8dbf3597c2f8ce06293d5466c9927733761054046bd0f46c3ef44ff670f2de",
+      "annotationHash": "6025721ba59b3c1637547d90de24b9809e29d2425c19e3ee147ec9e2020a0cc4",
+      "inputHash": "e8456c75e478a0f771bf5f10638bb334ed7ae964948dfdbd00555e0c47a95055",
+      "fixture": {
+        "caseId": "citation-nonexistent-chunk-dropped",
+        "profile": {
+          "id": "profile_frontend",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Led a React platform team"
+              ],
+              "evidence": [
+                "Led a React platform team"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_frontend",
+          "company": "Example Employer",
+          "title": "Frontend Engineering Lead",
+          "description": "Frontend Engineering Lead: Lead a React team",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Lead a React team",
+              "type": "leadership",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineering Lead",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Led a React platform team",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt",
+          "citations": [
+            {
+              "claimId": "557a71f0ef13c43c14e2b78d93ff493afe2786d42a28c77eff69237ccc1f5064",
+              "ref": {
+                "source": "evidence",
+                "path": "chunk:0000000000000000000000000000000000000000000000000000000000000000",
+                "quote": "Led a React platform team"
+              }
+            }
+          ]
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "10 years of React"
+        ],
+        "rationale": "A chunk id that no run produced is not evidence; the citation is dropped and the claim is unsupported.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Led a React platform team"
+        ],
+        "expectedValidCitations": 0,
+        "expectedUnsupportedClaims": 1
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 1,
+        "valid": 0,
+        "claims": 1,
+        "unsupported": 1
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "low",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Led a React platform team",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [
+          "One or more citations were dropped because their reference did not resolve to an exact retrieved chunk or input field for this run."
+        ],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt",
+        "citations": []
+      }
+    },
+    {
+      "caseId": "citation-quote-from-other-chunk-dropped",
+      "contractHash": "585f41d40e031a7c6f1cb9046e8a583c16d10ce00879402c1c49c448fdc47a33",
+      "annotationHash": "80465f19413a6933b2176ca414f6eaabe39eff38a3644a8183fb0b571c2bcfec",
+      "inputHash": "224b69f2528a99864117c51c4ede4ac06fda849b3bcc3645813d728b0b5f3c2e",
+      "fixture": {
+        "caseId": "citation-quote-from-other-chunk-dropped",
+        "profile": {
+          "id": "profile_frontend",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Led a React platform team"
+              ],
+              "evidence": [
+                "Led a React platform team"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_frontend",
+          "company": "Example Employer",
+          "title": "Frontend Engineering Lead",
+          "description": "Frontend Engineering Lead: Lead a React team",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Lead a React team",
+              "type": "leadership",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineering Lead",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Led a React platform team",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt",
+          "citations": [
+            {
+              "claimId": "557a71f0ef13c43c14e2b78d93ff493afe2786d42a28c77eff69237ccc1f5064",
+              "ref": {
+                "source": "evidence",
+                "path": "chunk:a20e4431e87686c8c1b59a2acb0b83012f9c7a22f2a697aa937653cd88b1a15b",
+                "quote": "Led a React platform team"
+              }
+            }
+          ]
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "10 years of React"
+        ],
+        "rationale": "A retrieved chunk id with the quote of a different chunk is dropped: quotes must equal the cited chunk's text.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Led a React platform team"
+        ],
+        "expectedValidCitations": 0,
+        "expectedUnsupportedClaims": 1
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 1,
+        "valid": 0,
+        "claims": 1,
+        "unsupported": 1
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "low",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Led a React platform team",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [
+          "One or more citations were dropped because their reference did not resolve to an exact retrieved chunk or input field for this run."
+        ],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt",
+        "citations": []
+      }
+    },
+    {
+      "caseId": "citation-negated-quote-dropped",
+      "contractHash": "4223f97eb320f5c02ca07fd071806ebfc1e3bbc4c3509fd37df0962955b604a6",
+      "annotationHash": "98da734bfbf5a91696818d352df702dff1d44c1b4525d02e7adb1619e9a6dba3",
+      "inputHash": "5425af33219da98cbc5baaf6924a4a0808a7daf4de06904f35186f1cec694a9b",
+      "fixture": {
+        "caseId": "citation-negated-quote-dropped",
+        "profile": {
+          "id": "profile_frontend",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Led a React platform team"
+              ],
+              "evidence": [
+                "Led a React platform team"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_frontend",
+          "company": "Example Employer",
+          "title": "Frontend Engineering Lead",
+          "description": "Frontend Engineering Lead: Lead a React team",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Lead a React team",
+              "type": "leadership",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineering Lead",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Led a React platform team",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt",
+          "citations": [
+            {
+              "claimId": "557a71f0ef13c43c14e2b78d93ff493afe2786d42a28c77eff69237ccc1f5064",
+              "ref": {
+                "source": "evidence",
+                "path": "chunk:4325e200e80d5a46a5370be5ea68fb25cbf72eee62b0f1a6ff12fee6a5c34982",
+                "quote": "Never led a React platform team"
+              }
+            }
+          ]
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "10 years of React"
+        ],
+        "rationale": "A quote altered by one negation no longer equals the chunk text and is dropped.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Led a React platform team"
+        ],
+        "expectedValidCitations": 0,
+        "expectedUnsupportedClaims": 1
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 1,
+        "valid": 0,
+        "claims": 1,
+        "unsupported": 1
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "low",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Led a React platform team",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [
+          "One or more citations were dropped because their reference did not resolve to an exact retrieved chunk or input field for this run."
+        ],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt",
+        "citations": []
+      }
+    },
+    {
+      "caseId": "citation-chunk-from-other-run-dropped",
+      "contractHash": "548e670308e8e12789df8e6fb1a3af6483cbaf1ef47a2471d7600c6efcaad3ba",
+      "annotationHash": "a5dc0537bb98b24ef15f3b730f6283177766e0c93375633c0cfdc392f07f1dfb",
+      "inputHash": "88c8dffb65b8348c125663098ac2986790b9f093b81bcadaf59a5d069438f00f",
+      "fixture": {
+        "caseId": "citation-chunk-from-other-run-dropped",
+        "profile": {
+          "id": "profile_frontend",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Led a React platform team"
+              ],
+              "evidence": [
+                "Led a React platform team"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_frontend",
+          "company": "Example Employer",
+          "title": "Frontend Engineering Lead",
+          "description": "Frontend Engineering Lead: Lead a React team",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Lead a React team",
+              "type": "leadership",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineering Lead",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Led a React platform team",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt",
+          "citations": [
+            {
+              "claimId": "557a71f0ef13c43c14e2b78d93ff493afe2786d42a28c77eff69237ccc1f5064",
+              "ref": {
+                "source": "evidence",
+                "path": "chunk:f5fd1acdb6b438a76749c44681f51c2c879ba2a7778deb6b4df6cca6d8fb59f2",
+                "quote": "Led a React platform team"
+              }
+            }
+          ]
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "10 years of React"
+        ],
+        "rationale": "A content hash computed for another corpus resolves nothing here: membership in this run's trace, not the hash, makes a chunk citable.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Led a React platform team"
+        ],
+        "expectedValidCitations": 0,
+        "expectedUnsupportedClaims": 1
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 1,
+        "valid": 0,
+        "claims": 1,
+        "unsupported": 1
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "low",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Led a React platform team",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [
+          "One or more citations were dropped because their reference did not resolve to an exact retrieved chunk or input field for this run."
+        ],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt",
+        "citations": []
+      }
+    },
+    {
+      "caseId": "citation-removed-match-keeps-valid-one",
+      "contractHash": "b3432c9d7f8928e09d3718acdca1ac487b634bd721482cf9c3fe5e4067808fd8",
+      "annotationHash": "6c9f9d692f638cd5bb38c8c1904f9ff7a16f6642c7ce84f76b5a083995967d9e",
+      "inputHash": "edeb34f59f24d5003a92e2f466a0ad8cfdbf8b147e06a916b2740f64fd17d1ea",
+      "fixture": {
+        "caseId": "citation-removed-match-keeps-valid-one",
+        "profile": {
+          "id": "profile_inflated",
+          "headline": "Frontend Lead",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Lead",
+              "responsibilities": [
+                "Led a React platform team for three years"
+              ],
+              "evidence": [
+                "Led a React platform team for three years"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_inflated",
+          "company": "Example Employer",
+          "title": "Frontend Lead",
+          "description": "Frontend Lead: Lead a React team",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Lead a React team",
+              "type": "leadership",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Lead",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "REALISTIC",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Led a React platform team for three years and owned company-wide architecture",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            },
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Led a React platform team for three years",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [],
+          "hardBlockers": [],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt",
+          "citations": [
+            {
+              "claimId": "df9a4fdedd2a7eb10a964843118c0dc5b855b131cdd4d22f4ebcb270d761ef4d",
+              "ref": {
+                "source": "evidence",
+                "path": "chunk:c1c3c61712e7e55e6ee7c8e422db7e88780875f6740b4b321e3963ba3261bf50",
+                "quote": "Led a React platform team for three years"
+              }
+            },
+            {
+              "claimId": "14f972efae377b114c6ff23ed03f0d61c7b89d907f880f83540bf079ffaa82a0",
+              "ref": {
+                "source": "evidence",
+                "path": "chunk:c1c3c61712e7e55e6ee7c8e422db7e88780875f6740b4b321e3963ba3261bf50",
+                "quote": "Led a React platform team for three years"
+              }
+            }
+          ]
+        },
+        "expectedVerdict": "REALISTIC",
+        "expectHardBlocker": false,
+        "mustNotClaim": [
+          "owned company-wide architecture"
+        ],
+        "rationale": "The removed leading match takes its citation with it; the surviving match keeps its own and no citation moves to another claim.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [],
+        "requiredEvidence": [
+          "Led a React platform team for three years"
+        ],
+        "expectedValidCitations": 1,
+        "expectedUnsupportedClaims": 0
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 2,
+        "valid": 1,
+        "claims": 1,
+        "unsupported": 0
+      },
+      "actual": {
+        "verdict": "REALISTIC",
+        "confidence": "low",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Led a React platform team for three years",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [],
+        "hardBlockers": [],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [
+          "One or more citations were dropped because the claim they supported was removed or is not in the result.",
+          "One or more positive claims lacked a traceable candidate-profile evidence sentence."
+        ],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt",
+        "citations": [
+          {
+            "claimId": "14f972efae377b114c6ff23ed03f0d61c7b89d907f880f83540bf079ffaa82a0",
+            "ref": {
+              "source": "evidence",
+              "path": "chunk:c1c3c61712e7e55e6ee7c8e422db7e88780875f6740b4b321e3963ba3261bf50",
+              "quote": "Led a React platform team for three years"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "citation-dedup-pair-rekeyed",
+      "contractHash": "4c05209e05d5f721bdacfeec7344e7e647c316d9a47dc1a12f622486e1646b80",
+      "annotationHash": "e0bcc8496644560d97b536c48050c2e85894c087ed172752a9ae7810d6c10226",
+      "inputHash": "af4bbaf67f4515c3072e159cadf96ba1555c605e50cf7edab6d48db8ca2b57fc",
+      "fixture": {
+        "caseId": "citation-dedup-pair-rekeyed",
+        "profile": {
+          "id": "profile_duplicate",
+          "headline": "Frontend Engineer",
+          "roles": [
+            {
+              "company": "Example Company",
+              "title": "Frontend Engineer",
+              "responsibilities": [
+                "Built internationalized web applications"
+              ],
+              "evidence": [
+                "Built internationalized web applications"
+              ]
+            }
+          ],
+          "skills": [],
+          "domains": [],
+          "leadership": [],
+          "customerFacing": [],
+          "aiEvidence": [],
+          "cloudEvidence": [],
+          "sourceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "job": {
+          "id": "job_duplicate",
+          "company": "Example Employer",
+          "title": "Frontend Engineer",
+          "description": "Frontend Engineer: Fluent Korean required",
+          "required": [
+            {
+              "id": "req_1",
+              "text": "Fluent Korean required",
+              "type": "language",
+              "importance": "core"
+            }
+          ],
+          "preferred": [],
+          "responsibilities": [],
+          "roleFamily": "Frontend Engineer",
+          "domains": [],
+          "technologies": []
+        },
+        "draftAssessment": {
+          "verdict": "STRETCH",
+          "confidence": "medium",
+          "resumeContortion": "low",
+          "strongestMatches": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Core requirement",
+              "evidence": "Built internationalized web applications",
+              "source": {
+                "company": "Example Company"
+              },
+              "strength": "direct"
+            }
+          ],
+          "gaps": [
+            {
+              "requirementId": "req_1",
+              "requirement": "Fluent Korean required",
+              "reason": "No direct evidence",
+              "severity": "material"
+            }
+          ],
+          "hardBlockers": [
+            {
+              "requirement": "Fluent Korean required",
+              "reason": "No Korean evidence",
+              "severity": "hard_blocker"
+            }
+          ],
+          "interviewRisks": [],
+          "recommendation": "Consider applying with a truthful story.",
+          "missingInformation": [],
+          "modelVersion": "eval-model",
+          "promptVersion": "eval-prompt",
+          "citations": [
+            {
+              "claimId": "req:req_1",
+              "ref": {
+                "source": "candidate",
+                "path": "roles[0].evidence[0]",
+                "quote": "Built internationalized web applications"
+              }
+            },
+            {
+              "claimId": "text:fluent korean required",
+              "ref": {
+                "source": "job",
+                "path": "required[0].text",
+                "quote": "Fluent Korean required"
+              }
+            }
+          ]
+        },
+        "expectedVerdict": "PASS",
+        "expectHardBlocker": true,
+        "expectedHardBlockerCount": 1,
+        "mustNotClaim": [
+          "Fluent Korean"
+        ],
+        "rationale": "An ID-less model blocker merged into the promoted gap hands its citation to the surviving req: claim; the uncited match stays unsupported.",
+        "provenance": "synthetic-policy-contract",
+        "humanReview": "pending",
+        "expectedBlockerIds": [
+          "req_1"
+        ],
+        "requiredEvidence": [],
+        "expectedValidCitations": 2,
+        "expectedUnsupportedClaims": 1
+      },
+      "status": "passed",
+      "violations": [],
+      "blockers": {
+        "found": [
+          "req_1"
+        ],
+        "missing": [],
+        "spurious": [],
+        "duplicates": [],
+        "unlinked": 0,
+        "textResolved": 0
+      },
+      "citations": {
+        "supplied": 2,
+        "valid": 2,
+        "claims": 2,
+        "unsupported": 1
+      },
+      "actual": {
+        "verdict": "PASS",
+        "confidence": "medium",
+        "resumeContortion": "low",
+        "strongestMatches": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Core requirement",
+            "evidence": "Built internationalized web applications",
+            "source": {
+              "company": "Example Company"
+            },
+            "strength": "direct"
+          }
+        ],
+        "gaps": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Fluent Korean required",
+            "reason": "No direct evidence",
+            "severity": "hard_blocker"
+          }
+        ],
+        "hardBlockers": [
+          {
+            "requirementId": "req_1",
+            "requirement": "Fluent Korean required",
+            "reason": "No direct evidence",
+            "severity": "hard_blocker"
+          }
+        ],
+        "interviewRisks": [],
+        "recommendation": "Consider applying with a truthful story.",
+        "missingInformation": [
+          "One or more citations were moved to a merged requirement claim."
+        ],
+        "modelVersion": "eval-model",
+        "promptVersion": "eval-prompt",
+        "citations": [
+          {
+            "claimId": "req:req_1",
+            "ref": {
+              "source": "candidate",
+              "path": "roles[0].evidence[0]",
+              "quote": "Built internationalized web applications"
+            }
+          },
+          {
+            "claimId": "req:req_1",
+            "ref": {
+              "source": "job",
+              "path": "required[0].text",
+              "quote": "Fluent Korean required"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "success": true
+}
