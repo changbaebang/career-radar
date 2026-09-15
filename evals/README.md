@@ -237,15 +237,26 @@ own entries there are kept verbatim, so a sentence match could not prove the sta
 inside the adapter mapping (citation bounds, producer-side context discard) happen before the
 pipeline and are not attributed. This lets a verdict change be attributed to the policy
 (`verdictChangedByPolicy`) and dropped citations to their stage (`noteCounts`); `citationInvalid` is
-likewise validator-attributed. Before anything is written, `assertModelReportRedacted` throws if the
-JSON or the Markdown contains a resume or posting text, a headline, an evidence sentence, a
-responsibility line, a key-shaped string or a prompt tag; gold requirement texts are the authored
+likewise validator-attributed. Model-written strings the report keeps for readability — extracted
+requirement texts in `unmatchedExtracted` and `nearestExtracted`, hard blocker texts — are replaced
+by a fixed marker when they equal an input sentence (a model that copies a responsibilities line
+into the requirements did exactly that on the first full live run and, before this rule, cost the
+whole report), and the count is reported as `redactions`. Then `assertModelReportRedacted` throws if
+the JSON or the Markdown still contains a resume or posting text, a headline, an evidence sentence,
+a responsibility line, a key-shaped string or a prompt tag; gold requirement texts are the authored
 contract and may appear. `--baseline` compares case by case on the same `provider`,
 `requestedModel`, `promptVersion` and golden-set hash (`outcomeChanged`, `verdictChanged`,
 `blockerRecallAllChanged`); a changed outcome under a live model is a model-path observation, not a
-policy regression. Exit `0` when every selected case was attempted, `1` on golden-set problems (no
-call, no report) or not-attempted cases at the call cap (the report is still written), `2` on an
-argument or gate refusal or an incompatible baseline.
+policy regression. `--resume REPORT_JSON` reruns only the cases of an earlier report that did not
+reach an assessment (a daily request limit or a key that stopped mid-run leaves a tail of
+`provider_error`s) and writes one merged report: rerun records replace the old ones by case id,
+aggregates are recomputed from the case records, calls are summed, `resumed` records the earlier
+`generatedAt`, the rerun count and the round number, and the golden-set hash is that of the full
+set, so the merged report can be a baseline. The earlier report must come from the same report
+version, provider, model, prompt and golden set; `--resume` cannot be combined with `--cases` or
+`--limit`. Exit `0` when every selected case was attempted, `1` on golden-set problems (no call, no
+report) or not-attempted cases at the call cap (the report is still written), `2` on an argument or
+gate refusal or an incompatible baseline.
 
 **What a dry run establishes.** Numbers under the fake verify the runner, not any model: the fake's
 verdicts follow a fixed token-overlap rule and are not meant to agree with the gold set. Retention

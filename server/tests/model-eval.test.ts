@@ -9,7 +9,7 @@ import { UNGROUNDED_MATCH_REMOVED } from "../src/domain/assessment/policy.js";
 import { GoldenFakeAnalyzer, keyFor, type FakeFailure, type GoldenFakeOptions } from "../../evals/fixtures/golden/fake-analyzer.js";
 import { GOLDEN_SET_VERSION, goldenCases, goldenPostingText, goldenResumeText, type GoldenCase } from "../../evals/fixtures/golden/index.js";
 import {
-  ModelEvalReportSchema, assertModelReportRedacted, classifyFailure, compareModelReports, renderModelMarkdown, runModelEvaluation, validateGoldenSet,
+  ModelEvalReportSchema, REDACTED_TEXT, RESUME_ERRORS, assertModelReportRedacted, casesToRerun, classifyFailure, compareModelReports, mergeModelReports, renderModelMarkdown, runModelEvaluation, validateGoldenSet,
   type ModelRunOptions,
 } from "../../evals/model-mode.js";
 
@@ -280,5 +280,38 @@ describe("M5-D review fixes: golden-set stop and per-call deadline", () => {
       for (const c of bounded.cases) expect(c.telemetry[0]!.durationMs).toBeLessThan(350);
       expect(bounded).toMatchObject({ modelCalls: 2, abortedCalls: 2, unsettledCalls: 0, success: true });
     } finally { await new Promise<void>((resolve) => server.close(() => resolve())); }
+  });
+});
+
+describe("M5-D live-run follow-up: model text that equals an input sentence, and resuming a partial run", () => {
+  it("replaces a model-written requirement that copies a posting line instead of losing the report (the 2026-09-15 run)", async () => {
+    const item = byId("gm-frontend-lead-realistic"); // responsibilities: ["Own the frontend platform roadmap"]
+    const report = await runModelEvaluation([item], options(fakeWith({ copyResponsibilities: true })));
+    expect(report.cases[0]!.extraction!.unmatchedExtracted).toEqual([REDACTED_TEXT]);
+    expect(report.redactions).toBe(1);
+    expect(() => assertModelReportRedacted(JSON.stringify(report) + renderModelMarkdown(report), [item])).not.toThrow();
+    expect(renderModelMarkdown(report)).toContain("model-written strings redacted: 1");
+    const clean = await runModelEvaluation([item], options(fakeWith({})));
+    expect(clean.redactions).toBe(0);
+  });
+
+  it("reruns only the cases without an assessment and merges them into one report with recomputed aggregates", async () => {
+    const cases = goldenCases.slice(0, 4).map((c) => structuredClone(c));
+    const failing = new Map<string, FakeFailure>([[keyFor(goldenPostingText(cases[1]!)), { stage: "extractJob", kind: "provider_error" }], [keyFor(goldenPostingText(cases[3]!)), { stage: "assess", kind: "timeout" }]]);
+    const first = await runModelEvaluation(cases, options(fakeWith({ failures: failing })));
+    expect(first.metrics.outcomes).toMatchObject({ assessed: 2, extractionFailed: 1, assessmentFailed: 1 });
+    const rerunCases = casesToRerun(first, cases);
+    expect(rerunCases.map((c) => c.caseId)).toEqual([cases[1]!.caseId, cases[3]!.caseId]);
+    const second = await runModelEvaluation(rerunCases, options(fakeWith({})));
+    const merged = mergeModelReports(first, second, metadata);
+    expect(() => ModelEvalReportSchema.parse({ ...merged, extra: 1 })).toThrow();
+    expect(merged.cases.map((c) => [c.caseId, c.outcome])).toEqual(cases.map((c) => [c.caseId, "assessed"]));
+    expect(merged).toMatchObject({ goldenSetHash: first.goldenSetHash, selectedCases: 4, modelCalls: first.modelCalls + second.modelCalls, resumed: { from: first.generatedAt, rerunCases: 2, rounds: 2 }, success: true });
+    expect(merged.metrics.outcomes).toEqual({ assessed: 4, extractionFailed: 0, assessmentFailed: 0, notAttempted: 0 });
+    expect(merged.metrics.usage.calls).toBe(merged.cases.reduce((n, c) => n + c.calls, 0));
+    expect(merged.metrics.latency.assess.count).toBe(4);
+    // A third round keeps counting rounds; a report from another model cannot be merged.
+    expect(mergeModelReports(merged, second, metadata).resumed?.rounds).toBe(3);
+    expect(() => mergeModelReports(first, { ...second, requestedModel: "other" }, metadata)).toThrow(RESUME_ERRORS.incompatible);
   });
 });

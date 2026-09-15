@@ -32,6 +32,8 @@ export type GoldenFakeOptions = {
   ungroundedEvidence?: boolean;
   // Model-written missingInformation entries to append to every draft (may equal the pipeline's fixed sentences).
   injectNotes?: string[];
+  // Copy the posting's responsibilities lines into the required list (a model that mistakes duties for requirements).
+  copyResponsibilities?: boolean;
   onResponse?: (event: AnalyzerResponseEvent) => void;
   // Simulated latency per call; it ends early with an AbortError when the call's signal fires.
   delayMs?: number;
@@ -106,7 +108,7 @@ export class GoldenFakeAnalyzer implements CareerAnalyzer {
       const spec = parsePosting(description);
       const id = `${stableId("job", description)}${this.#options.idSalt ?? ""}`;
       const drop = this.#options.dropRequirement?.get(keyFor(description));
-      const required = drop === "all" ? [] : spec.required.filter((_, index) => index !== drop);
+      const required = [...(drop === "all" ? [] : spec.required.filter((_, index) => index !== drop)), ...(this.#options.copyResponsibilities ? spec.responsibilities ?? [] : [])];
       const typed = (text: string) => ({
         text, type: /japanese|korean|language/i.test(text) ? "language" as const : /city|relocat|on-site/i.test(text) ? "location" as const
           : /certif/i.test(text) ? "certification" as const : /degree/i.test(text) ? "education" as const : /lead|mentor|organization/i.test(text) ? "leadership" as const : "technology" as const,

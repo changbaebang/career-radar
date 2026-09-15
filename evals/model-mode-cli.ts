@@ -12,7 +12,8 @@ import { digest } from "./evaluate.js";
 import { GoldenFakeAnalyzer } from "./fixtures/golden/fake-analyzer.js";
 import { GOLDEN_SET_VERSION, goldenCases, type GoldenCase } from "./fixtures/golden/index.js";
 import {
-  CALLS_PER_CASE, assertModelReportRedacted, compareModelReports, renderModelMarkdown, runModelEvaluation, validateGoldenSet, type ModelComparison, type ModelEvalReport,
+  CALLS_PER_CASE, ModelEvalReportSchema, RESUME_ERRORS, assertModelReportRedacted, casesToRerun, compareModelReports, mergeModelReports, renderModelMarkdown, runModelEvaluation, validateGoldenSet,
+  type ModelComparison, type ModelEvalReport,
 } from "./model-mode.js";
 
 // `pnpm eval --mode model` (M5-D). Without an approval flag this is a dry run: the golden fake
@@ -40,9 +41,12 @@ export const MODEL_REFUSALS = {
   outputWithNoSave: "--output cannot be combined with --no-save",
   noCases: "No golden case matches the selection. Use --help.",
   baselineTooLarge: "Baseline exceeds 5 MB",
+  resumeTooLarge: "Resume report exceeds 5 MB",
+  resumeInvalid: "Resume report is not a model-mode report of the current version.",
+  resumeWithSelection: "--resume selects its own cases; it cannot be combined with --cases or --limit.",
 } as const;
 
-export const MODEL_HELP = `pnpm eval --mode model [--cases a,b] [--limit N] [--provider openrouter|openai] [--approve-transmission] [--approve-model-cost] [--max-model-calls N] [--output DIR] [--baseline REPORT_JSON] [--no-save]
+export const MODEL_HELP = `pnpm eval --mode model [--cases a,b] [--limit N] [--resume REPORT_JSON] [--provider openrouter|openai] [--approve-transmission] [--approve-model-cost] [--max-model-calls N] [--output DIR] [--baseline REPORT_JSON] [--no-save]
 
 Golden-set evaluation of the real model path: extraction (profile, posting) and assessment through the
 provider, then the deterministic pipeline. Without --approve-transmission it is a dry run with the golden
@@ -51,14 +55,17 @@ default provider is openrouter (free tier, OPENROUTER_API_KEY/OPENROUTER_MODEL f
 ':free' model id is accepted unless --approve-model-cost is given; --provider openai always needs
 --approve-model-cost. Up to ${CALLS_PER_CASE} model calls per case, one HTTP attempt each, SDK logging off,
 ${MODEL_EVAL_TIMEOUT_MS / 1000}s per call covering headers and body; the hard ceiling is ${HARD_MAX_MODEL_EVAL_CALLS} calls.
-Golden-set integrity problems stop the run before any call. Reports never contain resume text, evidence
-sentences or posting prose. Exit 0: every selected case attempted; 1: golden-set problems (no call, no report)
+Golden-set integrity problems stop the run before any call. --resume REPORT_JSON reruns only the cases of an
+earlier report that did not reach an assessment (a daily request limit, a key that stopped mid-run) and writes
+one merged report with the same golden-set hash; the earlier report must come from the same provider, model,
+prompt and golden set. Reports never contain resume text, evidence sentences or posting prose; a model-written
+requirement or blocker text that equals an input sentence is replaced by a fixed marker and counted. Exit 0: every selected case attempted; 1: golden-set problems (no call, no report)
 or cases not attempted at the call cap (report still written); 2: argument or gate refusal.`;
 
 export type ModelOptions = {
   help: boolean; cases?: string[]; limit?: number; provider: ProviderName;
   approveTransmission: boolean; approveModelCost: boolean; maxModelCalls?: number;
-  output?: string; save: boolean; baseline?: string;
+  output?: string; save: boolean; baseline?: string; resume?: string;
 };
 
 function integer(value: string | undefined, min: number, max: number): number {
@@ -88,10 +95,12 @@ export function parseModelArgs(argv: string[]): ModelOptions {
       case "--max-model-calls": options.maxModelCalls = integer(next(), 1, 10_000); break;
       case "--output": options.output = next(); break;
       case "--baseline": options.baseline = next(); break;
+      case "--resume": options.resume = next(); break;
       default: throw new Error(MODEL_REFUSALS.unknownOption);
     }
   }
   if (!options.save && options.output) throw new Error(MODEL_REFUSALS.outputWithNoSave);
+  if (options.resume && (options.cases || options.limit !== undefined)) throw new Error(MODEL_REFUSALS.resumeWithSelection);
   return options;
 }
 
@@ -148,7 +157,17 @@ export async function runModelEvalCli(argv: string[], io: ModelCliIo = { log: co
   let options: ModelOptions;
   try { options = parseModelArgs(argv); } catch (error) { io.log(error instanceof Error ? error.message : MODEL_REFUSALS.unknownOption); return 2; }
   if (options.help) { io.out(MODEL_HELP); return 0; }
-  const selected = selectCases(options, io.cases);
+  // --resume: the earlier report decides the selection (its non-assessed cases) and the merge target.
+  let previous: ModelEvalReport | undefined;
+  if (options.resume) {
+    const path = resolve(root, options.resume);
+    if (!existsSync(path) || statSync(path).size > 5_000_000) { io.log(MODEL_REFUSALS.resumeTooLarge); return 2; }
+    const parsed = ModelEvalReportSchema.safeParse(JSON.parse(readFileSync(path, "utf8")));
+    if (!parsed.success) { io.log(MODEL_REFUSALS.resumeInvalid); return 2; }
+    previous = parsed.data;
+  }
+  const selected = previous ? casesToRerun(previous, io.cases ?? goldenCases) : selectCases(options, io.cases);
+  if (previous && selected.length === 0) { io.log(RESUME_ERRORS.nothingToRerun); return 2; }
   const problems = validateGoldenSet(selected);
   if (problems.length) { io.log(MODEL_REFUSALS.goldenSetProblems); for (const problem of problems) io.log(`  ${problem}`); return 1; }
   // .env.local is read before the gate for a live run, so the gate judges the model the adapter would use.
@@ -171,7 +190,7 @@ export async function runModelEvalCli(argv: string[], io: ModelCliIo = { log: co
   }
   io.log([
     `Model-mode evaluation plan (${gate.execution})`,
-    `  golden set: ${GOLDEN_SET_VERSION}, ${selected.length} of ${goldenCases.length} cases`,
+    `  golden set: ${GOLDEN_SET_VERSION}, ${selected.length} of ${goldenCases.length} cases${previous ? ` (resuming ${options.resume}: cases without an assessment)` : ""}`,
     gate.execution === "live"
       ? `  provider: ${options.provider}   destination: ${providerDestination(options.provider)}   model: ${model}`
       : "  analyzer: golden fake (no network); add --approve-transmission for a live run",
@@ -184,16 +203,21 @@ export async function runModelEvalCli(argv: string[], io: ModelCliIo = { log: co
   const createAnalyzer = (onResponse: (event: AnalyzerResponseEvent) => void) => gate.execution === "live"
     ? createAnalyzerFromEnv({ provider: options.provider, transport: { ...MODEL_TRANSPORT }, onResponse })
     : new GoldenFakeAnalyzer({ onResponse });
-  const report: ModelEvalReport = await runModelEvaluation(selected, {
+  const metadata = provenance();
+  const rerun: ModelEvalReport = await runModelEvaluation(selected, {
     execution: gate.execution, provider: gate.execution === "live" ? options.provider : "fake", requestedModel: model, store,
     transport: { maxRetries: 0, logLevel: "off", timeoutMs: MODEL_EVAL_TIMEOUT_MS }, approvals: { transmission: options.approveTransmission },
-    callCap: gate.cap, callTimeoutMs: MODEL_EVAL_TIMEOUT_MS, metadata: provenance(), goldenSetVersion: GOLDEN_SET_VERSION, createAnalyzer, log: (line) => io.log(`  ${line}`),
+    callCap: gate.cap, callTimeoutMs: MODEL_EVAL_TIMEOUT_MS, metadata, goldenSetVersion: GOLDEN_SET_VERSION, createAnalyzer, log: (line) => io.log(`  ${line}`),
   });
+  let report = rerun;
+  if (previous) {
+    try { report = mergeModelReports(previous, rerun, metadata); } catch (error) { io.log(error instanceof Error ? error.message : RESUME_ERRORS.incompatible); return 2; }
+  }
   let comparison: ModelComparison | undefined;
   if (baseline !== undefined) comparison = compareModelReports(report, baseline);
   const serialized = `${JSON.stringify({ ...report, comparison }, null, 2)}\n`;
   const markdown = renderModelMarkdown(report, comparison);
-  assertModelReportRedacted(serialized + markdown, selected);
+  assertModelReportRedacted(serialized + markdown, previous ? (io.cases ?? goldenCases) : selected);
   let reportDirectory: string | undefined;
   if (options.save) {
     reportDirectory = output ?? resolve(root, "evals/reports", `model-${new Date().toISOString().replaceAll(":", "-")}-${randomUUID()}`);

@@ -7,7 +7,10 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { goldenCases } from "../../evals/fixtures/golden/index.js";
 import { HARD_MAX_MODEL_EVAL_CALLS, MODEL_REFUSALS, isFreeModelId, parseModelArgs, resolveModelGate, runModelEvalCli, selectCases } from "../../evals/model-mode-cli.js";
-import { CALLS_PER_CASE, ModelEvalReportSchema } from "../../evals/model-mode.js";
+import { CALLS_PER_CASE, ModelEvalReportSchema, RESUME_ERRORS, runModelEvaluation } from "../../evals/model-mode.js";
+import { GoldenFakeAnalyzer, keyFor, type FakeFailure } from "../../evals/fixtures/golden/fake-analyzer.js";
+import { GOLDEN_SET_VERSION, goldenPostingText } from "../../evals/fixtures/golden/index.js";
+import { PROMPT_VERSION } from "../src/ai/contracts.js";
 
 const serverDirectory = fileURLToPath(new URL("../", import.meta.url));
 const script = fileURLToPath(new URL("../../evals/run-evals.ts", import.meta.url));
@@ -177,5 +180,49 @@ describe("runModelEvalCli live gate in process (fetch stubbed: zero real HTTP)",
     expect(logs).toEqual([MODEL_REFUSALS.goldenSetProblems, `  ${goldenCases[0]!.caseId}: expected blocker is not a gold requirement`]);
     expect(outs).toEqual([]);
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("pnpm eval --mode model --resume", () => {
+  const collect = () => { const logs: string[] = [], outs: string[] = []; return { logs, outs, log: (line: string) => { logs.push(line); }, out: (line: string) => { outs.push(line); } }; };
+  async function partialReport(directory: string) {
+    const cases = goldenCases.slice(0, 3);
+    const failures = new Map<string, FakeFailure>([[keyFor(goldenPostingText(cases[2]!)), { stage: "assess", kind: "provider_error" }]]);
+    const report = await runModelEvaluation(cases, {
+      execution: "dry-run", provider: "fake", requestedModel: "golden-fake", store: "n/a", transport: { maxRetries: 0, logLevel: "off", timeoutMs: 300000 },
+      approvals: { transmission: false }, callCap: 9, metadata: { codeSha: "a".repeat(40), dirty: false, policyHash: "b".repeat(64), schemaHash: "c".repeat(64), promptVersion: PROMPT_VERSION },
+      goldenSetVersion: GOLDEN_SET_VERSION, createAnalyzer: (onResponse) => new GoldenFakeAnalyzer({ failures, onResponse }),
+    });
+    const path = join(directory, "report.json");
+    writeFileSync(path, JSON.stringify(report));
+    return { path, report, cases };
+  }
+
+  it("reruns the non-assessed cases of an earlier report and writes one merged report", async () => {
+    const { path, report, cases } = await partialReport(temporary());
+    expect(report.metrics.outcomes.assessmentFailed).toBe(1);
+    const { logs, outs, log, out } = collect();
+    const code = await runModelEvalCli(["--resume", path, "--no-save"], { log, out, cases: [...cases] });
+    expect(code).toBe(0);
+    expect(logs.join("\n")).toContain("1 of 33 cases (resuming");
+    const merged = JSON.parse(outs[0]!);
+    expect(merged).toMatchObject({ selectedCases: 3, modelCalls: report.modelCalls + 3, resumed: { from: report.generatedAt, rerunCases: 1, rounds: 2 }, success: true, metrics: { outcomes: { assessed: 3, assessmentFailed: 0 } } });
+  });
+
+  it("refuses a resume with a selection, an unreadable report, and a report with nothing to rerun", async () => {
+    const { path, cases } = await partialReport(temporary());
+    expect(() => parseModelArgs(["--resume", path, "--limit", "1"])).toThrow(MODEL_REFUSALS.resumeWithSelection);
+    const { logs, outs, log, out } = collect();
+    expect(await runModelEvalCli(["--resume", join(temporary(), "missing.json"), "--no-save"], { log, out, cases: [...cases] })).toBe(2);
+    expect(logs.at(-1)).toBe(MODEL_REFUSALS.resumeTooLarge);
+    const bad = join(temporary(), "bad.json"); writeFileSync(bad, JSON.stringify({ reportKind: "model-evaluation", reportVersion: 1 }));
+    expect(await runModelEvalCli(["--resume", bad, "--no-save"], { log, out, cases: [...cases] })).toBe(2);
+    expect(logs.at(-1)).toBe(MODEL_REFUSALS.resumeInvalid);
+    // Resume once, save, then resume the merged report: nothing left.
+    const output = join(temporary(), "merged");
+    expect(await runModelEvalCli(["--resume", path, "--output", output], { log, out, cases: [...cases] })).toBe(0);
+    expect(await runModelEvalCli(["--resume", join(output, "report.json"), "--no-save"], { log, out, cases: [...cases] })).toBe(2);
+    expect(logs.at(-1)).toBe(RESUME_ERRORS.nothingToRerun);
+    expect(outs).toHaveLength(1); // only the saving resume printed a report
   });
 });
