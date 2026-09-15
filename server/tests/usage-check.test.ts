@@ -1,7 +1,10 @@
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { stableId } from "../src/domain/store.js";
 import { renderAssessment, renderIndex, runUsageCheck, withCallDeadline } from "../scripts/usage-check/run.js";
 import { OpenAICareerAnalyzer } from "../src/ai/analyzer.js";
@@ -9,6 +12,10 @@ import { createServer } from "node:http";
 import { parseUsageArgs } from "../scripts/usage-check/cli.js";
 import { groundedAssessment } from "./discovery-fixtures.js";
 import { syntheticJob, syntheticProfile } from "./fixtures.js";
+
+const traceDirectories: string[] = [];
+const temporary = () => { const d = mkdtempSync(join(tmpdir(), "career-radar-usage-traces-")); traceDirectories.push(d); return d; };
+afterEach(() => { for (const d of traceDirectories.splice(0)) rmSync(d, { recursive: true, force: true }); });
 
 const serverDirectory = fileURLToPath(new URL("../", import.meta.url));
 const script = fileURLToPath(new URL("../scripts/usage-check/cli.ts", import.meta.url));
@@ -36,7 +43,7 @@ describe("usage check (real MCP tools over HTTP, fake analyzer, no network)", ()
   it("runs profile_upsert, then job_ingest and job_assess per posting, and reports the call count", async () => {
     const analyzer = fakeAnalyzer();
     const fetchJob = vi.fn(async (url: string) => ({ text: "Gamma role fetched: own frontend delivery for customers.", sourceUrl: url, warnings: ["Synthetic fetched page"] }));
-    const results = await runUsageCheck({ resumeText: "Synthetic resume text that is long enough to pass the minimum length check.", jobs,
+    const results = await runUsageCheck({ traceDirectory: temporary(), resumeText: "Synthetic resume text that is long enough to pass the minimum length check.", jobs,
       createAnalyzer: () => analyzer, fetchJob, provider: "openrouter", model: "synthetic/free-model", now: () => new Date("2026-09-12T00:00:00.000Z") });
     expect(results).toMatchObject({ kind: "usage-check", provider: "openrouter", model: "synthetic/free-model", modelCalls: 7, promptVersion: groundedAssessment.promptVersion, toolTimeoutMs: 300_000 });
     expect(results.profileMs).toBeGreaterThanOrEqual(0);
@@ -62,7 +69,7 @@ describe("usage check (real MCP tools over HTTP, fake analyzer, no network)", ()
   });
 
   it("keeps going after one posting fails and records the fixed failure message", async () => {
-    const results = await runUsageCheck({ resumeText: "Synthetic resume text that is long enough to pass the minimum length check.", jobs: jobs.slice(0, 2),
+    const results = await runUsageCheck({ traceDirectory: temporary(), resumeText: "Synthetic resume text that is long enough to pass the minimum length check.", jobs: jobs.slice(0, 2),
       createAnalyzer: () => fakeAnalyzer("Beta"), provider: "openai", model: "gpt-synthetic" });
     expect(results.jobs.map((j) => j.status)).toEqual(["assessed", "failed"]);
     const failed = results.jobs[1]!;
@@ -78,7 +85,7 @@ describe("usage check (real MCP tools over HTTP, fake analyzer, no network)", ()
     analyzer.assess.mockImplementationOnce((_profile: unknown, _job: unknown, signal?: AbortSignal) => new Promise((_, reject) => {
       seen = signal; signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true });
     }));
-    const results = await runUsageCheck({ resumeText: "Synthetic resume text that is long enough to pass the minimum length check.", jobs: jobs.slice(0, 2),
+    const results = await runUsageCheck({ traceDirectory: temporary(), resumeText: "Synthetic resume text that is long enough to pass the minimum length check.", jobs: jobs.slice(0, 2),
       createAnalyzer: () => analyzer, provider: "openai", model: "gpt-synthetic", toolTimeoutMs: 300 });
     expect(results.jobs.map((j) => j.status)).toEqual(["failed", "assessed"]);
     const failed = results.jobs[0]!;
@@ -137,10 +144,8 @@ describe("usage check (real MCP tools over HTTP, fake analyzer, no network)", ()
 // --- review follow-ups: access gate, pinned transport, caller-relative paths ---
 import { request as httpRequest } from "node:http";
 import type { AddressInfo } from "node:net";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
-import { afterEach } from "vitest";
 import { createResultsApp, type UsageCheckResults } from "../scripts/usage-check/run.js";
 import { USAGE_ERRORS, usageAnalyzerFactory } from "../scripts/usage-check/cli.js";
 
@@ -149,7 +154,7 @@ const cleanup: Array<() => void | Promise<void>> = [];
 afterEach(async () => { for (const fn of cleanup.splice(0).reverse()) await fn(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 async function syntheticResults(): Promise<UsageCheckResults> {
-  return runUsageCheck({ resumeText: "Synthetic resume text that is long enough to pass the minimum length check.", jobs: jobs.slice(0, 1),
+  return runUsageCheck({ traceDirectory: temporary(), resumeText: "Synthetic resume text that is long enough to pass the minimum length check.", jobs: jobs.slice(0, 1),
     createAnalyzer: () => fakeAnalyzer(), provider: "synthetic", model: "synthetic-no-model", now: () => new Date("2026-09-12T00:00:00.000Z") });
 }
 function rawGet(port: number, path: string, headers: Record<string, string>): Promise<{ status: number; body: string }> {

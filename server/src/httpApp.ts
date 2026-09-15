@@ -3,6 +3,8 @@ import express, { type Express } from "express";
 
 import type { CareerAnalyzer } from "./ai/analyzer.js";
 import { createAnalyzerFromEnv } from "./ai/provider.js";
+import { traceHook } from "./domain/trace/run-trace.js";
+import { TraceStore } from "./domain/trace/store.js";
 import { buildCareerRadarStatus } from "./demo.js";
 import { CareerStore } from "./domain/store.js";
 import { JobDiscovery } from "./domain/jobs/search.js";
@@ -27,12 +29,14 @@ export function createHttpApp(options: Partial<McpDependencies> = {}): Express {
   const app = express();
   // One store and one lazily created analyzer per HTTP app, shared by every per-request MCP server.
   let analyzer: CareerAnalyzer | undefined;
-  const createAnalyzer = options.createAnalyzer ?? (() => createAnalyzerFromEnv());
+  // The default analyzer reports every call to the run trace of the tool call executing it (M5-E).
+  const createAnalyzer = options.createAnalyzer ?? (() => createAnalyzerFromEnv({ onResponse: traceHook }));
   const sharedDependencies: McpDependencies = {
     store: options.store ?? new CareerStore(),
     createAnalyzer: () => (analyzer ??= createAnalyzer()),
     fetchJob: options.fetchJob,
     discovery: options.discovery ?? new JobDiscovery(new GreenhouseJobSearchProvider()),
+    traces: options.traces ?? new TraceStore(),
   };
 
   // This server is private and bound to loopback. Browser pages must not be able to reach it, so

@@ -19,6 +19,10 @@ import {
   type McpDependencies,
 } from "../src/mcp/createServer.js";
 import { CareerStore } from "../src/domain/store.js";
+import { TRACE_WRITE_FAILED, TraceStore } from "../src/domain/trace/store.js";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { syntheticProfile } from "./fixtures.js";
 import { syntheticJob } from "./fixtures.js";
 import { JobDiscovery } from "../src/domain/jobs/search.js";
@@ -79,7 +83,8 @@ describe("Career Radar HTTP and MCP server", () => {
     const createAnalyzer = vi.fn(() => ({ extractProfile: vi.fn(),
       extractJob: async () => ({ job: syntheticJob, warnings: [] }), assess: async () => groundedAssessment,
     }));
-    const client = await connectClient(await startTestServer({ store, discovery, createAnalyzer }));
+    const traces = new TraceStore();
+    const client = await connectClient(await startTestServer({ store, discovery, createAnalyzer, traces }));
     closeCallbacks.push(async () => { discovery.close(); store.close(); });
     const tools = (await client.listTools()).tools;
     // B2 advertises the optional screening context on assessment outputs; identity stays internal. URI is v7 since
@@ -110,6 +115,13 @@ describe("Career Radar HTTP and MCP server", () => {
     expect(result.realistic[0]).not.toHaveProperty("inputIdentity");
     expect(result.shortfall.stretch).toBe(1);
     expect(store.pipelineSummary().total).toBe(0);
+    // M5-E: the batch left one run trace whose stages carry the candidate index and no input text.
+    // The rejected foreign-id call above was traced too: failed, zero model calls.
+    const batchTrace = traces.list();
+    expect(batchTrace.map((t) => [t.tool, t.outcome, t.modelCalls])).toEqual([["job_recommend", "ok", 2], ["job_recommend", "failed", 0]]);
+    const full = traces.get(batchTrace[0]!.runId)!;
+    expect(full.stages.map((s) => [s.stage, s.item])).toEqual([["extract", 0], ["retrieve", 0], ["model", 0], ["validate", 0], ["persist", 0]]);
+    expect(JSON.stringify(full)).not.toContain(syntheticJob.description);
     const saved = await client.callTool({ name: "application_save", arguments: { assessmentId: result.realistic[0]!.assessmentId } });
     expect(saved.structuredContent).toMatchObject({ application: { status: "saved", verdictAtDecision: "REALISTIC" } });
     expect(provider.search).toHaveBeenCalledTimes(1);
@@ -232,7 +244,8 @@ describe("Career Radar HTTP and MCP server", () => {
     };
     const store = new CareerStore();
     const createAnalyzer = vi.fn(() => analyzer);
-    const client = await connectClient(await startTestServer({ createAnalyzer, store }));
+    const traces = new TraceStore();
+    const client = await connectClient(await startTestServer({ createAnalyzer, store, traces }));
     expect(createAnalyzer).not.toHaveBeenCalled();
 
     await client.callTool({ name: "profile_upsert", arguments: { resumeText: "Frontend engineer with direct production React delivery experience." } });
@@ -260,6 +273,15 @@ describe("Career Radar HTTP and MCP server", () => {
     expect(store.getProfile(profile.id)).toEqual(profile);
     expect(store.getJob(job.id)).toEqual(job);
     expect(createAnalyzer).toHaveBeenCalledTimes(1);
+    // M5-E: the call left a run trace; its id is echoed in the tool text and the trace holds no resume, posting or evidence text.
+    const [traced] = traces.list();
+    expect(traced).toMatchObject({ tool: "job_assess", outcome: "ok", modelCalls: 1 });
+    expect((result.content as { text: string }[])[0]!.text).toContain(`(run ${traced!.runId})`);
+    const trace = traces.get(traced!.runId)!;
+    expect(trace.stages.map((s) => s.stage)).toEqual(["retrieve", "model", "validate", "persist"]);
+    expect(trace.stages[2]!.validation).toMatchObject({ finalVerdict: "REALISTIC", finalConfidence: "low", diagnostics: { citationsInvalid: 1 } });
+    expect(trace.counters.invalidCitations).toBe(1);
+    for (const text of ["Frontend engineer with direct production React delivery experience.", "Synthetic unsupported scope claim.", job.description, ...profile.roles.flatMap((r) => r.evidence)]) expect(JSON.stringify(trace)).not.toContain(text);
     const assessmentId = JobAssessmentResultSchema.parse(result.structuredContent).assessmentId;
     expect(typeof assessmentId).toBe("string");
     const saved = await client.callTool({ name: "application_save", arguments: { assessmentId, status: "saved" } });
@@ -328,5 +350,81 @@ describe("Career Radar HTTP and MCP server", () => {
     const result = await client.callTool({ name: "job_ingest", arguments: { url: "https://jobs.lever.co/example/job" } });
     expect(result.structuredContent).toMatchObject({ job: { sourceUrl: "https://jobs.lever.co/example/final" }, warnings: ["Synthetic fetched page"] });
     expect(extractJob).toHaveBeenCalledWith("Synthetic public frontend job description with sufficient text.");
+  });
+});
+
+describe("M5-E run trace on a failed tool call", () => {
+  it("records the failure class and stage outcome, echoes nothing about the inputs, and still reports the tool error", async () => {
+    const store = new CareerStore();
+    store.upsertProfile(syntheticProfile); store.upsertJob(syntheticJob);
+    const boom = new Error("synthetic provider request failed (HTTP 500)"); boom.name = "InternalServerError"; (boom as { status?: number }).status = 500;
+    const traces = new TraceStore();
+    const client = await connectClient(await startTestServer({ store, traces, createAnalyzer: () => ({ extractProfile: vi.fn(), extractJob: vi.fn(), assess: async () => { throw boom; } }) }));
+    const result = await client.callTool({ name: "job_assess", arguments: { candidateProfileId: syntheticProfile.id, jobId: syntheticJob.id } });
+    expect(result.isError).toBe(true);
+    const [summary] = traces.list();
+    expect(summary).toMatchObject({ tool: "job_assess", outcome: "failed", modelCalls: 1 });
+    const trace = traces.get(summary!.runId)!;
+    expect(trace).toMatchObject({ failureClass: "provider_error", counters: { providerErrors: 1 } });
+    expect(trace.stages.map((s) => [s.stage, s.outcome])).toEqual([["retrieve", "ok"], ["model", "error"]]);
+    expect(JSON.stringify(trace)).not.toContain(syntheticJob.description);
+  });
+});
+
+describe("M5-E review: trace persistence and batch deadlines never change tool results", () => {
+  it("returns the saved assessment when the trace cannot be written, and keeps the original error when the model fails", async () => {
+    const warnings: string[] = [];
+    const warn = vi.spyOn(console, "error").mockImplementation((line: unknown) => { warnings.push(String(line)); });
+    try {
+      const store = new CareerStore();
+      store.upsertProfile(syntheticProfile); store.upsertJob(syntheticJob);
+      // A regular file where the trace directory should be: mkdir fails with EEXIST/ENOTDIR on every save.
+      const blocked = join(mkdtempSync(join(tmpdir(), "career-radar-blocked-")), "not-a-directory");
+      writeFileSync(blocked, "x");
+      const traces = new TraceStore(blocked);
+      const analyzer: CareerAnalyzer = { extractProfile: vi.fn(), extractJob: vi.fn(), assess: async () => groundedAssessment };
+      const client = await connectClient(await startTestServer({ store, traces, createAnalyzer: () => analyzer }));
+      const ok = await client.callTool({ name: "job_assess", arguments: { candidateProfileId: syntheticProfile.id, jobId: syntheticJob.id } });
+      expect(ok.isError).toBeFalsy();
+      expect(typeof JobAssessmentResultSchema.parse(ok.structuredContent).assessmentId).toBe("string");
+      expect(store.pipelineSummary().total).toBe(0);
+      expect(traces.list()).toHaveLength(1); // memory copy survives the failed write
+      expect(warnings).toEqual([TRACE_WRITE_FAILED]);
+      expect(JSON.stringify(warnings)).not.toContain(blocked);
+      const boom = new Error("synthetic provider request failed (HTTP 500)"); boom.name = "InternalServerError";
+      const failing = await connectClient(await startTestServer({ store, traces: new TraceStore(blocked), createAnalyzer: () => ({ ...analyzer, assess: async () => { throw boom; } }) }));
+      const failed = await failing.callTool({ name: "job_assess", arguments: { candidateProfileId: syntheticProfile.id, jobId: syntheticJob.id } });
+      expect(failed.isError).toBe(true);
+      const text = (failed.content as { text: string }[])[0]!.text;
+      expect(text).not.toMatch(/EEXIST|ENOTDIR|not-a-directory/);
+      expect(warnings).toHaveLength(2);
+    } finally { warn.mockRestore(); }
+  });
+
+  it("records a batch deadline as an aborted stage and a timeout in the trace that is saved when the tool returns", async () => {
+    const store = new CareerStore();
+    store.upsertProfile(syntheticProfile);
+    const discovery = new JobDiscovery({ search: vi.fn(async () => discoveryResult) }, undefined, { deadlineMs: 20 });
+    // Settles 30 ms after the batch deadline aborted it: the tool has already returned by then.
+    const lateAnalyzer: CareerAnalyzer = {
+      extractProfile: vi.fn(),
+      extractJob: (_description, signal) => new Promise((_resolve, reject) => { signal?.addEventListener("abort", () => setTimeout(() => reject(new Error("late")), 30), { once: true }); }),
+      assess: vi.fn(),
+    };
+    const traces = new TraceStore();
+    const client = await connectClient(await startTestServer({ store, discovery, traces, createAnalyzer: () => lateAnalyzer }));
+    const search = JobSearchResultSchema.parse((await client.callTool({ name: "job_search", arguments: { boardToken: "synthetic" } })).structuredContent);
+    const result = JobRecommendationsSchema.parse((await client.callTool({ name: "job_recommend", arguments: {
+      searchId: search.searchId, candidateProfileId: syntheticProfile.id, candidateIds: [search.candidates[0]!.candidateId],
+    } })).structuredContent);
+    expect(result.failures).toHaveLength(1);
+    const [summary] = traces.list();
+    expect(summary).toMatchObject({ tool: "job_recommend", outcome: "partial", modelCalls: 1 });
+    const saved = JSON.parse(JSON.stringify(traces.get(summary!.runId)));
+    expect(saved.stages.map((s: { stage: string; outcome: string; failureClass?: string }) => [s.stage, s.outcome, s.failureClass])).toEqual([["extract", "aborted", "timeout"]]);
+    expect(saved.stages[0].durationMs).toBeGreaterThan(0);
+    expect(saved.counters.timeouts).toBe(1);
+    await new Promise((resolve) => setTimeout(resolve, 60)); // the late rejection must not rewrite the finished trace
+    expect(traces.get(summary!.runId)!.stages[0]!.errorName).toBe("UnsettledAtFinish");
   });
 });

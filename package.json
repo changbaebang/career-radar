@@ -12,6 +12,8 @@
     "build": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/web build && pnpm --filter @career-radar/server build",
     "dev": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/web build && pnpm --filter @career-radar/server dev",
     "db:reset": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/server db:reset",
+    "diagnose": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/server diagnose",
+    "traces:clear": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/server traces:clear",
     "demo": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/web build && pnpm --filter @career-radar/server demo",
     "lint": "eslint .",
     "typecheck": "pnpm --filter @career-radar/shared build && pnpm --filter @career-radar/shared typecheck && pnpm --filter @career-radar/web typecheck && pnpm --filter @career-radar/server typecheck",

@@ -5,7 +5,8 @@ import {
 } from "@career-radar/shared";
 import type { CareerAnalyzer } from "../../ai/analyzer.js";
 import type { JobSearchProvider, SearchHit } from "../../infra/search/greenhouse.js";
-import { finalizeAssessment } from "../assessment/pipeline.js";
+import { finalizeAssessmentDetailed } from "../assessment/pipeline.js";
+import type { RunTracer } from "../trace/run-trace.js";
 import { retrieveEvidence } from "../evidence/retrieve.js";
 import { CareerStore, stableId } from "../store.js";
 
@@ -70,7 +71,7 @@ export class JobDiscovery {
   }
   close(): void { for (const id of this.#searches.keys()) this.remove(id); }
 
-  async recommend(raw: unknown, store: CareerStore, createAnalyzer: () => CareerAnalyzer): Promise<JobRecommendations> {
+  async recommend(raw: unknown, store: CareerStore, createAnalyzer: () => CareerAnalyzer, tracer?: RunTracer): Promise<JobRecommendations> {
     const input = JobRecommendInputSchema.parse(raw);
     if (new Set(input.candidateIds).size !== input.candidateIds.length) throw new Error("Select unique candidate IDs.");
     if (input.realisticCount + input.stretchCount > 5) throw new Error("Request at most five REALISTIC and STRETCH roles in total.");
@@ -86,7 +87,7 @@ export class JobDiscovery {
     if (!profile) throw new Error("Candidate profile not found. Call profile_upsert first.");
     // Configuration failures (for example a missing API key) must surface with their own message and
     // cost nothing; only per-job analysis failures are reported as batch failures below.
-    const analyzer = createAnalyzer();
+    const analyzer = tracer ? tracer.wrap(createAnalyzer()) : createAnalyzer();
     if (this.#busy) throw new Error("A recommendation batch is already running. Wait for it before retrying.");
     this.#busy = true;
     const controller = new AbortController();
@@ -100,8 +101,9 @@ export class JobDiscovery {
       "Assessed only the selected jobs; every assessed role is returned. Requested counts only report shortfalls and never change verdicts. Ranking uses confidence, contortion, then ID, not hiring probability.",
       "Assessment snapshots are saved locally; no application was added or sent. Retrying performs new analysis and may incur model cost."];
     try {
-      for (const hit of hits) {
+      for (const [index, hit] of hits.entries()) {
         if (!hit) continue; // Membership was checked for the complete batch above.
+        tracer?.item(index);
         if (failures.length) {
           failures.push({ candidateId: hit.candidate.candidateId, message: "Not attempted after an earlier analysis failure. Select this ID explicitly to retry." });
           continue;
@@ -120,11 +122,12 @@ export class JobDiscovery {
             // discard a paid extraction and a retry only re-runs the assessment.
             store.upsertJob(job);
           }
-          const evidence = retrieveEvidence(profile, job);
+          const evidence = tracer ? await tracer.stage("retrieve", () => retrieveEvidence(profile, job), (found) => tracer.retrieveDetail(found)) : retrieveEvidence(profile, job);
           const draft = await Promise.race([analyzer.assess(profile, job, controller.signal, evidence), aborted]);
-          const assessment = finalizeAssessment(profile, job, draft, evidence);
+          const finalize = () => finalizeAssessmentDetailed(profile, job, draft, evidence);
+          const { assessment } = tracer ? await tracer.stage("validate", finalize, (done) => tracer.validateDetail(draft, done.assessment, done.diagnostics)) : finalize();
           controller.signal.throwIfAborted();
-          const assessmentId = store.saveAssessment(profile, job, assessment);
+          const assessmentId = tracer ? await tracer.stage("persist", () => store.saveAssessment(profile, job, assessment)) : store.saveAssessment(profile, job, assessment);
           items.push({ candidate: hit.candidate, jobId: job.id, assessmentId, assessment });
         } catch {
           failures.push({ candidateId: hit.candidate.candidateId, message: "Analysis failed or timed out. Check model credit and network, then retry explicitly. This is not a PASS verdict." });
