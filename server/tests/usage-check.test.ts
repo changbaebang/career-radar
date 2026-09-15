@@ -144,10 +144,8 @@ describe("usage check (real MCP tools over HTTP, fake analyzer, no network)", ()
 // --- review follow-ups: access gate, pinned transport, caller-relative paths ---
 import { request as httpRequest } from "node:http";
 import type { AddressInfo } from "node:net";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { spawn } from "node:child_process";
-import { afterEach } from "vitest";
 import { createResultsApp, type UsageCheckResults } from "../scripts/usage-check/run.js";
 import { USAGE_ERRORS, usageAnalyzerFactory } from "../scripts/usage-check/cli.js";
 

@@ -215,7 +215,7 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
           const assessmentId = await tracer.stage("persist", () => store.saveAssessment(profile, job, assessment));
           return JobAssessmentResultSchema.parse({ job, assessment, assessmentId });
         });
-        traces.save(tracer.finish("ok"));
+        traces.trySave(tracer.finish("ok"));
         return {
           structuredContent: result,
           content: [{
@@ -224,7 +224,7 @@ export function createMcpServer(dependencies: McpDependencies): McpServer {
           }],
         };
       } catch (error) {
-        traces.save(tracer.finish("failed", error));
+        traces.trySave(tracer.finish("failed", error));
         throw error;
       }
     },

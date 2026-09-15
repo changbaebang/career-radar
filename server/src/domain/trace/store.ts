@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wri
 import { join } from "node:path";
 import type { RunTrace } from "./run-trace.js";
 
+export const TRACE_WRITE_FAILED = "Run trace could not be written; the tool result is unaffected.";
+
 const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export const isRunId = (value: string): boolean => RUN_ID.test(value);
 
@@ -26,6 +28,18 @@ export class TraceStore {
     writeFileSync(join(this.directory, `${trace.runId}.json`), `${JSON.stringify(trace, null, 2)}\n`, { mode: 0o600 });
   }
 
+  // For tool handlers: a trace that cannot be persisted must never fail the assessment it describes.
+  // The memory copy is kept, the write failure is a fixed line on stderr (no path, no error body).
+  trySave(trace: RunTrace, warn: (line: string) => void = (line) => console.error(line)): boolean {
+    try { this.save(trace); return true; } catch { warn(TRACE_WRITE_FAILED); return false; }
+  }
+
+  // Trace files in the directory; a missing or unreadable directory, or a file in its place, yields none.
+  #files(): string[] {
+    if (!this.directory) return [];
+    try { return statSync(this.directory).isDirectory() ? readdirSync(this.directory).filter((name) => name.endsWith(".json")) : []; } catch { return []; }
+  }
+
   get(runId: string): RunTrace | undefined {
     if (!isRunId(runId)) return undefined;
     const cached = this.#memory.get(runId);
@@ -38,13 +52,11 @@ export class TraceStore {
 
   list(): TraceSummary[] {
     const seen = new Map<string, RunTrace>(this.#memory);
-    if (this.directory && existsSync(this.directory)) {
-      for (const name of readdirSync(this.directory)) {
-        const runId = name.replace(/\.json$/, "");
-        if (!name.endsWith(".json") || !isRunId(runId) || seen.has(runId)) continue;
-        const trace = this.get(runId);
-        if (trace) seen.set(runId, trace);
-      }
+    for (const name of this.#files()) {
+      const runId = name.replace(/\.json$/, "");
+      if (!isRunId(runId) || seen.has(runId)) continue;
+      const trace = this.get(runId);
+      if (trace) seen.set(runId, trace);
     }
     return [...seen.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt) || b.endedAt.localeCompare(a.endedAt)).map(summarize);
   }
@@ -53,11 +65,9 @@ export class TraceStore {
   clear(): number {
     const removed = new Set(this.#memory.keys());
     this.#memory.clear();
-    if (this.directory && existsSync(this.directory)) {
-      for (const name of readdirSync(this.directory)) {
-        const runId = name.replace(/\.json$/, "");
-        if (name.endsWith(".json") && isRunId(runId)) { rmSync(join(this.directory, name)); removed.add(runId); }
-      }
+    for (const name of this.#files()) {
+      const runId = name.replace(/\.json$/, "");
+      if (isRunId(runId)) { rmSync(join(this.directory!, name)); removed.add(runId); }
     }
     return removed.size;
   }

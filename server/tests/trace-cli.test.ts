@@ -49,4 +49,17 @@ describe("pnpm diagnose / traces:clear / db:reset (trace files)", () => {
     expect(reset.stdout).toContain("Removed 1 run trace file(s)");
     expect(readdirSync(directory)).toEqual([]);
   });
+
+  it("removes files written while traces were on even when CAREER_RADAR_TRACES=off now (the switch stops writes, not the wipe)", () => {
+    const directory = temporary();
+    new TraceStore(directory).save(new RunTracer("job_assess").finish("ok"));
+    const cleared = run("clear-traces.ts", [], { CAREER_RADAR_TRACE_DIR: directory, CAREER_RADAR_TRACES: "off" });
+    expect(cleared.status).toBe(0);
+    expect(cleared.stdout).toContain("Removed 1 run trace file(s)");
+    expect(readdirSync(directory)).toEqual([]);
+    new TraceStore(directory).save(new RunTracer("job_assess").finish("ok"));
+    const reset = run("reset-db.ts", [], { CAREER_RADAR_TRACE_DIR: directory, CAREER_RADAR_TRACES: "off", CAREER_RADAR_DB_PATH: join(temporary(), "none.db") });
+    expect(reset.stdout).toContain("Removed 1 run trace file(s)");
+    expect(readdirSync(directory)).toEqual([]);
+  });
 });

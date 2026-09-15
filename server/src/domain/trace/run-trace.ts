@@ -61,6 +61,9 @@ export class RunTracer {
   readonly #startedAt = new Date();
   readonly #origin = performance.now();
   readonly #stages: StageRecord[] = [];
+  // Stages whose work has not settled yet; finish() closes them as aborted (the batch deadline can
+  // return before the underlying model call settles) and a late settle no longer rewrites them.
+  readonly #open = new Set<StageRecord>();
   #item: number | undefined;
 
   constructor(tool: RunTool) { this.tool = tool; }
@@ -75,13 +78,14 @@ export class RunTracer {
   // record is pushed before the work starts so the telemetry hook can find it while a call is open.
   async stage<T>(stage: StageName, run: () => T | Promise<T>, detail?: (result: T) => Partial<StageRecord>, init: Partial<StageRecord> = {}): Promise<T> {
     const record = this.#push({ stage, startedMs: this.#now(), durationMs: 0, outcome: "ok", ...init });
+    this.#open.add(record);
     try {
       const result = await run();
-      Object.assign(record, { durationMs: this.#now() - record.startedMs }, detail ? detail(result) : {});
+      if (this.#open.delete(record)) Object.assign(record, { durationMs: this.#now() - record.startedMs }, detail ? detail(result) : {});
       return result;
     } catch (error) {
       const failureClass = classifyFailure(error);
-      Object.assign(record, { durationMs: this.#now() - record.startedMs, outcome: failureClass === "timeout" ? "aborted" : "error", failureClass, errorName: error instanceof Error ? error.name : "Error" });
+      if (this.#open.delete(record)) Object.assign(record, { durationMs: this.#now() - record.startedMs, outcome: failureClass === "timeout" ? "aborted" : "error", failureClass, errorName: error instanceof Error ? error.name : "Error" });
       throw error;
     }
   }
@@ -113,7 +117,7 @@ export class RunTracer {
 
   attach(event: AnalyzerResponseEvent): void {
     event.runId = this.runId;
-    const open = [...this.#stages].reverse().find((record) => record.operation === event.operation && record.durationMs === 0 && record.usage === undefined);
+    const open = [...this.#stages].reverse().find((record) => record.operation === event.operation && this.#open.has(record) && record.usage === undefined);
     if (!open) return;
     if (event.responseModel) open.responseModel = event.responseModel;
     if (event.upstreamProvider) open.upstreamProvider = event.upstreamProvider;
@@ -123,6 +127,10 @@ export class RunTracer {
 
   finish(outcome: RunOutcome, error?: unknown): RunTrace {
     const endedAt = new Date();
+    // A stage still open at finish did not settle before the run ended (batch deadline, cancellation):
+    // it is recorded as aborted with the time it had run, and counted as a timeout.
+    for (const record of this.#open) Object.assign(record, { durationMs: this.#now() - record.startedMs, outcome: "aborted", failureClass: "timeout", errorName: "UnsettledAtFinish" });
+    this.#open.clear();
     const failures = (kind: FailureClass) => this.#stages.filter((record) => record.failureClass === kind).length;
     const validations = this.#stages.map((record) => record.validation?.diagnostics).filter((d): d is PipelineDiagnostics => d !== undefined);
     const sum = (pick: (d: PipelineDiagnostics) => number) => validations.reduce((n, d) => n + pick(d), 0);

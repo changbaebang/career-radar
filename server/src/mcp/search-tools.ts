@@ -30,8 +30,8 @@ export function registerSearchTools(server: McpServer, discovery: JobDiscovery, 
     const tracer = new RunTracer("job_recommend");
     let result;
     try { result = await runWithTrace(tracer, () => discovery.recommend(input, store, createAnalyzer, tracer)); }
-    catch (error) { traces?.save(tracer.finish("failed", error)); throw error; }
-    traces?.save(tracer.finish(result.failures.length ? "partial" : "ok"));
+    catch (error) { traces?.trySave(tracer.finish("failed", error)); throw error; }
+    traces?.trySave(tracer.finish(result.failures.length ? "partial" : "ok"));
     return { structuredContent: result, content: [{ type: "text", text: `${result.realistic.length} REALISTIC, ${result.stretch.length} STRETCH, ${result.pass.length} PASS explanations. Shortfall: ${result.shortfall.realistic} REALISTIC, ${result.shortfall.stretch} STRETCH. ${result.failures.length} failed or unattempted jobs; those are not PASS verdicts. No employer was contacted. (run ${tracer.runId})` }] };
   });
 }

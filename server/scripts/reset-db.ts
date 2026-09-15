@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { loadLocalEnv, resolveDatabasePath, resolveTraceDirectory } from "../src/config.js";
+import { loadLocalEnv, resolveDatabasePath, traceDirectory } from "../src/config.js";
 import { CareerStore } from "../src/domain/store.js";
 import { TraceStore } from "../src/domain/trace/store.js";
 
@@ -15,5 +15,6 @@ if (!existsSync(databasePath)) {
   try { store.reset(); } finally { store.close(); }
   console.log(`Cleared all Career Radar records in ${databasePath}. The file was vacuumed; delete it and its -wal/-shm siblings if you want no trace.`);
 }
-const traceDirectory = resolveTraceDirectory();
-if (traceDirectory) console.log(`Removed ${new TraceStore(traceDirectory).clear()} run trace file(s) from ${traceDirectory}.`);
+// Trace removal ignores CAREER_RADAR_TRACES=off: that switch stops new writes, not the wipe.
+const traces = traceDirectory();
+console.log(`Removed ${new TraceStore(traces).clear()} run trace file(s) from ${traces}.`);

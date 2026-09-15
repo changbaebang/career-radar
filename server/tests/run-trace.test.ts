@@ -89,6 +89,19 @@ describe("M5-E run trace", () => {
   });
 });
 
+describe("M5-E open stages at finish", () => {
+  it("closes a stage that has not settled as aborted/timeout, and a late settle does not rewrite it", async () => {
+    const tracer = new RunTracer("job_recommend");
+    let settle: (() => void) | undefined;
+    const pending = tracer.stage("model", () => new Promise<void>((resolve) => { settle = resolve; }), undefined, { operation: "assess" });
+    const trace = tracer.finish("partial");
+    expect(trace.stages[0]).toMatchObject({ stage: "model", outcome: "aborted", failureClass: "timeout", errorName: "UnsettledAtFinish" });
+    expect(trace.counters).toMatchObject({ modelCalls: 1, timeouts: 1 });
+    settle!(); await pending;
+    expect(tracer.finish("partial").stages[0]).toMatchObject({ outcome: "aborted", errorName: "UnsettledAtFinish" });
+  });
+});
+
 describe("M5-E trace store", () => {
   it("writes each trace as a private file, reads it back by id, lists newest first, and clears", async () => {
     const directory = temporary();
