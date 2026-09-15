@@ -9,6 +9,7 @@ import { compareReports } from "../../evals/report.js";
 // If this fails, a runner, metric or fixture change made the pre-M5 baseline stale: decide whether
 // to refresh it (new SHA on the baseline page) rather than silently comparing fewer cases.
 const baselinePath = fileURLToPath(new URL("../../evals/baselines/m5-0/report.json", import.meta.url));
+const postM5Path = fileURLToPath(new URL("../../evals/baselines/m5-f/report.json", import.meta.url));
 
 describe("M5-0 committed policy baseline", () => {
   const baseline = JSON.parse(readFileSync(baselinePath, "utf8")) as Record<string, unknown>;
@@ -32,5 +33,22 @@ describe("M5-0 committed policy baseline", () => {
   it("reports, not refuses, a shared-schema change against this baseline", () => {
     const current = runEvaluation(policyCases, { codeSha: "0".repeat(40), dirty: false, policyHash: baseline.policyHash as string, schemaHash: "m5-a-adds-a-schema" });
     expect(compareReports(current, baseline)).toMatchObject({ compatible: true, compared: 28, schemaChanged: true });
+  });
+});
+
+// The post-M5 policy report (M5-F) is committed next to the freeze so the two can be compared later.
+describe("M5-F committed post-M5 policy report", () => {
+  const report = JSON.parse(readFileSync(postM5Path, "utf8")) as Record<string, unknown>;
+
+  it("was produced from a clean checkout by the current report contract, with every case and no comparison embedded", () => {
+    expect(report).toMatchObject({ reportVersion: REPORT_VERSION, metricVersion: METRIC_VERSION, mode: "policy", dirty: false });
+    expect(report.codeSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(report.cases).toHaveLength(policyCases.length);
+    expect(report).not.toHaveProperty("comparison");
+  });
+
+  it("compares every current case with no regressions", () => {
+    const current = runEvaluation(policyCases, { codeSha: "0".repeat(40), dirty: false, policyHash: report.policyHash as string, schemaHash: report.schemaHash as string });
+    expect(compareReports(current, report)).toMatchObject({ compatible: true, compared: policyCases.length, incompatibleReasons: [], removed: [], added: [], regressions: [] });
   });
 });
