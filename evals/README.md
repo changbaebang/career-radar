@@ -59,6 +59,10 @@ case by `contractHash` (report version 3, M5-0). The committed pre-M5 baseline i
 pnpm eval --baseline evals/baselines/m5-0/report.json --no-save
 ```
 
+Two policy reports are committed under `evals/baselines/`: `m5-0` (28 cases, the pre-M5 freeze) and
+`m5-f` (35 cases, the tree after M5-E). Compare a run with either; `server/tests/evaluation-baseline.test.ts`
+fails when a runner or fixture change makes them stale.
+
 ## What the 28 cases establish
 
 All 16 M1–M3 fixtures remain unchanged. `dataset.ts` adds rationale, expected required

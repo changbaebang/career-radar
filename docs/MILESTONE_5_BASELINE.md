@@ -118,6 +118,16 @@ The one missed blocker and the six verdicts outside the allowed set are the fake
 rule at work (the fake is not gold), and the fake cites a match only when its evidence sentence was
 retrieved and never cites a gap or blocker, so those claims count as unsupported.
 
+## Fourth check after the freeze (M5-F)
+
+The post-M5 policy report is committed next to this baseline as `evals/baselines/m5-f/report.json`
+(35 cases, `synthetic-policy-v3`, produced from a clean checkout; its code SHA is in the file). The
+comparison of the current tree with the M5-0 baseline is unchanged from M5-B: `compatible: true`,
+`compared: 28`, `schemaChanged: true`, `policyChanged: true`, `regressions: []`, seven citation
+cases under `added`. The metric-by-metric table is in
+[MILESTONE_5_WRAP_UP.md](MILESTONE_5_WRAP_UP.md); `server/tests/evaluation-baseline.test.ts` keeps
+both committed reports usable by the current runner.
+
 ## Verification labels by feature
 
 | Feature | Label | Supported by |

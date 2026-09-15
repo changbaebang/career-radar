@@ -381,6 +381,11 @@ scheduled: M5 ends at E, and tool use stays `not verified` for every provider.
 
 ### M5-F — Portfolio evidence and failure write-up (docs + blog)
 
+Status: **in progress** (branch `docs/m5-f-wrap-up`). [ARCHITECTURE.md](ARCHITECTURE.md) and
+[MILESTONE_5_WRAP_UP.md](MILESTONE_5_WRAP_UP.md) are written; the post-M5 policy report is committed
+as `evals/baselines/m5-f/`; the model-mode baseline waits for an approved full-set run with report
+v3 (new `:free` key); the closing article follows.
+
 Architecture and data-flow page, the policy baseline (M5-0) compared with the post-M5 policy report,
 the model-mode report of the first approved free-tier D run (there is no post-C report: C is
 dropped), at least one recorded failure with its design change (the first usage check already

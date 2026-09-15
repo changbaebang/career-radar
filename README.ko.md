@@ -213,7 +213,7 @@ strict JSON 스키마 출력과 `require_parameters` 라우팅으로 보낼 수 
 상태 → 프로필 → 공고 추출 → 판정 → 지원 기록 도구이고, 추천 배치는 #4 실측 뒤로 미룹니다. 기록이 남기
 전까지 호스트 동작은 `not verified`입니다.
 
-### M5 (진행 중)
+### M5 (코드 완료, 정리 진행 중)
 
 근거 기반 마일스톤(합성 코퍼스 검색, 검색된 조각에 대한 인용, 모델 모드 평가 실행기, 실행 단위 관측) 계획을
 [MILESTONE_5.md](docs/MILESTONE_5.md)와 ADR-0013으로 정리했습니다. 제한된 도구
@@ -249,6 +249,13 @@ M5-E는 실행 단위 관측을 더했습니다. `job_assess`·`job_recommend` �
 소요 시간·고정 실패 분류·카운터를 남기며, 텍스트 없는 흔적 파일과 `pnpm diagnose`를 제공합니다. 첫
 실제 모델 모드 실행(무료 OpenRouter 모델 하나로 3건, 이어 13건)은 M5-D PR과 블로그에 기록했고,
 전체 골든셋 기준선은 승인된 실행이 아직 필요합니다.
+M5-F는 정리입니다. [ARCHITECTURE.md](docs/ARCHITECTURE.md)(데이터 흐름, 무엇이
+결정적인지, 무엇이 기기를 떠나지 않는지)와
+[MILESTONE_5_WRAP_UP.md](docs/MILESTONE_5_WRAP_UP.md)(M5-0 정책 기준선과
+M5 이후 보고서의 비교 — 둘 다 `evals/baselines/`에 커밋, 작은 실제 모델 모드 실행 두 번은
+기준선이 아닌 관측으로, 기록된 실패 전부와 그로 인한 변경, 그리고 M5가 답하지 못한 질문 — 지원 우선순위를
+정하는 사람에게 일반 채팅보다 나은지는 나란히 재지 않았음). 기능별 확인 표시는
+[MILESTONE_5_BASELINE.md](docs/MILESTONE_5_BASELINE.md)에 그대로 있습니다.
 
 ## 참고 문서
 

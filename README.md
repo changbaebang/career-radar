@@ -213,7 +213,7 @@ reasoned from the parser. [HOST_CHECK.md](docs/HOST_CHECK.md) is the runbook for
 v6, scoped to status → profile → ingest → assess → application tools, and its run log; the
 recommendation batch waits for #4. Until a run is logged there, host behaviour is `not verified`.
 
-### M5 (in progress)
+### M5 (code complete; wrap-up in progress)
 
 A reviewed plan for a grounded-evidence milestone (retrieval over a synthetic corpus, citations to
 retrieved chunks, a model-mode eval harness, run-level observability) is in
@@ -254,6 +254,13 @@ diagnostics; stage records (`extract`, `retrieve`, `model`, `validate`, `persist
 fixed failure classes and counters; persisted content-free traces and `pnpm diagnose`. The first
 live model-mode runs (three, then thirteen golden cases on one free OpenRouter model) are recorded
 in the M5-D PRs and blog posts; a full-set baseline still needs an approved run.
+M5-F is the wrap-up: [ARCHITECTURE.md](docs/ARCHITECTURE.md) (data flow, what is deterministic, what
+never leaves the machine) and [MILESTONE_5_WRAP_UP.md](docs/MILESTONE_5_WRAP_UP.md) (the M5-0 policy
+baseline against the post-M5 report, both committed under `evals/baselines/`; the two small live
+model-mode runs as observations, not a baseline; every recorded failure with the change it caused;
+and the question M5 did not answer — whether this beats a plain chat for the person prioritizing
+applications, which has not been measured side by side). The verification label per feature stays in
+[MILESTONE_5_BASELINE.md](docs/MILESTONE_5_BASELINE.md).
 
 ## Documentation references
 
