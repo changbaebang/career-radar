@@ -92,7 +92,9 @@ What is transmitted, by path and by call:
 | --- | --- | --- |
 | ChatGPT host → this server | ChatGPT processes the conversation, the tool inputs and the tool results under its own terms before and after the server does; the server then sends the model calls below to the configured provider | The host's own user consent; no CLI flag and no CI refusal on this path (`server/src/index.ts` → `createHttpApp` → `createAnalyzerFromEnv`) |
 | Configured provider (`docs/PROVIDERS.md`) | OpenAI directly, or OpenRouter, which forwards to the upstream endpoint that serves the model (recorded per call as `upstreamProvider`) | Provider choice is explicit, never a silent fallback |
-| CLI runs (`measure:live`, `usage-check`, `eval --mode model`) | Same provider path | Explicit approval flags, refused under CI/test, hard call caps, OpenRouter live only with a `:free` model id unless cost is approved |
+| `pnpm eval --mode model` | Same provider path | `--approve-transmission`; refused under CI/test; hard ceiling of 150 calls; OpenRouter live only with a `:free` model id unless `--approve-model-cost`; `--provider openai` needs the cost flag |
+| `pnpm measure:live` | Same provider path | `--approve-network` (search only) and `--approve-model-cost` plus a typed call cap for model calls; refused under CI/test; hard ceiling of 40 calls; no `:free` check — the configured model runs |
+| `pnpm usage-check` | Same provider path | `--approve-transmission` only: no CI/test refusal and no `:free` check — the configured provider and model run; bounded by at most five postings and a per-call deadline |
 
 Per call: `profile_upsert` sends the **raw resume text**; `job_ingest` sends the **posting text**;
 `job_assess` and the recommendation batch send the **structured profile, the structured posting and
