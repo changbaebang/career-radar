@@ -2,6 +2,7 @@
   "name": "career-radar",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "description": "Evidence-based career decision support as a ChatGPT plugin.",
   "type": "module",
   "packageManager": "pnpm@10.33.2",
