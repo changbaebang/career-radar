@@ -233,7 +233,7 @@ describe("usage check through the root pnpm command", () => {
       env: { ...env, CAREER_RADAR_PROVIDER: "openai", OPENAI_API_KEY: "synthetic-not-a-real-key", OPENAI_BASE_URL: "https://review-destination.invalid/v1" } });
     expect(refused.status).toBe(2);
     expect(refused.stderr).toContain(USAGE_ERRORS.baseUrlSet);
-  });
+  }, 120_000); // spawns the root pnpm command (builds workspace packages first); ~10-15 s on a cold CI runner
 
   it("replays a saved results file given as a caller-relative path", async () => {
     const directory = scratch();
