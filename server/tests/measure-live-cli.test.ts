@@ -97,7 +97,7 @@ describe("measure:live CLI (dry run only; approvals are refused under the test r
     const summary = JSON.parse(run.stdout.slice(run.stdout.indexOf("{"), run.stdout.lastIndexOf("}") + 1));
     expect(summary).toMatchObject({ mode: "dry-run", status: "complete", modelCalls: 11 });
     expect(summary.runs[0].totals).toMatchObject({ modelCalls: 6, completed: 2, failed: 1, notAttempted: 2 });
-  });
+  }, 120_000); // spawns the root pnpm command (builds workspace packages first); ~10-15 s on a cold CI runner
 
   it("writes a partial report holding every call of the batch in progress when interrupted", async () => {
     const output = join(temporary(), "run");
