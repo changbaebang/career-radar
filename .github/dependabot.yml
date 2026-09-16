@@ -18,6 +18,10 @@ updates:
         dependency-type: production
         update-types: [minor, patch]
     open-pull-requests-limit: 5
+    ignore:
+      # typescript-eslint does not support TypeScript 7 yet; majors are evaluated by hand.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
