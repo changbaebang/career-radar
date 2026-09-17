@@ -241,14 +241,18 @@ M5-D는 모델 모드 평가 실행기를 더했습니다. `pnpm eval --mode mod
 판정 일치, 인용 정확도, 지연과 제공자가 보고한 토큰을 기록하고 이력서·공고 텍스트는 담지
 않습니다([evals/README.md](evals/README.md)). 소유자 결정(2026-09-14,
 ADR-0014): M5 검증은 무료 티어에서 마무리합니다 — 유료 제공자 없음, 어휘 검색만, 합성 코퍼스만,
-M5-C 제외. 승인된 실제 실행은 아직 없어 모델 모드 수치는 전부 dry run이고, 실제 모델이 해석되는 조각
-id를 인용하는지는 여전히 미측정입니다.
+M5-C 제외. 승인된 첫 전체 실행을 모델 모드 기준선으로 커밋했습니다(`evals/baselines/m5-d/`,
+OpenRouter `dots-studio/dots-3-note-preview:free`, 무료 티어 일일 50회 한도
+때문에 2라운드): 33건 중 28건 채점, 요건 텍스트 대응 38/39, 결격 재현율 10/10, 허용 집합 안 판정
+18/28, 인용 해석 60/174 — 실제 모델은 검색 조각 id를 인용하지만 그 인용의 대부분은 해석되지 않습니다.
+자세한 수치는 [MILESTONE_5_WRAP_UP.md](docs/MILESTONE_5_WRAP_UP.md)에
+있습니다.
 M5-E는 실행 단위 관측을 더했습니다. `job_assess`·`job_recommend` 호출마다 run id
 하나를 만들어 분석기 텔레메트리(`AnalyzerResponseEvent.runId`)·검색 흔적·파이프라인 진단에
 관통시키고, 단계 기록(`extract`·`retrieve`·`model`·`validate`·`persist`)에
 소요 시간·고정 실패 분류·카운터를 남기며, 텍스트 없는 흔적 파일과 `pnpm diagnose`를 제공합니다. 첫
 실제 모델 모드 실행(무료 OpenRouter 모델 하나로 3건, 이어 13건)은 M5-D PR과 블로그에 기록했고,
-전체 골든셋 기준선은 승인된 실행이 아직 필요합니다.
+전체 골든셋 기준선은 2026-09-17에 만들었습니다.
 M5-F는 정리입니다. [ARCHITECTURE.md](docs/ARCHITECTURE.md)(데이터 흐름, 무엇이
 결정적인지, 무엇이 기기를 떠나지 않는지)와
 [MILESTONE_5_WRAP_UP.md](docs/MILESTONE_5_WRAP_UP.md)(M5-0 정책 기준선과

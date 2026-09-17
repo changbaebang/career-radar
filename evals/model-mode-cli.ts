@@ -41,6 +41,7 @@ export const MODEL_REFUSALS = {
   outputWithNoSave: "--output cannot be combined with --no-save",
   noCases: "No golden case matches the selection. Use --help.",
   baselineTooLarge: "Baseline exceeds 5 MB",
+  resumeNotFound: "Resume report not found (paths are relative to the repository root).",
   resumeTooLarge: "Resume report exceeds 5 MB",
   resumeInvalid: "Resume report is not a model-mode report of the current version.",
   resumeWithSelection: "--resume selects its own cases; it cannot be combined with --cases or --limit.",
@@ -161,7 +162,8 @@ export async function runModelEvalCli(argv: string[], io: ModelCliIo = { log: co
   let previous: ModelEvalReport | undefined;
   if (options.resume) {
     const path = resolve(root, options.resume);
-    if (!existsSync(path) || statSync(path).size > 5_000_000) { io.log(MODEL_REFUSALS.resumeTooLarge); return 2; }
+    if (!existsSync(path)) { io.log(MODEL_REFUSALS.resumeNotFound); return 2; }
+    if (statSync(path).size > 5_000_000) { io.log(MODEL_REFUSALS.resumeTooLarge); return 2; }
     const parsed = ModelEvalReportSchema.safeParse(JSON.parse(readFileSync(path, "utf8")));
     if (!parsed.success) { io.log(MODEL_REFUSALS.resumeInvalid); return 2; }
     previous = parsed.data;

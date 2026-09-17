@@ -229,7 +229,7 @@ describe("pnpm eval --mode model --resume", () => {
     expect(() => parseModelArgs(["--resume", path, "--limit", "1"])).toThrow(MODEL_REFUSALS.resumeWithSelection);
     const { logs, outs, log, out } = collect();
     expect(await runModelEvalCli(["--resume", join(temporary(), "missing.json"), "--no-save"], { log, out, cases: [...cases] })).toBe(2);
-    expect(logs.at(-1)).toBe(MODEL_REFUSALS.resumeTooLarge);
+    expect(logs.at(-1)).toBe(MODEL_REFUSALS.resumeNotFound);
     const bad = join(temporary(), "bad.json"); writeFileSync(bad, JSON.stringify({ reportKind: "model-evaluation", reportVersion: 1 }));
     expect(await runModelEvalCli(["--resume", bad, "--no-save"], { log, out, cases: [...cases] })).toBe(2);
     expect(logs.at(-1)).toBe(MODEL_REFUSALS.resumeInvalid);

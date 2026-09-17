@@ -50,11 +50,11 @@ unsupported, and the seven new cases add 5 unsupported of 8. Both are expected v
 dataset, not scores. Every human-review field is still `pending`: the policy dataset is a contract
 on the policy, not gold about people.
 
-## Model-mode observations (not a baseline)
+## Model-mode observations before the baseline
 
 Two live runs exist, both on `dots-studio/dots-3-note-preview:free` through OpenRouter (upstream
 `AtlasCloud`), synthetic golden texts only, cost reported as 0 by the key dashboard at the time of
-the check. Neither is the model-mode baseline: the first predates the draft/diagnostic fields, the
+the check. Neither is the baseline (next section): the first predates the draft/diagnostic fields, the
 second was produced by report version 2 whose note attribution was text-based (fixed in #26), and
 both are partial sets.
 
@@ -70,11 +70,42 @@ redaction guard discarded the whole run. The runner now replaces such strings wi
 them, and `--resume` completes a cut run into one report; the attempt itself left only the per-case log lines
 (18 cases reached an outcome: 15 assessed, 3 extraction failures at the posting).
 
-The two REALISTIC-expected cases were STRETCH in the model's own draft in the second run; the
-first run recorded no draft, so its cause is not established. The baseline still to make is one
-approved run of the full golden set with report v3 (`pnpm eval --mode model --approve-transmission`),
-which needs a valid `:free` key and, on the no-credit tier, may have to be split by the daily
-request limit.
+The two REALISTIC-expected cases were STRETCH in the model's own draft in the second run; the first
+run recorded no draft, so its cause is not established.
+
+## Model-mode baseline (first approved full-set run)
+
+Committed as `evals/baselines/m5-d/report.json` (report version 3, `model-metrics-v1`, code
+`6afcd0a`, clean checkout, golden set `model-golden-v1` with the hash the runner computes today;
+`server/tests/model-eval-baseline.test.ts` fails when the golden set, prompt, policy or shared
+schema drifts from it). Provider `openrouter`, model `dots-studio/dots-3-note-preview:free`,
+upstream `AtlasCloud`, synthetic golden texts only, cost 0 on the key dashboard. Made in 2 rounds
+because the no-credit free tier allows 50 requests per day: 2026-09-16 (17 cases assessed, then 429
+from the 52nd call) and 2026-09-17 `--resume` of the 16 remaining (109 calls in total, 5 cut by the
+300 s per-call deadline). Numbers are evidence for this provider, model and endpoint only.
+
+| Measure | Value |
+| --- | --- |
+| Outcomes | assessed 28, extraction failed 5 (all `timeout` at 300 s on the extraction call), assessment failed 0 |
+| Requirement text match (extracted → gold) | 38/39 — the one miss is the Korean posting, where the model wrote `이끌은` for `이끈` |
+| Blocker recall, matched / all | 10/10 / 10/10 |
+| Verdict inside the gold allowed set | 18/28 (human-reviewed: none yet, N/A) |
+| Verdict changed by the policy (draft → final) | 16/28, all towards PASS through blocker promotion |
+| Pipeline diagnostics (cases) | ungrounded match removed 16, citation invalid 15, citation orphan 16, re-keyed 1 |
+| Citation correctness / unsupported claim rate | 60/174 / 15/37 |
+| Schema failure / refusal / truncation / timeout | 0/33 / 0/33 / 0/33 / 5/33 |
+| Invented employers / forbidden claims / redacted model strings | 0 / 0 / 0 |
+| Latency median ms (extractProfile / extractJob / assess) | 8614 / 14700 / 58318 (max 93370; five extraction calls hit 300,000) |
+| Tokens over 88 reporting calls (in / out; reasoning) | 39,292 / 225,074; 195,864 |
+
+What the baseline says about this model on this endpoint: it answers the M5-B question — the model
+does cite retrieved chunk ids, but only about a third of its citations resolve against the run's
+retrieval trace, and the rest are dropped with lowered confidence. It is lenient on the draft
+(REALISTIC or STRETCH at `high` confidence) and the deterministic policy is the main source of PASS
+verdicts: more than half of the final verdicts differ from the draft. Every case in the gold set is
+still `pending` human review, so whether the gold or the model is right in the ten out-of-set cases
+is not decided here. Extraction is the fragile stage on this endpoint: five calls did not return
+within 300 s while no assessment call did.
 
 ## Recorded failures and the change each one caused
 

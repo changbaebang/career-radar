@@ -249,8 +249,11 @@ carry no relevance labels) and the report records per-case retrieval counts (que
 missing terms) instead; the report carries provider-reported token counters and never a cost or a
 dashboard link; the report fields are `unmatchedGold` and `unmatchedExtracted`. The dry run verifies
 the runner only (33/33 assessed, 99 calls, `requirementMatchRate` 45/45, both blocker recalls 10/11,
-27/33 verdicts inside the allowed set; the fake's verdicts are not gold). No approved run yet: every
-live number, including whether a model cites resolvable chunk ids, is `not verified`.
+27/33 verdicts inside the allowed set; the fake's verdicts are not gold). The first approved
+full-set run (2026-09-16/17, two rounds with `--resume`, OpenRouter
+`dots-studio/dots-3-note-preview:free`) is the committed model-mode baseline
+`evals/baselines/m5-d/`; its numbers are in MILESTONE_5_WRAP_UP.md and are live-verified for that
+endpoint only.
 
 - **Goal.** Evaluate the real model path on a versioned golden set, with the same approval
   discipline as `measure:live`.
