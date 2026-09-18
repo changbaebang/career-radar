@@ -258,6 +258,13 @@ version, provider, model, prompt and golden set; `--resume` cannot be combined w
 report) or not-attempted cases at the call cap (the report is still written), `2` on an argument or
 gate refusal or an incompatible baseline.
 
+**Committed baseline.** `evals/baselines/m5-d/report.json` is the first approved full-set live run
+(OpenRouter `dots-studio/dots-3-note-preview:free`, four rounds merged with `--resume`). Compare a
+later live run on the same provider, model and prompt with `pnpm eval --mode model
+--approve-transmission --baseline evals/baselines/m5-d/report.json`;
+`server/tests/model-eval-baseline.test.ts` fails when the golden set, prompt, policy or shared
+schema drifts from the baseline.
+
 **What a dry run establishes.** Numbers under the fake verify the runner, not any model: the fake's
 verdicts follow a fixed token-overlap rule and are not meant to agree with the gold set. Retention
 is as for policy reports above. A live report names its provider, model and upstream and is evidence
