@@ -250,7 +250,7 @@ missing terms) instead; the report carries provider-reported token counters and 
 dashboard link; the report fields are `unmatchedGold` and `unmatchedExtracted`. The dry run verifies
 the runner only (33/33 assessed, 99 calls, `requirementMatchRate` 45/45, both blocker recalls 10/11,
 27/33 verdicts inside the allowed set; the fake's verdicts are not gold). The first approved
-full-set run (2026-09-16/17, two rounds with `--resume`, OpenRouter
+full-set run (2026-09-16/17/18, four rounds with `--resume`, OpenRouter
 `dots-studio/dots-3-note-preview:free`) is the committed model-mode baseline
 `evals/baselines/m5-d/`; its numbers are in MILESTONE_5_WRAP_UP.md and are live-verified for that
 endpoint only.

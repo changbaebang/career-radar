@@ -247,17 +247,17 @@ citation correctness, latency and provider-reported tokens, and never resume or 
 ([evals/README.md](evals/README.md)). Owner decision (2026-09-14, ADR-0014): M5 finishes its
 verification on the free tier — no paid provider, lexical retrieval only, synthetic corpus only,
 M5-C dropped. The first approved full-set run is committed as the model-mode baseline
-(`evals/baselines/m5-d/`, OpenRouter `dots-studio/dots-3-note-preview:free`, two rounds over the
-free tier's 50-requests-per-day limit): 28 of 33 cases assessed, requirement text match 38/39,
-blocker recall 10/10, verdict inside the gold set 18/28, citations 60/174 resolved — a live model
-does cite retrieved chunk ids, and most of those citations do not resolve. Details in
+(`evals/baselines/m5-d/`, OpenRouter `dots-studio/dots-3-note-preview:free`, four rounds over the
+free tier's 50-requests-per-day limit and endpoint timeouts): 32 of 33 cases assessed, requirement
+text match 43/44, blocker recall 10/10, verdict inside the gold set 21/32, citations 70/190 resolved
+— a live model does cite retrieved chunk ids, and most of those citations do not resolve. Details in
 [MILESTONE_5_WRAP_UP.md](docs/MILESTONE_5_WRAP_UP.md).
 M5-E adds run-level observability: one run id per `job_assess`/`job_recommend` call, threaded
 through the analyzer telemetry (`AnalyzerResponseEvent.runId`), the retrieval trace and the pipeline
 diagnostics; stage records (`extract`, `retrieve`, `model`, `validate`, `persist`) with timings,
 fixed failure classes and counters; persisted content-free traces and `pnpm diagnose`. The first
 live model-mode runs (three, then thirteen golden cases on one free OpenRouter model) are recorded
-in the M5-D PRs and blog posts; the full-set baseline followed on 2026-09-17.
+in the M5-D PRs and blog posts; the full-set baseline followed on 2026-09-18.
 M5-F is the wrap-up: [ARCHITECTURE.md](docs/ARCHITECTURE.md) (data flow, what is deterministic, what
 never leaves the machine) and [MILESTONE_5_WRAP_UP.md](docs/MILESTONE_5_WRAP_UP.md) (the M5-0 policy
 baseline against the post-M5 report, both committed under `evals/baselines/`; the two small live

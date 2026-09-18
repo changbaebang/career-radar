@@ -76,36 +76,39 @@ run recorded no draft, so its cause is not established.
 ## Model-mode baseline (first approved full-set run)
 
 Committed as `evals/baselines/m5-d/report.json` (report version 3, `model-metrics-v1`, code
-`6afcd0a`, clean checkout, golden set `model-golden-v1` with the hash the runner computes today;
+`d841dda`, clean checkout, golden set `model-golden-v1` with the hash the runner computes today;
 `server/tests/model-eval-baseline.test.ts` fails when the golden set, prompt, policy or shared
 schema drifts from it). Provider `openrouter`, model `dots-studio/dots-3-note-preview:free`,
-upstream `AtlasCloud`, synthetic golden texts only, cost 0 on the key dashboard. Made in 2 rounds
-because the no-credit free tier allows 50 requests per day: 2026-09-16 (17 cases assessed, then 429
-from the 52nd call) and 2026-09-17 `--resume` of the 16 remaining (109 calls in total, 5 cut by the
-300 s per-call deadline). Numbers are evidence for this provider, model and endpoint only.
+upstream `AtlasCloud`, synthetic golden texts only, cost 0 on the key dashboard. Made in 4 rounds
+with `--resume` because the no-credit free tier allows 50 requests per day and this endpoint
+sometimes does not answer within 300 s: 2026-09-16 (17 cases assessed, then 429 from the 52nd call),
+2026-09-17 (the 16 remaining: 11 assessed, 5 extraction timeouts) and 2026-09-18 twice (4 of the 5
+assessed; the last case's posting extraction timed out a third time in a row) — 125 calls in total,
+7 cut by the per-call deadline, all of them extraction calls. Numbers are evidence for this
+provider, model and endpoint only.
 
 | Measure | Value |
 | --- | --- |
-| Outcomes | assessed 28, extraction failed 5 (all `timeout` at 300 s on the extraction call), assessment failed 0 |
-| Requirement text match (extracted → gold) | 38/39 — the one miss is the Korean posting, where the model wrote `이끌은` for `이끈` |
+| Outcomes | assessed 32, extraction failed 1 (`timeout` at 300 s on the posting extraction, reproduced three times), assessment failed 0 |
+| Requirement text match (extracted → gold) | 43/44 — the one miss is the Korean posting, where the model wrote `이끌은` for `이끈` |
 | Blocker recall, matched / all | 10/10 / 10/10 |
-| Verdict inside the gold allowed set | 18/28 (human-reviewed: none yet, N/A) |
-| Verdict changed by the policy (draft → final) | 16/28, all towards PASS through blocker promotion |
-| Pipeline diagnostics (cases) | ungrounded match removed 16, citation invalid 15, citation orphan 16, re-keyed 1 |
-| Citation correctness / unsupported claim rate | 60/174 / 15/37 |
-| Schema failure / refusal / truncation / timeout | 0/33 / 0/33 / 0/33 / 5/33 |
+| Verdict inside the gold allowed set | 21/32 (human-reviewed: none yet, N/A) |
+| Verdict changed by the policy (draft → final) | 16/32, all towards PASS through blocker promotion |
+| Pipeline diagnostics (cases) | ungrounded match removed 18, citation invalid 16, citation orphan 18, re-keyed 1 |
+| Citation correctness / unsupported claim rate | 70/190 / 17/43 |
+| Schema failure / refusal / truncation / timeout | 0/33 / 0/33 / 0/33 / 1/33 |
 | Invented employers / forbidden claims / redacted model strings | 0 / 0 / 0 |
-| Latency median ms (extractProfile / extractJob / assess) | 8614 / 14700 / 58318 (max 93370; five extraction calls hit 300,000) |
-| Tokens over 88 reporting calls (in / out; reasoning) | 39,292 / 225,074; 195,864 |
+| Latency median ms (extractProfile / extractJob / assess) | 8823 / 14741 / 58318 (assess max 93370; 7 extraction calls hit 300,000 across the rounds) |
+| Tokens over 102 reporting calls (in / out; reasoning) | 45,204 / 258,534; 224,205 |
 
 What the baseline says about this model on this endpoint: it answers the M5-B question — the model
 does cite retrieved chunk ids, but only about a third of its citations resolve against the run's
 retrieval trace, and the rest are dropped with lowered confidence. It is lenient on the draft
 (REALISTIC or STRETCH at `high` confidence) and the deterministic policy is the main source of PASS
-verdicts: more than half of the final verdicts differ from the draft. Every case in the gold set is
-still `pending` human review, so whether the gold or the model is right in the ten out-of-set cases
-is not decided here. Extraction is the fragile stage on this endpoint: five calls did not return
-within 300 s while no assessment call did.
+verdicts: half of the final verdicts differ from the draft. Every case in the gold set is still
+`pending` human review, so whether the gold or the model is right in the eleven out-of-set cases is
+not decided here. Extraction is the fragile stage on this endpoint: seven extraction calls did not
+return within 300 s while no assessment call did, and one posting never did in three attempts.
 
 ## Recorded failures and the change each one caused
 

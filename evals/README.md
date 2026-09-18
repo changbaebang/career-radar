@@ -259,7 +259,7 @@ report) or not-attempted cases at the call cap (the report is still written), `2
 gate refusal or an incompatible baseline.
 
 **Committed baseline.** `evals/baselines/m5-d/report.json` is the first approved full-set live run
-(OpenRouter `dots-studio/dots-3-note-preview:free`, two rounds merged with `--resume`). Compare a
+(OpenRouter `dots-studio/dots-3-note-preview:free`, four rounds merged with `--resume`). Compare a
 later live run on the same provider, model and prompt with `pnpm eval --mode model
 --approve-transmission --baseline evals/baselines/m5-d/report.json`;
 `server/tests/model-eval-baseline.test.ts` fails when the golden set, prompt, policy or shared

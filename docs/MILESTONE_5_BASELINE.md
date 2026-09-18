@@ -131,10 +131,10 @@ both committed reports usable by the current runner.
 ## Fifth check after the freeze (M5-D model-mode baseline)
 
 The first approved full-set model-mode run is committed as `evals/baselines/m5-d/report.json`
-(`6afcd0a`, clean; provider `openrouter`, model `dots-studio/dots-3-note-preview:free`, upstream
-`AtlasCloud`, 2 rounds over the free-tier daily limit, 109 calls). It is the model-mode counterpart
-of the policy baseline above and is compared only with model-mode reports (`pnpm eval --mode model
---baseline evals/baselines/m5-d/report.json`); the numbers are in
+(`d841dda`, clean; provider `openrouter`, model `dots-studio/dots-3-note-preview:free`, upstream
+`AtlasCloud`, 4 rounds over the free-tier daily limit and endpoint timeouts, 125 calls). It is the
+model-mode counterpart of the policy baseline above and is compared only with model-mode reports
+(`pnpm eval --mode model --baseline evals/baselines/m5-d/report.json`); the numbers are in
 [MILESTONE_5_WRAP_UP.md](MILESTONE_5_WRAP_UP.md). `server/tests/model-eval-baseline.test.ts` keeps
 it in step with the golden set, prompt, policy and shared schema.
 
@@ -159,7 +159,7 @@ it in step with the golden set, prompt, policy and shared schema.
 | ChatGPT host: tool discovery, widget v6 rendering, re-entry, error display | **not verified** | only the M0 status card was seen in ChatGPT (2026-09-09); runbook `docs/HOST_CHECK.md`, run pending (issue #5) |
 | Citations to retrieved evidence (M5-B): pre-retrieval before the model call, `chunk:<id>` refs resolved only against the run's trace, claim ids, policy re-keying, validator, widget v7 | synthetic-verified; live: **not verified** | `server/tests/{claims,citations,retrieve,snapshot-compat}.test.ts`, `screening.test.ts`, `httpApp.test.ts`; policy eval 35/35 with the seven citation cases: `citationCorrectness` 4/9 and `unsupportedClaimRate` 48/51 by construction (five adversarial refs are meant to be dropped); whether a live model produces resolvable chunk ids is M5-D's question |
 | Evidence corpus, field/sentence chunkers, BM25 retrieval, `pnpm eval:retrieval` (M5-A) | synthetic-verified; live: not applicable (no model call) | `server/tests/evidence-*.test.ts`, `retrieval-*.test.ts`; retrieval eval on the M5-A branch: 36 queries, field chunker Recall@3 47/55 (0.855 micro, 0.866 macro) and Recall@5 49/55 (0.891 / 0.882), sentence chunker Recall@3 46/60 (0.767 / 0.773) and Recall@5 51/60 (0.850 / 0.845), deterministic, 0 dataset problems; no query returned an empty hit list, and three queries returned hits that contained none of their relevant chunks (morphology and an abbreviation, by design) |
-| Model-mode eval harness (M5-D): golden set `model-golden-v1` (33 raw-text cases, all `pending`), `pnpm eval --mode model`, failure classes as outcomes, two blocker recalls, redaction, `--resume`, baseline comparison | synthetic-verified; **live-verified** for OpenRouter `dots-studio/dots-3-note-preview:free` (upstream `AtlasCloud`), prompt `milestone-5b-v1`, code `6afcd0a` | `server/tests/model-eval*.test.ts`; the committed baseline `evals/baselines/m5-d/` (28/33 assessed, 5 extraction timeouts; requirement match 38/39, blocker recall 10/10, verdict in gold set 18/28, citations 60/174 resolved). A live model does cite resolvable chunk ids; most of its citations do not resolve. Other models: **not verified** |
+| Model-mode eval harness (M5-D): golden set `model-golden-v1` (33 raw-text cases, all `pending`), `pnpm eval --mode model`, failure classes as outcomes, two blocker recalls, redaction, `--resume`, baseline comparison | synthetic-verified; **live-verified** for OpenRouter `dots-studio/dots-3-note-preview:free` (upstream `AtlasCloud`), prompt `milestone-5b-v1`, code `d841dda` | `server/tests/model-eval*.test.ts`; the committed baseline `evals/baselines/m5-d/` (32/33 assessed, 1 extraction timeout reproduced three times; requirement match 43/44, blocker recall 10/10, verdict in gold set 21/32, citations 70/190 resolved). A live model does cite resolvable chunk ids; most of its citations do not resolve. Other models: **not verified** |
 | Run trace (M5-E): one run id per `job_assess`/`job_recommend`, telemetry attribution, stage records, counters, `data/traces`, `pnpm diagnose` | synthetic-verified; live: **not verified** | `server/tests/run-trace.test.ts`, `trace-cli.test.ts`, `httpApp.test.ts` (traced success and failure paths, sentinel-free); no traced live call yet |
 
 No row above depends on anything not in the repository, in a results file named here, or in a

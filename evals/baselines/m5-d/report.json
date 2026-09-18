@@ -15,21 +15,21 @@
   "promptVersion": "milestone-5b-v1",
   "policyHash": "0ea62b26888a4e1a0cf2b5e979b05bfe3863a741bbe1e356d99b13a436c92fb0",
   "schemaHash": "2b73bd1a46f3d6aa548353b2917a01e768e0b8433ba0d90eb89e78a816318924",
-  "codeSha": "6afcd0a7ae5aabd4cd68e86252961417e541499b",
+  "codeSha": "d841ddaaf34f4d1b0b4ccdd262182d5815404a87",
   "dirty": false,
-  "generatedAt": "2026-09-17T01:58:57.939Z",
+  "generatedAt": "2026-09-18T04:41:35.709Z",
   "goldenSetVersion": "model-golden-v1",
   "goldenSetHash": "dc5268eb011e72015b7b8a19e47ede3b7fcac5f7dd6942f3373c71e248c2d9a2",
   "selectedCases": 33,
-  "callCap": 147,
-  "modelCalls": 109,
+  "callCap": 165,
+  "modelCalls": 125,
   "redactions": 0,
   "resumed": {
-    "from": "2026-09-16T00:32:06.801Z",
-    "rerunCases": 16,
-    "rounds": 2
+    "from": "2026-09-18T04:35:53.472Z",
+    "rerunCases": 1,
+    "rounds": 4
   },
-  "abortedCalls": 5,
+  "abortedCalls": 7,
   "unsettledCalls": 0,
   "transport": {
     "maxRetries": 0,
@@ -2024,6 +2024,34 @@
         {
           "operation": "extractProfile",
           "outcome": "ok",
+          "durationMs": 9787,
+          "responseModel": "dots-studio/dots-3-note-preview:free",
+          "upstreamProvider": "AtlasCloud",
+          "usage": {
+            "inputTokens": 95,
+            "outputTokens": 674,
+            "totalTokens": 769,
+            "cachedInputTokens": 0,
+            "reasoningTokens": 596
+          }
+        },
+        {
+          "operation": "extractJob",
+          "outcome": "error",
+          "durationMs": 300013,
+          "errorName": "AbortError"
+        }
+      ],
+      "priorTelemetry": [
+        {
+          "operation": "extractProfile",
+          "outcome": "error",
+          "durationMs": 257,
+          "errorName": "RateLimitError"
+        },
+        {
+          "operation": "extractProfile",
+          "outcome": "ok",
           "durationMs": 8823,
           "responseModel": "dots-studio/dots-3-note-preview:free",
           "upstreamProvider": "AtlasCloud",
@@ -2040,14 +2068,26 @@
           "outcome": "error",
           "durationMs": 300005,
           "errorName": "AbortError"
-        }
-      ],
-      "priorTelemetry": [
+        },
         {
           "operation": "extractProfile",
+          "outcome": "ok",
+          "durationMs": 8990,
+          "responseModel": "dots-studio/dots-3-note-preview:free",
+          "upstreamProvider": "AtlasCloud",
+          "usage": {
+            "inputTokens": 95,
+            "outputTokens": 602,
+            "totalTokens": 697,
+            "cachedInputTokens": 0,
+            "reasoningTokens": 535
+          }
+        },
+        {
+          "operation": "extractJob",
           "outcome": "error",
-          "durationMs": 257,
-          "errorName": "RateLimitError"
+          "durationMs": 300019,
+          "errorName": "AbortError"
         }
       ]
     },
@@ -2182,16 +2222,115 @@
       "caseId": "gm-adjacent-platform-role",
       "goldHash": "6f4bde7ef0a04d2c6d1515a74f7bd551b4ce06bb2c97bbe147b910f67c60a293",
       "humanReview": "pending",
-      "outcome": "extraction_failed",
-      "failedStage": "extractProfile",
-      "failureClass": "timeout",
-      "calls": 1,
+      "outcome": "assessed",
+      "calls": 3,
+      "extraction": {
+        "requiredExtracted": 2,
+        "preferredExtracted": 0,
+        "companyNamedInPosting": false,
+        "companyExtracted": false,
+        "inventedEmployer": false,
+        "requirementMatchRate": {
+          "numerator": 2,
+          "denominator": 2,
+          "value": 1
+        },
+        "matchedGold": [
+          "Maintain a shared design system",
+          "TypeScript"
+        ],
+        "unmatchedGold": [],
+        "unmatchedExtracted": []
+      },
+      "assessment": {
+        "verdict": "STRETCH",
+        "verdictInAllowedSet": true,
+        "confidence": "low",
+        "draft": {
+          "verdict": "STRETCH",
+          "confidence": "high",
+          "matches": 1,
+          "gaps": 1,
+          "hardBlockers": 0,
+          "citations": 3
+        },
+        "final": {
+          "matches": 0,
+          "gaps": 1,
+          "hardBlockers": 0
+        },
+        "notes": [
+          "ungroundedMatchRemoved",
+          "citationOrphan"
+        ],
+        "hardBlockers": [],
+        "blockerRecallMatched": {
+          "found": 0,
+          "matched": 0,
+          "value": null
+        },
+        "blockerRecallAll": {
+          "found": 0,
+          "all": 0,
+          "value": null
+        },
+        "spuriousBlockers": 0,
+        "forbiddenClaims": 0,
+        "citations": {
+          "supplied": 3,
+          "valid": 1,
+          "claims": 1,
+          "unsupported": 0
+        },
+        "citationInvalid": false,
+        "retrieval": {
+          "queries": 2,
+          "chunks": 5,
+          "missingTerms": 4
+        }
+      },
       "telemetry": [
         {
           "operation": "extractProfile",
-          "outcome": "error",
-          "durationMs": 300003,
-          "errorName": "AbortError"
+          "outcome": "ok",
+          "durationMs": 14640,
+          "responseModel": "dots-studio/dots-3-note-preview:free",
+          "upstreamProvider": "AtlasCloud",
+          "usage": {
+            "inputTokens": 143,
+            "outputTokens": 1080,
+            "totalTokens": 1223,
+            "cachedInputTokens": 0,
+            "reasoningTokens": 966
+          }
+        },
+        {
+          "operation": "extractJob",
+          "outcome": "ok",
+          "durationMs": 15207,
+          "responseModel": "dots-studio/dots-3-note-preview:free",
+          "upstreamProvider": "AtlasCloud",
+          "usage": {
+            "inputTokens": 128,
+            "outputTokens": 1234,
+            "totalTokens": 1362,
+            "cachedInputTokens": 0,
+            "reasoningTokens": 1310
+          }
+        },
+        {
+          "operation": "assess",
+          "outcome": "ok",
+          "durationMs": 85361,
+          "responseModel": "dots-studio/dots-3-note-preview:free",
+          "upstreamProvider": "AtlasCloud",
+          "usage": {
+            "inputTokens": 1381,
+            "outputTokens": 7936,
+            "totalTokens": 9317,
+            "cachedInputTokens": 0,
+            "reasoningTokens": 6477
+          }
         }
       ],
       "priorTelemetry": [
@@ -2200,6 +2339,12 @@
           "outcome": "error",
           "durationMs": 49,
           "errorName": "RateLimitError"
+        },
+        {
+          "operation": "extractProfile",
+          "outcome": "error",
+          "durationMs": 300003,
+          "errorName": "AbortError"
         }
       ]
     },
@@ -2333,11 +2478,122 @@
       "caseId": "gm-title-gap-with-evidence",
       "goldHash": "f09dc19ee708a2c72cfc80839b727fcaa8de6044db07f82436163632e8888063",
       "humanReview": "pending",
-      "outcome": "extraction_failed",
-      "failedStage": "extractJob",
-      "failureClass": "timeout",
-      "calls": 2,
+      "outcome": "assessed",
+      "calls": 3,
+      "extraction": {
+        "requiredExtracted": 1,
+        "preferredExtracted": 0,
+        "companyNamedInPosting": false,
+        "companyExtracted": false,
+        "inventedEmployer": false,
+        "requirementMatchRate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "matchedGold": [
+          "Lead a frontend team"
+        ],
+        "unmatchedGold": [],
+        "unmatchedExtracted": []
+      },
+      "assessment": {
+        "verdict": "STRETCH",
+        "verdictInAllowedSet": true,
+        "confidence": "low",
+        "draft": {
+          "verdict": "STRETCH",
+          "confidence": "high",
+          "matches": 2,
+          "gaps": 1,
+          "hardBlockers": 0,
+          "citations": 8
+        },
+        "final": {
+          "matches": 2,
+          "gaps": 1,
+          "hardBlockers": 0
+        },
+        "notes": [
+          "citationInvalid"
+        ],
+        "hardBlockers": [],
+        "blockerRecallMatched": {
+          "found": 0,
+          "matched": 0,
+          "value": null
+        },
+        "blockerRecallAll": {
+          "found": 0,
+          "all": 0,
+          "value": null
+        },
+        "spuriousBlockers": 0,
+        "forbiddenClaims": 0,
+        "citations": {
+          "supplied": 8,
+          "valid": 6,
+          "claims": 3,
+          "unsupported": 1
+        },
+        "citationInvalid": true,
+        "retrieval": {
+          "queries": 1,
+          "chunks": 3,
+          "missingTerms": 0
+        }
+      },
       "telemetry": [
+        {
+          "operation": "extractProfile",
+          "outcome": "ok",
+          "durationMs": 7672,
+          "responseModel": "dots-studio/dots-3-note-preview:free",
+          "upstreamProvider": "AtlasCloud",
+          "usage": {
+            "inputTokens": 108,
+            "outputTokens": 518,
+            "totalTokens": 626,
+            "cachedInputTokens": 0,
+            "reasoningTokens": 414
+          }
+        },
+        {
+          "operation": "extractJob",
+          "outcome": "ok",
+          "durationMs": 10006,
+          "responseModel": "dots-studio/dots-3-note-preview:free",
+          "upstreamProvider": "AtlasCloud",
+          "usage": {
+            "inputTokens": 124,
+            "outputTokens": 770,
+            "totalTokens": 894,
+            "cachedInputTokens": 0,
+            "reasoningTokens": 747
+          }
+        },
+        {
+          "operation": "assess",
+          "outcome": "ok",
+          "durationMs": 74723,
+          "responseModel": "dots-studio/dots-3-note-preview:free",
+          "upstreamProvider": "AtlasCloud",
+          "usage": {
+            "inputTokens": 1102,
+            "outputTokens": 7371,
+            "totalTokens": 8473,
+            "cachedInputTokens": 0,
+            "reasoningTokens": 5596
+          }
+        }
+      ],
+      "priorTelemetry": [
+        {
+          "operation": "extractProfile",
+          "outcome": "error",
+          "durationMs": 50,
+          "errorName": "RateLimitError"
+        },
         {
           "operation": "extractProfile",
           "outcome": "ok",
@@ -2358,25 +2614,129 @@
           "durationMs": 300006,
           "errorName": "AbortError"
         }
-      ],
-      "priorTelemetry": [
-        {
-          "operation": "extractProfile",
-          "outcome": "error",
-          "durationMs": 50,
-          "errorName": "RateLimitError"
-        }
       ]
     },
     {
       "caseId": "gm-citation-typescript-migration",
       "goldHash": "fb6ef19b63f195fda5c4b073c191bf31fc89e67bc60705cac60ba649f309eacf",
       "humanReview": "pending",
-      "outcome": "extraction_failed",
-      "failedStage": "extractJob",
-      "failureClass": "timeout",
-      "calls": 2,
+      "outcome": "assessed",
+      "calls": 3,
+      "extraction": {
+        "requiredExtracted": 1,
+        "preferredExtracted": 0,
+        "companyNamedInPosting": false,
+        "companyExtracted": false,
+        "inventedEmployer": false,
+        "requirementMatchRate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "matchedGold": [
+          "TypeScript strict mode migration experience"
+        ],
+        "unmatchedGold": [],
+        "unmatchedExtracted": []
+      },
+      "assessment": {
+        "verdict": "STRETCH",
+        "verdictInAllowedSet": false,
+        "confidence": "low",
+        "draft": {
+          "verdict": "STRETCH",
+          "confidence": "medium",
+          "matches": 1,
+          "gaps": 1,
+          "hardBlockers": 0,
+          "citations": 2
+        },
+        "final": {
+          "matches": 0,
+          "gaps": 1,
+          "hardBlockers": 0
+        },
+        "notes": [
+          "ungroundedMatchRemoved",
+          "citationOrphan"
+        ],
+        "hardBlockers": [],
+        "blockerRecallMatched": {
+          "found": 0,
+          "matched": 0,
+          "value": null
+        },
+        "blockerRecallAll": {
+          "found": 0,
+          "all": 0,
+          "value": null
+        },
+        "spuriousBlockers": 0,
+        "forbiddenClaims": 0,
+        "citations": {
+          "supplied": 2,
+          "valid": 0,
+          "claims": 1,
+          "unsupported": 1
+        },
+        "citationInvalid": false,
+        "retrieval": {
+          "queries": 1,
+          "chunks": 1,
+          "missingTerms": 4
+        }
+      },
       "telemetry": [
+        {
+          "operation": "extractProfile",
+          "outcome": "ok",
+          "durationMs": 10950,
+          "responseModel": "dots-studio/dots-3-note-preview:free",
+          "upstreamProvider": "AtlasCloud",
+          "usage": {
+            "inputTokens": 143,
+            "outputTokens": 852,
+            "totalTokens": 995,
+            "cachedInputTokens": 0,
+            "reasoningTokens": 801
+          }
+        },
+        {
+          "operation": "extractJob",
+          "outcome": "ok",
+          "durationMs": 8018,
+          "responseModel": "dots-studio/dots-3-note-preview:free",
+          "upstreamProvider": "AtlasCloud",
+          "usage": {
+            "inputTokens": 124,
+            "outputTokens": 568,
+            "totalTokens": 692,
+            "cachedInputTokens": 0,
+            "reasoningTokens": 532
+          }
+        },
+        {
+          "operation": "assess",
+          "outcome": "ok",
+          "durationMs": 48030,
+          "responseModel": "dots-studio/dots-3-note-preview:free",
+          "upstreamProvider": "AtlasCloud",
+          "usage": {
+            "inputTokens": 941,
+            "outputTokens": 4500,
+            "totalTokens": 5441,
+            "cachedInputTokens": 0,
+            "reasoningTokens": 3875
+          }
+        }
+      ],
+      "priorTelemetry": [
+        {
+          "operation": "extractProfile",
+          "outcome": "error",
+          "durationMs": 40,
+          "errorName": "RateLimitError"
+        },
         {
           "operation": "extractProfile",
           "outcome": "ok",
@@ -2396,14 +2756,6 @@
           "outcome": "error",
           "durationMs": 300004,
           "errorName": "AbortError"
-        }
-      ],
-      "priorTelemetry": [
-        {
-          "operation": "extractProfile",
-          "outcome": "error",
-          "durationMs": 40,
-          "errorName": "RateLimitError"
         }
       ]
     },
@@ -2908,11 +3260,120 @@
       "caseId": "gm-no-employer-named",
       "goldHash": "d219a01a6ab6f532eac6ccb099bd3fcbf260c208dfb641b643c640e0250c9994",
       "humanReview": "pending",
-      "outcome": "extraction_failed",
-      "failedStage": "extractJob",
-      "failureClass": "timeout",
-      "calls": 2,
+      "outcome": "assessed",
+      "calls": 3,
+      "extraction": {
+        "requiredExtracted": 1,
+        "preferredExtracted": 0,
+        "companyNamedInPosting": false,
+        "companyExtracted": false,
+        "inventedEmployer": false,
+        "requirementMatchRate": {
+          "numerator": 1,
+          "denominator": 1,
+          "value": 1
+        },
+        "matchedGold": [
+          "Lead a React team"
+        ],
+        "unmatchedGold": [],
+        "unmatchedExtracted": []
+      },
+      "assessment": {
+        "verdict": "REALISTIC",
+        "verdictInAllowedSet": true,
+        "confidence": "high",
+        "draft": {
+          "verdict": "REALISTIC",
+          "confidence": "high",
+          "matches": 1,
+          "gaps": 0,
+          "hardBlockers": 0,
+          "citations": 3
+        },
+        "final": {
+          "matches": 1,
+          "gaps": 0,
+          "hardBlockers": 0
+        },
+        "notes": [],
+        "hardBlockers": [],
+        "blockerRecallMatched": {
+          "found": 0,
+          "matched": 0,
+          "value": null
+        },
+        "blockerRecallAll": {
+          "found": 0,
+          "all": 0,
+          "value": null
+        },
+        "spuriousBlockers": 0,
+        "forbiddenClaims": 0,
+        "citations": {
+          "supplied": 3,
+          "valid": 3,
+          "claims": 1,
+          "unsupported": 0
+        },
+        "citationInvalid": false,
+        "retrieval": {
+          "queries": 1,
+          "chunks": 3,
+          "missingTerms": 0
+        }
+      },
       "telemetry": [
+        {
+          "operation": "extractProfile",
+          "outcome": "ok",
+          "durationMs": 14544,
+          "responseModel": "dots-studio/dots-3-note-preview:free",
+          "upstreamProvider": "AtlasCloud",
+          "usage": {
+            "inputTokens": 143,
+            "outputTokens": 1184,
+            "totalTokens": 1327,
+            "cachedInputTokens": 0,
+            "reasoningTokens": 923
+          }
+        },
+        {
+          "operation": "extractJob",
+          "outcome": "ok",
+          "durationMs": 19708,
+          "responseModel": "dots-studio/dots-3-note-preview:free",
+          "upstreamProvider": "AtlasCloud",
+          "usage": {
+            "inputTokens": 123,
+            "outputTokens": 1671,
+            "totalTokens": 1794,
+            "cachedInputTokens": 0,
+            "reasoningTokens": 1878
+          }
+        },
+        {
+          "operation": "assess",
+          "outcome": "ok",
+          "durationMs": 47142,
+          "responseModel": "dots-studio/dots-3-note-preview:free",
+          "upstreamProvider": "AtlasCloud",
+          "usage": {
+            "inputTokens": 1262,
+            "outputTokens": 4500,
+            "totalTokens": 5762,
+            "cachedInputTokens": 0,
+            "reasoningTokens": 3691
+          }
+        }
+      ],
+      "priorTelemetry": [
+        {
+          "operation": "extractProfile",
+          "outcome": "error",
+          "durationMs": 50,
+          "errorName": "RateLimitError"
+        },
         {
           "operation": "extractProfile",
           "outcome": "ok",
@@ -2932,14 +3393,6 @@
           "outcome": "error",
           "durationMs": 300005,
           "errorName": "AbortError"
-        }
-      ],
-      "priorTelemetry": [
-        {
-          "operation": "extractProfile",
-          "outcome": "error",
-          "durationMs": 50,
-          "errorName": "RateLimitError"
         }
       ]
     },
@@ -3571,15 +4024,15 @@
   ],
   "metrics": {
     "outcomes": {
-      "assessed": 28,
-      "extractionFailed": 5,
+      "assessed": 32,
+      "extractionFailed": 1,
       "assessmentFailed": 0,
       "notAttempted": 0
     },
     "requirementMatchRate": {
-      "numerator": 38,
-      "denominator": 39,
-      "value": 0.9743589743589743
+      "numerator": 43,
+      "denominator": 44,
+      "value": 0.9772727272727273
     },
     "blockerRecallMatched": {
       "numerator": 10,
@@ -3592,9 +4045,9 @@
       "value": 1
     },
     "goldVerdictAgreement": {
-      "numerator": 18,
-      "denominator": 28,
-      "value": 0.6428571428571429
+      "numerator": 21,
+      "denominator": 32,
+      "value": 0.65625
     },
     "humanVerdictAgreement": {
       "numerator": 0,
@@ -3605,14 +4058,14 @@
     "forbiddenClaims": 0,
     "verdictChangedByPolicy": {
       "numerator": 16,
-      "denominator": 28,
-      "value": 0.5714285714285714
+      "denominator": 32,
+      "value": 0.5
     },
     "noteCounts": {
-      "ungroundedMatchRemoved": 16,
+      "ungroundedMatchRemoved": 18,
       "citationRekeyed": 1,
-      "citationOrphan": 16,
-      "citationInvalid": 15,
+      "citationOrphan": 18,
+      "citationInvalid": 16,
       "screeningContextDiscarded": 0
     },
     "schemaFailureRate": {
@@ -3631,47 +4084,47 @@
       "value": 0
     },
     "timeoutRate": {
-      "numerator": 5,
+      "numerator": 1,
       "denominator": 33,
-      "value": 0.15151515151515152
+      "value": 0.030303030303030304
     },
     "citationCorrectness": {
-      "numerator": 60,
-      "denominator": 174,
-      "value": 0.3448275862068966
+      "numerator": 70,
+      "denominator": 190,
+      "value": 0.3684210526315789
     },
     "unsupportedClaimRate": {
-      "numerator": 15,
-      "denominator": 37,
-      "value": 0.40540540540540543
+      "numerator": 17,
+      "denominator": 43,
+      "value": 0.3953488372093023
     },
     "latency": {
       "extractProfile": {
-        "count": 49,
+        "count": 55,
         "minMs": 30,
-        "medianMs": 8614,
+        "medianMs": 8823,
         "maxMs": 300003
       },
       "extractJob": {
-        "count": 32,
-        "minMs": 8833,
-        "medianMs": 14700,
-        "maxMs": 300006
+        "count": 38,
+        "minMs": 8018,
+        "medianMs": 14741,
+        "maxMs": 300019
       },
       "assess": {
-        "count": 28,
+        "count": 32,
         "minMs": 38229,
         "medianMs": 58318,
         "maxMs": 93370
       }
     },
     "usage": {
-      "inputTokens": 39292,
-      "outputTokens": 225074,
-      "totalTokens": 264366,
-      "reasoningTokens": 195864,
-      "reportedCalls": 88,
-      "calls": 109
+      "inputTokens": 45204,
+      "outputTokens": 258534,
+      "totalTokens": 303738,
+      "reasoningTokens": 224205,
+      "reportedCalls": 102,
+      "calls": 125
     }
   },
   "success": true
