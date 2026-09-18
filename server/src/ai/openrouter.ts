@@ -2,6 +2,7 @@ import type { RetrievedEvidence } from "../domain/evidence/retrieve.js";
 import type { CandidateProfile, FitAssessment, JobPosting } from "@career-radar/shared";
 import { APIError, APIUserAbortError } from "openai/error";
 import { HTTPClient } from "@openrouter/sdk/lib/http";
+import { ChatResult$inboundSchema } from "@openrouter/sdk/models";
 import { createOpenRouterText } from "@tanstack/ai-openrouter";
 import type { JSONSchema } from "@tanstack/ai";
 import { resolveDebugOption } from "@tanstack/ai/adapter-internals";
@@ -100,64 +101,73 @@ export class OpenRouterCareerAnalyzer implements CareerAnalyzer {
     const combined = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
     let response: ChatResponse | undefined;
     let boundaryError: unknown;
-    const httpClient = new HTTPClient({ fetcher: async (request, init) => {
-      try {
-        response = await observeCall(this.#onResponse, operation, this.#model, "OpenRouter", async () => {
-          if (combined.aborted) throw new APIUserAbortError();
-          let wire: Response;
-          let text: string;
+    // Observe the whole operation, including SDK request preparation and output validation.
+    // Preserve available usage/finish metadata even when validation rejects the response.
+    const hook = this.#onResponse;
+    return observeCall(hook ? (event) => hook({ ...(response ? projectChat(response) : {}), ...event }) : undefined,
+      operation, this.#model, "OpenRouter", async () => {
+        try {
+          const httpClient = new HTTPClient({ fetcher: async (request, init) => {
+            try {
+              response = await (async () => {
+                if (combined.aborted) throw new APIUserAbortError();
+                let wire: Response;
+                let text: string;
+                try {
+                  wire = await fetch(request, { ...init, signal: combined });
+                  text = await wire.text(); // signal remains active until the body is consumed
+                } catch {
+                  if (combined.aborted) throw new APIUserAbortError();
+                  throw new ProviderRequestError("OpenRouter", "APIConnectionError", {});
+                }
+                let json: unknown;
+                try { json = JSON.parse(text); } catch {
+                  if (wire.ok) throw new Error(OPENROUTER_ERRORS.invalidJson);
+                }
+                if (!wire.ok) throw APIError.generate(wire.status, json && typeof json === "object" ? json : undefined, "", wire.headers);
+                const envelope = ChatResponseSchema.safeParse(json);
+                if (!envelope.success) throw new Error(OPENROUTER_ERRORS.noContent);
+                const raw = envelope.data;
+                raw._request_id = wire.headers.get("x-request-id");
+                return raw;
+              })();
+              validateCompletion(response);
+              if (!ChatResult$inboundSchema.safeParse(response).success) throw new Error(OPENROUTER_ERRORS.schemaMismatch);
+              return new Response(JSON.stringify(response), { headers: { "content-type": "application/json" } });
+            } catch (error) {
+              boundaryError = combined.aborted ? new APIUserAbortError() : error;
+              throw boundaryError;
+            }
+          } });
+          // OPENROUTER_MODEL intentionally accepts newly published / :free IDs outside the SDK catalog.
+          // The cast only crosses the SDK's catalog type; it does not claim runtime capabilities.
+          let data: unknown;
           try {
-            wire = await fetch(request, { ...init, signal: combined });
-            text = await wire.text(); // signal remains active until the body is consumed
+            const adapter = createOpenRouterText(this.#model as Parameters<typeof createOpenRouterText>[0], this.#apiKey, {
+              serverURL: OPENROUTER_BASE_URL, appTitle: "Career Radar", httpClient,
+              retryConfig: { strategy: "none" }, debugLogger: { group() {}, groupEnd() {}, log() {} },
+            });
+            const result = await adapter.structuredOutput({
+              outputSchema: zodResponseFormat(schema, OUTPUT_NAMES[operation]).json_schema.schema as JSONSchema,
+              chatOptions: {
+                model: this.#model, systemPrompts: [instructions], messages: [{ role: "user", content: input }],
+                modelOptions: { provider: { requireParameters: true }, ...(this.#reasoningEffort ? { reasoning: { effort: this.#reasoningEffort } } : {}) },
+                request: { signal: combined }, logger: resolveDebugOption(false),
+              },
+            });
+            data = result.data;
           } catch {
             if (combined.aborted) throw new APIUserAbortError();
-            throw new ProviderRequestError("OpenRouter", "APIConnectionError", {});
+            // SDK parser errors may embed output text. Never let their messages/causes escape.
+            if (boundaryError) throw boundaryError;
+            throw new ProviderRequestError("OpenRouter", "APIResponseValidationError", {});
           }
-          let json: unknown;
-          try { json = JSON.parse(text); } catch {
-            if (wire.ok) throw new Error(OPENROUTER_ERRORS.invalidJson);
-          }
-          if (!wire.ok) throw APIError.generate(wire.status, json && typeof json === "object" ? json : undefined, "", wire.headers);
-          const envelope = ChatResponseSchema.safeParse(json);
-          if (!envelope.success) throw new Error(OPENROUTER_ERRORS.noContent);
-          const raw = envelope.data;
-          raw._request_id = wire.headers.get("x-request-id");
-          return raw;
-        }, projectChat);
-        validateCompletion(response);
-        return new Response(JSON.stringify(response), { headers: { "content-type": "application/json" } });
-      } catch (error) {
-        boundaryError = combined.aborted ? new APIUserAbortError() : error;
-        throw boundaryError;
-      }
-    } });
-    // OPENROUTER_MODEL intentionally accepts newly published / :free IDs outside the SDK catalog.
-    // The cast only crosses the SDK's catalog type; it does not claim runtime capabilities.
-    const adapter = createOpenRouterText(this.#model as Parameters<typeof createOpenRouterText>[0], this.#apiKey, {
-      serverURL: OPENROUTER_BASE_URL, appTitle: "Career Radar", httpClient,
-      retryConfig: { strategy: "none" }, debugLogger: { group() {}, groupEnd() {}, log() {} },
-    });
-    let data: unknown;
-    try {
-      const result = await adapter.structuredOutput({
-        outputSchema: zodResponseFormat(schema, OUTPUT_NAMES[operation]).json_schema.schema as JSONSchema,
-        chatOptions: {
-          model: this.#model, systemPrompts: [instructions], messages: [{ role: "user", content: input }],
-          modelOptions: { provider: { requireParameters: true }, ...(this.#reasoningEffort ? { reasoning: { effort: this.#reasoningEffort } } : {}) },
-          request: { signal: combined }, logger: resolveDebugOption(false),
-        },
-      });
-      data = result.data;
-    } catch {
-      if (combined.aborted) throw new APIUserAbortError();
-      // SDK parser errors may embed output text. Never let their messages/causes escape.
-      if (boundaryError) throw boundaryError;
-      throw new ProviderRequestError("OpenRouter", "APIResponseValidationError", {});
-    } finally { clearTimeout(timer); }
-    if (!response) throw new Error(OPENROUTER_ERRORS.noContent);
-    const parsed = schema.safeParse(data);
-    if (!parsed.success) throw new Error(OPENROUTER_ERRORS.schemaMismatch);
-    return { draft: parsed.data as z.infer<S>, response };
+          if (!response) throw new Error(OPENROUTER_ERRORS.noContent);
+          const parsed = schema.safeParse(data);
+          if (!parsed.success) throw new Error(OPENROUTER_ERRORS.schemaMismatch);
+          return { draft: parsed.data as z.infer<S>, response };
+        } finally { clearTimeout(timer); }
+    }, (result) => projectChat(result.response));
   }
 
   // "openrouter/<model>@<upstream provider>": which endpoint actually produced the draft.

@@ -4,6 +4,9 @@ import { APIUserAbortError } from "openai/error";
 import { PROMPT_VERSION, type AnalyzerResponseEvent } from "../src/ai/analyzer.js";
 import { OPENROUTER_BASE_URL, OPENROUTER_ERRORS, OpenRouterCareerAnalyzer } from "../src/ai/openrouter.js";
 import { syntheticJob, syntheticProfile } from "./fixtures.js";
+import { classifyFailure } from "../src/ai/failure-class.js";
+import * as tanstack from "@tanstack/ai-openrouter";
+vi.mock("@tanstack/ai-openrouter", { spy: true });
 
 // Real TanStack/OpenRouter SDK against a stubbed global fetch: request shape, headers and every fail-closed path
 // are exercised without any network. No OpenRouter call is made.
@@ -111,9 +114,12 @@ describe("OpenRouterCareerAnalyzer (real SDK, stubbed fetch, no network)", () =>
   ])("fails closed on %s with a fixed message that never echoes the content", async (_name, reply, message) => {
     stubFetch(reply);
     let caught = "";
-    try { await analyzer().assess(syntheticProfile, syntheticJob); } catch (error) { caught = (error as Error).message; }
+    const events: AnalyzerResponseEvent[] = [];
+    try { await analyzer({ onResponse: (event) => events.push(event) }).assess(syntheticProfile, syntheticJob); } catch (error) { caught = (error as Error).message; }
     expect(caught).toBe(message);
     expect(caught).not.toContain("SECRET");
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ outcome: "error" });
   });
 
   it("reports chat usage counters through the telemetry hook and disables SDK retries for batch calls", async () => {
@@ -212,9 +218,35 @@ describe("OpenRouterCareerAnalyzer (real SDK, stubbed fetch, no network)", () =>
 
   it("sanitizes SDK envelope-validation failures and raw fetch errors", async () => {
     stubFetch(() => completion(profileDraft, { created: "SECRET-BAD-ENVELOPE" }));
-    await expect(analyzer().extractProfile("Synthetic resume.")).rejects.toThrow("OpenRouter request failed");
+    await expect(analyzer().extractProfile("Synthetic resume.")).rejects.toThrow(OPENROUTER_ERRORS.schemaMismatch);
     vi.stubGlobal("fetch", vi.fn(() => { throw new Error("SECRET-NETWORK-ERROR"); }));
     await expect(analyzer().extractProfile("Synthetic resume.")).rejects.toThrow("OpenRouter request failed");
+  });
+
+  it.each(["id", "object", "created", "model", "system_fingerprint", "index", "role"])("rejects missing SDK field %s with one schema failure event", async (field) => {
+    stubFetch(() => completion(profileDraft,
+      ["index", "role"].includes(field) ? {} : { [field]: undefined },
+      field === "index" ? { index: undefined } : field === "role" ? { message: { content: JSON.stringify(profileDraft) } } : {}));
+    const events: AnalyzerResponseEvent[] = [];
+    const error = await analyzer({ onResponse: (event) => events.push(event) }).extractProfile("Synthetic resume.").catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(classifyFailure(error, events[0])).toBe("schema_failure");
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ outcome: "error", error: { name: "Error" } });
+  });
+
+  it("records an SDK preparation failure before fetch exactly once", async () => {
+    stubFetch(() => completion(profileDraft));
+    // Inject a preparation failure: this proves our observer's boundary, not a live SDK defect.
+    const events: AnalyzerResponseEvent[] = [];
+    const factory = vi.mocked(tanstack.createOpenRouterText).mockImplementationOnce(() => { throw new Error("SECRET-PREPARATION"); });
+    try {
+      await expect(analyzer({ onResponse: (event) => events.push(event) }).extractProfile("Synthetic resume.")).rejects.toThrow("OpenRouter request failed");
+    } finally { factory.mockRestore(); }
+    expect(requests).toHaveLength(0);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ outcome: "error" });
+    expect(JSON.stringify(events)).not.toContain("SECRET-PREPARATION");
   });
 
   it.each(["deadline", "caller"])("aborts a slow response body with %s cancellation (real fetch to loopback only)", async (mode) => {

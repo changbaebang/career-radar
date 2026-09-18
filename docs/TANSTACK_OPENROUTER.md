@@ -34,12 +34,28 @@ Radar still validates the returned data with its existing Zod generation contrac
 TanStack names schemas `structured_output` instead of operation-specific names.
 Instructions/input and the strict schema content remain application-owned.
 
-## Boundaries we cannot remove yet
+## Upstream findings and boundaries we cannot remove yet
 
 In the installed non-streaming adapter source, `structuredOutput` returns data,
 rawText and usage, but not response model, upstream provider, request ID or finish
 reason. It also does not reject a valid JSON payload solely because its finish is
 `length`/`error`, and its parse error can contain raw model text.
+
+Source/version pointers for potential upstream reports:
+- Stream preference: `@tanstack/ai@0.46.0/src/activities/chat/index.ts`.
+- Missing metadata, finish validation and raw parse-error text:
+  `@tanstack/ai-openrouter@0.18.0/src/adapters/text.ts`.
+- Required envelope fields: `@openrouter/sdk@0.13.20/esm/models/chatresult.js`
+  and its choice/message schemas require id, object, created, model,
+  system_fingerprint (nullable but present), choice index and message role.
+  Missing fields were reproduced with synthetic responses. Whether live responses
+  omit them remains unverified; this is an issue candidate, not a proven provider bug.
+
+The boundary now checks the SDK's exported inbound schema before handing it the
+response. Missing required fields fail as schema failures, not provider errors.
+One outer observation covers SDK preparation, completion checks, SDK parsing and
+generation-contract validation. Rejected calls emit one error event while retaining
+available response counters; failure before fetch also emits one event.
 
 Therefore a request-local HTTPClient boundary remains:
 
@@ -69,7 +85,8 @@ model-mode **dry run**. None proves live quality, provider routing support, late
 or ChatGPT-host rendering. A future approved three-case run is separate work.
 
 Verified on this branch: typecheck/lint/build passed; shared 7 + server 461 = 468
-tests passed. Policy evaluation passed 35/35 (M5-0: 28 compared, 7 added, no
+tests passed initially; review follow-up adds 8 tests (shared 7 + server 469 = 476).
+Policy evaluation passed 35/35 (M5-0: 28 compared, 7 added, no
 regressions). Retrieval remained field 47/55 and 49/55, sentence 46/60 and 51/60.
 The fake model-mode dry run assessed 33 cases in 99 simulated calls; this is runner
 coverage, not provider validation. Frozen-lockfile installation also passed.
