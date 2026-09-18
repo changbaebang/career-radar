@@ -9,6 +9,7 @@ export type FailureClass = "schema_failure" | "refusal" | "truncation" | "timeou
 export function classifyFailure(error: unknown, lastEvent?: Partial<AnalyzerResponseEvent>): FailureClass {
   const name = error instanceof Error ? error.name : "";
   const message = error instanceof Error ? error.message : "";
+  if (message === OPENROUTER_ERRORS.envelopeMismatch) return "provider_error";
   if (name === "AbortError" || name === "APIUserAbortError" || /timed? ?out/i.test(name)) return "timeout";
   if (message === OPENROUTER_ERRORS.truncated || lastEvent?.incompleteReason === "max_output_tokens") return "truncation";
   if (message === OPENROUTER_ERRORS.refused || /refus/i.test(name)) return "refusal";

@@ -34,6 +34,7 @@ export const OPENROUTER_ERRORS = {
   finishError: "OpenRouter's upstream endpoint reported an error finish (no completed output).",
   invalidJson: "OpenRouter returned content that is not valid JSON.",
   schemaMismatch: "OpenRouter returned JSON that does not match the requested schema; the routed endpoint may not enforce structured outputs.",
+  envelopeMismatch: "OpenRouter returned a response envelope incompatible with the SDK transport contract.",
 } as const;
 
 const ChatResponseSchema = z.object({
@@ -126,13 +127,13 @@ export class OpenRouterCareerAnalyzer implements CareerAnalyzer {
                 }
                 if (!wire.ok) throw APIError.generate(wire.status, json && typeof json === "object" ? json : undefined, "", wire.headers);
                 const envelope = ChatResponseSchema.safeParse(json);
-                if (!envelope.success) throw new Error(OPENROUTER_ERRORS.noContent);
+                if (!envelope.success) throw new Error(OPENROUTER_ERRORS.envelopeMismatch);
                 const raw = envelope.data;
                 raw._request_id = wire.headers.get("x-request-id");
                 return raw;
               })();
               validateCompletion(response);
-              if (!ChatResult$inboundSchema.safeParse(response).success) throw new Error(OPENROUTER_ERRORS.schemaMismatch);
+              if (!ChatResult$inboundSchema.safeParse(response).success) throw new Error(OPENROUTER_ERRORS.envelopeMismatch);
               return new Response(JSON.stringify(response), { headers: { "content-type": "application/json" } });
             } catch (error) {
               boundaryError = combined.aborted ? new APIUserAbortError() : error;

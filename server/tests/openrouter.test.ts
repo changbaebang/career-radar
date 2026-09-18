@@ -218,19 +218,20 @@ describe("OpenRouterCareerAnalyzer (real SDK, stubbed fetch, no network)", () =>
 
   it("sanitizes SDK envelope-validation failures and raw fetch errors", async () => {
     stubFetch(() => completion(profileDraft, { created: "SECRET-BAD-ENVELOPE" }));
-    await expect(analyzer().extractProfile("Synthetic resume.")).rejects.toThrow(OPENROUTER_ERRORS.schemaMismatch);
+    await expect(analyzer().extractProfile("Synthetic resume.")).rejects.toThrow(OPENROUTER_ERRORS.envelopeMismatch);
     vi.stubGlobal("fetch", vi.fn(() => { throw new Error("SECRET-NETWORK-ERROR"); }));
     await expect(analyzer().extractProfile("Synthetic resume.")).rejects.toThrow("OpenRouter request failed");
   });
 
-  it.each(["id", "object", "created", "model", "system_fingerprint", "index", "role"])("rejects missing SDK field %s with one schema failure event", async (field) => {
+  it.each(["id", "object", "created", "model", "system_fingerprint", "index", "role"])("rejects missing SDK field %s as a provider error with one event", async (field) => {
     stubFetch(() => completion(profileDraft,
       ["index", "role"].includes(field) ? {} : { [field]: undefined },
       field === "index" ? { index: undefined } : field === "role" ? { message: { content: JSON.stringify(profileDraft) } } : {}));
     const events: AnalyzerResponseEvent[] = [];
     const error = await analyzer({ onResponse: (event) => events.push(event) }).extractProfile("Synthetic resume.").catch((error: unknown) => error);
     expect(error).toBeInstanceOf(Error);
-    expect(classifyFailure(error, events[0])).toBe("schema_failure");
+    expect(error).toMatchObject({ message: OPENROUTER_ERRORS.envelopeMismatch });
+    expect(classifyFailure(error, events[0])).toBe("provider_error");
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ outcome: "error", error: { name: "Error" } });
   });
@@ -247,6 +248,20 @@ describe("OpenRouterCareerAnalyzer (real SDK, stubbed fetch, no network)", () =>
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ outcome: "error" });
     expect(JSON.stringify(events)).not.toContain("SECRET-PREPARATION");
+  });
+
+  it.each([
+    ["envelope", () => completion(profileDraft, { choices: "SECRET-WRONG-TYPE" }), OPENROUTER_ERRORS.envelopeMismatch, "provider_error"],
+    ["model output", () => completion({ headline: 42 }), OPENROUTER_ERRORS.schemaMismatch, "schema_failure"],
+  ])("keeps %s contract failures distinct without exposing content", async (_kind, reply, message, classification) => {
+    stubFetch(reply);
+    const events: AnalyzerResponseEvent[] = [];
+    const error = await analyzer({ onResponse: (event) => events.push(event) }).extractProfile("Synthetic resume.").catch((error: unknown) => error);
+    expect(error).toMatchObject({ message });
+    expect(classifyFailure(error, events[0])).toBe(classification);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ outcome: "error" });
+    expect(JSON.stringify(events)).not.toContain("SECRET");
   });
 
   it.each(["deadline", "caller"])("aborts a slow response body with %s cancellation (real fetch to loopback only)", async (mode) => {

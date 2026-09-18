@@ -52,7 +52,9 @@ Source/version pointers for potential upstream reports:
   omit them remains unverified; this is an issue candidate, not a proven provider bug.
 
 The boundary now checks the SDK's exported inbound schema before handing it the
-response. Missing required fields fail as schema failures, not provider errors.
+response. Envelope failures use a fixed envelopeMismatch message and provider_error
+classification, separately from model-output schema failures. This classification
+identifies the transport-contract boundary, not fault attribution to a specific party.
 One outer observation covers SDK preparation, completion checks, SDK parsing and
 generation-contract validation. Rejected calls emit one error event while retaining
 available response counters; failure before fetch also emits one event.
@@ -86,6 +88,7 @@ or ChatGPT-host rendering. A future approved three-case run is separate work.
 
 Verified on this branch: typecheck/lint/build passed; shared 7 + server 461 = 468
 tests passed initially; review follow-up adds 8 tests (shared 7 + server 469 = 476).
+Envelope/model failure classification follow-up adds 2 controls (7 + 471 = 478).
 Policy evaluation passed 35/35 (M5-0: 28 compared, 7 added, no
 regressions). Retrieval remained field 47/55 and 49/55, sentence 46/60 and 51/60.
 The fake model-mode dry run assessed 33 cases in 99 simulated calls; this is runner
