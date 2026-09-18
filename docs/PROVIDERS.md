@@ -40,9 +40,10 @@ usage and quality measured on one provider do not verify another.
 - **No `store` parameter exists on this endpoint.** The OpenAI adapter sends `store: false`; the
   OpenRouter request has no equivalent, so the live report records `store: "n/a"`. Retention follows
   your OpenRouter provider-routing and data settings, not this request.
-- **Retries and logging** follow the same transport options as the OpenAI adapter: batch calls send
-  `maxRetries: 0`, and the live harness and the usage check pin retries and SDK logging off for every
-  request; the usage check also bounds each request at 5 minutes. A `finish_reason` of `error` from the
+- **Retries and logging:** the TanStack-backed OpenRouter path pins retries and both SDK loggers
+  off for every entry point, even if `transport.maxRetries` / `logLevel` ask otherwise. The OpenAI
+  path is unchanged. OpenRouter's `transport.timeout` now covers headers **and body** through an
+  AbortSignal (default 10 minutes; callers such as usage-check specify 5 minutes). A `finish_reason` of `error` from the
   upstream endpoint is reported as its own fixed message, distinct from truncation.
 - **Free is not private.** The resume text and the public job descriptions leave the machine on
   either provider. OpenRouter forwards them to the upstream provider that serves the chosen model;
@@ -61,6 +62,10 @@ usage and quality measured on one provider do not verify another.
   computed; confirm it in the OpenRouter dashboard.
 
 ## What this does not establish
+
+The TanStack replacement is a synthetic-verified integration experiment, not a live model or
+ChatGPT-host verification. See [the migration notes](TANSTACK_OPENROUTER.md) for the pinned versions,
+non-streaming adapter entry point and the safety/metadata boundary that remains application code.
 
 Nothing here claims model quality. The adapter is verified with the real SDK and a stubbed fetch:
 request shape, header and routing flags, mapping of a valid draft, and every fail-closed path. A
