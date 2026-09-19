@@ -84,7 +84,16 @@ and slow-body deadline/caller cancellation via real fetch to a loopback server.
 
 Run typecheck, lint, build, all tests, policy baseline comparison, retrieval eval and
 model-mode **dry run**. None proves live quality, provider routing support, latency,
-or ChatGPT-host rendering. A future approved three-case run is separate work.
+or ChatGPT-host rendering.
+
+Approved three-case live run (2026-09-19, after merge-candidate `a6be784`, one-day key,
+`pnpm eval --mode model --limit 3 --approve-transmission`, `dots-studio/dots-3-note-preview:free`,
+upstream AtlasCloud): 9/9 calls ok; envelopeMismatch 0, so real envelopes on that route satisfy
+the SDK inbound schema; schema/refusal/truncation/timeout 0; telemetry projected response model,
+upstream provider and usage (4,134 in / 20,446 out, 17,675 reasoning). All three assessed with
+the same final verdicts as the m5-d baseline cases; citation validity was 1/10 against 10/17 for
+the same cases in m5-d, which three cases cannot attribute to nondeterminism or to the wire
+change. The report was not committed. A full 33-case run remains separate work.
 
 Verified on this branch: typecheck/lint/build passed; shared 7 + server 461 = 468
 tests passed initially; review follow-up adds 8 tests (shared 7 + server 469 = 476).

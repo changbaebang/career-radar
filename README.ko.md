@@ -188,11 +188,16 @@ ChatGPT에서 도구 정보를 새로고침해야 합니다. 이 단계는 API �
 
 프롬프트와 출력 계약은 제공자에 독립적입니다. 기본 OpenAI Responses API 외에
 `CAREER_RADAR_PROVIDER=openrouter`로 같은 세 작업을 OpenRouter Chat Completions 엔드포인트에
-strict JSON 스키마 출력과 `require_parameters` 라우팅으로 보낼 수 있습니다. 어댑터는 모든 응답을
-다시 검증하고 거절·잘림·스키마 불일치는 고정 문구로 실패합니다. `modelVersion`에
-`openrouter/<모델>@<상위 제공자>`를 기록하므로 그 결과는 해당 엔드포인트만 증명합니다.
-`pnpm measure:live --provider openrouter`는 같은 승인 절차 뒤에 그 경로를 측정합니다. 이번
-작업에서 실제 제공자를 호출하지는 않았습니다. [상세](docs/PROVIDERS.md).
+strict JSON 스키마 출력과 `require_parameters` 라우팅으로 보낼 수 있습니다. OpenRouter 요청은
+[TanStack AI](https://github.com/TanStack/ai)의 공식 어댑터(`@tanstack/ai-openrouter`, 비스트리밍
+`structuredOutput`)가 보냅니다. 요청별 HTTP 클라이언트 경계는 그대로 두어 응답 모델·상위
+제공자·요청 ID를 기록하고, finish 사유와 SDK의 인바운드 봉투 스키마를 검사하고, 모든 응답을
+애플리케이션 Zod 계약으로 다시 검증하며, 거절·잘림·봉투 불일치·스키마 불일치는 고정 문구로
+실패합니다. `modelVersion`에 `openrouter/<모델>@<상위 제공자>`를 기록하므로 그 결과는 해당
+엔드포인트만 증명합니다. `pnpm measure:live --provider openrouter`는 같은 승인 절차 뒤에 그
+경로를 측정합니다. 승인된 라이브 3건(무료 모델)은 호출 9/9가 통과했고 봉투 불일치는 없었습니다.
+3건은 품질에 대해 아무것도 말하지 않습니다. [모델 제공자](docs/PROVIDERS.md) ·
+[TanStack 통합 메모](docs/TANSTACK_OPENROUTER.md).
 
 ### 사용 확인 — 1차 완료
 
