@@ -165,9 +165,12 @@ describe("Career Radar HTTP and MCP server", () => {
 
   it("never forwards a provider's HTTP error body through the OpenRouter adapter into an MCP result", async () => {
     const realFetch = globalThis.fetch;
-    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => String(input).startsWith(OPENROUTER_BASE_URL)
-      ? new Response('{"error":{"message":"SECRET-PROVIDER-BODY","code":"bad_request"}}', { status: 400, headers: { "content-type": "application/json" } })
-      : realFetch(input, init)));
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      if (url.href.startsWith(OPENROUTER_BASE_URL)) return new Response('{"error":{"message":"SECRET-PROVIDER-BODY","code":"bad_request"}}', { status: 400, headers: { "content-type": "application/json" } });
+      if (url.hostname !== "127.0.0.1" && url.hostname !== "localhost") throw new Error("Unexpected external test request");
+      return realFetch(input, init);
+    }));
     try {
       const createAnalyzer = () => new OpenRouterCareerAnalyzer({ apiKey: "synthetic-not-a-real-key", model: "synthetic/free-model", transport: { maxRetries: 0, logLevel: "off" } });
       const client = await connectClient(await startTestServer({ store: new CareerStore(), createAnalyzer }));

@@ -1,23 +1,29 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createServer } from "node:http";
+import { APIUserAbortError } from "openai/error";
 import { PROMPT_VERSION, type AnalyzerResponseEvent } from "../src/ai/analyzer.js";
 import { OPENROUTER_BASE_URL, OPENROUTER_ERRORS, OpenRouterCareerAnalyzer } from "../src/ai/openrouter.js";
 import { syntheticJob, syntheticProfile } from "./fixtures.js";
+import { classifyFailure } from "../src/ai/failure-class.js";
+import * as tanstack from "@tanstack/ai-openrouter";
+vi.mock("@tanstack/ai-openrouter", { spy: true });
 
-// Real OpenAI SDK against a stubbed global fetch: request shape, headers and every fail-closed path
+// Real TanStack/OpenRouter SDK against a stubbed global fetch: request shape, headers and every fail-closed path
 // are exercised without any network. No OpenRouter call is made.
 type Captured = { url: string; headers: Headers; body: Record<string, unknown> };
 const requests: Captured[] = [];
 function stubFetch(reply: (request: Captured) => Response) {
   requests.length = 0;
   vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-    const captured: Captured = { url: String(input), headers: new Headers(init?.headers as HeadersInit), body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown> };
+    const request = input instanceof Request ? input : new Request(input, init);
+    const captured: Captured = { url: request.url, headers: request.headers, body: JSON.parse(await request.text()) as Record<string, unknown> };
     requests.push(captured);
     return reply(captured);
   }));
 }
 function completion(content: unknown, overrides: Record<string, unknown> = {}, choice: Record<string, unknown> = {}) {
   return new Response(JSON.stringify({
-    id: "gen-synthetic", object: "chat.completion", model: "synthetic/free-model", provider: "SyntheticUpstream",
+    id: "gen-synthetic", object: "chat.completion", created: 0, system_fingerprint: null, model: "synthetic/free-model", provider: "SyntheticUpstream",
     choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content: typeof content === "string" ? content : JSON.stringify(content) }, ...choice }],
     usage: { prompt_tokens: 12, completion_tokens: 7, total_tokens: 19, prompt_tokens_details: { cached_tokens: 3 }, completion_tokens_details: { reasoning_tokens: 2 } },
     ...overrides,
@@ -61,10 +67,11 @@ describe("OpenRouterCareerAnalyzer (real SDK, stubbed fetch, no network)", () =>
     expect(headers.get("x-openrouter-title")).toBe("Career Radar");
     expect(body.model).toBe("synthetic/free-model");
     expect(body.provider).toEqual({ require_parameters: true });
+    expect(body.stream).toBe(false);
     expect(body).not.toHaveProperty("store");
     const format = body.response_format as { type: string; json_schema: { name: string; strict: boolean; schema: unknown } };
     expect(format.type).toBe("json_schema");
-    expect(format.json_schema).toMatchObject({ name: "fit_assessment", strict: true });
+    expect(format.json_schema).toMatchObject({ name: "structured_output", strict: true });
     expect(JSON.stringify(format.json_schema.schema)).toContain("screeningContext");
     const messages = body.messages as Array<{ role: string; content: string }>;
     expect(messages[0]!.role).toBe("system");
@@ -89,7 +96,7 @@ describe("OpenRouterCareerAnalyzer (real SDK, stubbed fetch, no network)", () =>
     expect(profile.roles[0]).not.toHaveProperty("start");
     expect(warnings).toEqual(["synthetic"]);
     expect((requests[0]!.body.messages as Array<{ content: string }>)[0]!.content).toContain("Extract only facts explicitly present in the resume.");
-    expect((requests[0]!.body.response_format as { json_schema: { name: string } }).json_schema.name).toBe("candidate_profile");
+    expect((requests[0]!.body.response_format as { json_schema: { name: string } }).json_schema.name).toBe("structured_output");
     stubFetch(() => completion(jobDraft));
     const { job } = await analyzer().extractJob("Synthetic job description.");
     expect(job.required[0]!.id).toBe(`${job.id}_required_1`);
@@ -107,9 +114,12 @@ describe("OpenRouterCareerAnalyzer (real SDK, stubbed fetch, no network)", () =>
   ])("fails closed on %s with a fixed message that never echoes the content", async (_name, reply, message) => {
     stubFetch(reply);
     let caught = "";
-    try { await analyzer().assess(syntheticProfile, syntheticJob); } catch (error) { caught = (error as Error).message; }
+    const events: AnalyzerResponseEvent[] = [];
+    try { await analyzer({ onResponse: (event) => events.push(event) }).assess(syntheticProfile, syntheticJob); } catch (error) { caught = (error as Error).message; }
     expect(caught).toBe(message);
     expect(caught).not.toContain("SECRET");
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ outcome: "error" });
   });
 
   it("reports chat usage counters through the telemetry hook and disables SDK retries for batch calls", async () => {
@@ -173,5 +183,112 @@ describe("OpenRouterCareerAnalyzer (real SDK, stubbed fetch, no network)", () =>
     expect(() => new OpenRouterCareerAnalyzer({ apiKey: key })).toThrow(OPENROUTER_ERRORS.missingModel);
     vi.stubEnv("OPENROUTER_API_KEY", key); vi.stubEnv("OPENROUTER_MODEL", "synthetic/free-model");
     expect(() => new OpenRouterCareerAnalyzer()).not.toThrow();
+  });
+
+  it("pins the destination, silences both SDK loggers and disables retries even when env/options ask otherwise", async () => {
+    vi.stubEnv("OPENAI_BASE_URL", "https://unrelated.invalid");
+    vi.stubEnv("OPENAI_LOG", "debug");
+    const logs = ["log", "debug", "info", "warn", "error"].map((method) => vi.spyOn(console, method as "log").mockImplementation(() => {}));
+    try {
+      stubFetch(() => new Response('{"error":{"message":"SECRET-SENTINEL"}}', { status: 500 }));
+      await expect(analyzer({ transport: { maxRetries: 3, logLevel: "debug" } }).extractJob("Synthetic JD.")).rejects.toThrow("OpenRouter request failed");
+      expect(requests).toHaveLength(1);
+      expect(requests[0]!.url).toBe(`${OPENROUTER_BASE_URL}/chat/completions`);
+      expect(logs.flatMap((log) => log.mock.calls)).toEqual([]);
+    } finally { logs.forEach((log) => log.mockRestore()); }
+  });
+
+  it("keeps concurrent call metadata isolated on one shared analyzer", async () => {
+    const events: AnalyzerResponseEvent[] = [];
+    stubFetch((request) => completion(assessmentDraft, { model: JSON.stringify(request.body).includes("CONCURRENT-A") ? "model-a" : "model-b", provider: "Endpoint" }));
+    const shared = analyzer({ onResponse: (event) => events.push(event) });
+    const [a, b] = await Promise.all([
+      shared.assess({ ...syntheticProfile, headline: "CONCURRENT-A" }, syntheticJob),
+      shared.assess({ ...syntheticProfile, headline: "CONCURRENT-B" }, syntheticJob),
+    ]);
+    expect(a.modelVersion).toBe("openrouter/model-a@Endpoint");
+    expect(b.modelVersion).toBe("openrouter/model-b@Endpoint");
+    expect(events.map((event) => event.responseModel).sort()).toEqual(["model-a", "model-b"]);
+  });
+
+  it.each(["length", "error", "content_filter"])("rejects even valid JSON when the finish is %s", async (finish_reason) => {
+    stubFetch(() => completion(assessmentDraft, {}, { finish_reason }));
+    await expect(analyzer().assess(syntheticProfile, syntheticJob)).rejects.toThrow(finish_reason === "error" ? OPENROUTER_ERRORS.finishError : OPENROUTER_ERRORS.truncated);
+  });
+
+  it("sanitizes SDK envelope-validation failures and raw fetch errors", async () => {
+    stubFetch(() => completion(profileDraft, { created: "SECRET-BAD-ENVELOPE" }));
+    await expect(analyzer().extractProfile("Synthetic resume.")).rejects.toThrow(OPENROUTER_ERRORS.envelopeMismatch);
+    vi.stubGlobal("fetch", vi.fn(() => { throw new Error("SECRET-NETWORK-ERROR"); }));
+    await expect(analyzer().extractProfile("Synthetic resume.")).rejects.toThrow("OpenRouter request failed");
+  });
+
+  it.each(["id", "object", "created", "model", "system_fingerprint", "index", "role"])("rejects missing SDK field %s as a provider error with one event", async (field) => {
+    stubFetch(() => completion(profileDraft,
+      ["index", "role"].includes(field) ? {} : { [field]: undefined },
+      field === "index" ? { index: undefined } : field === "role" ? { message: { content: JSON.stringify(profileDraft) } } : {}));
+    const events: AnalyzerResponseEvent[] = [];
+    const error = await analyzer({ onResponse: (event) => events.push(event) }).extractProfile("Synthetic resume.").catch((error: unknown) => error);
+    expect(error).toBeInstanceOf(Error);
+    expect(error).toMatchObject({ message: OPENROUTER_ERRORS.envelopeMismatch });
+    expect(classifyFailure(error, events[0])).toBe("provider_error");
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ outcome: "error", error: { name: "Error" } });
+  });
+
+  it("records an SDK preparation failure before fetch exactly once", async () => {
+    stubFetch(() => completion(profileDraft));
+    // Inject a preparation failure: this proves our observer's boundary, not a live SDK defect.
+    const events: AnalyzerResponseEvent[] = [];
+    const factory = vi.mocked(tanstack.createOpenRouterText).mockImplementationOnce(() => { throw new Error("SECRET-PREPARATION"); });
+    try {
+      await expect(analyzer({ onResponse: (event) => events.push(event) }).extractProfile("Synthetic resume.")).rejects.toThrow("OpenRouter request failed");
+    } finally { factory.mockRestore(); }
+    expect(requests).toHaveLength(0);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ outcome: "error" });
+    expect(JSON.stringify(events)).not.toContain("SECRET-PREPARATION");
+  });
+
+  it.each([
+    ["envelope", () => completion(profileDraft, { choices: "SECRET-WRONG-TYPE" }), OPENROUTER_ERRORS.envelopeMismatch, "provider_error"],
+    ["model output", () => completion({ headline: 42 }), OPENROUTER_ERRORS.schemaMismatch, "schema_failure"],
+  ])("keeps %s contract failures distinct without exposing content", async (_kind, reply, message, classification) => {
+    stubFetch(reply);
+    const events: AnalyzerResponseEvent[] = [];
+    const error = await analyzer({ onResponse: (event) => events.push(event) }).extractProfile("Synthetic resume.").catch((error: unknown) => error);
+    expect(error).toMatchObject({ message });
+    expect(classifyFailure(error, events[0])).toBe(classification);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ outcome: "error" });
+    expect(JSON.stringify(events)).not.toContain("SECRET");
+  });
+
+  it.each(["deadline", "caller"])("aborts a slow response body with %s cancellation (real fetch to loopback only)", async (mode) => {
+    const realFetch = globalThis.fetch;
+    let received = 0;
+    const server = createServer((_req, res) => {
+      received += 1;
+      res.writeHead(200, { "content-type": "application/json" });
+      res.write('{"id":');
+      const timer = setTimeout(() => res.end('"late"}'), 500);
+      res.on("close", () => clearTimeout(timer));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Expected TCP address");
+    vi.stubGlobal("fetch", (request: Request, init?: RequestInit) => realFetch(`http://127.0.0.1:${address.port}`, { method: request.method, headers: request.headers, body: request.body, duplex: "half", signal: init?.signal } as RequestInit));
+    const controller = new AbortController();
+    const timer = mode === "caller" ? setTimeout(() => controller.abort(), 80) : undefined;
+    try {
+      const start = performance.now();
+      await expect(analyzer({ transport: { timeout: mode === "deadline" ? 80 : 2000 } }).extractProfile("Synthetic resume.", undefined, controller.signal)).rejects.toBeInstanceOf(APIUserAbortError);
+      expect(performance.now() - start).toBeLessThan(450);
+      expect(received).toBe(1);
+    } finally {
+      clearTimeout(timer);
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });

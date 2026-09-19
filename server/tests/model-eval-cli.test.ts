@@ -156,8 +156,9 @@ describe("runModelEvalCli live gate in process (fetch stubbed: zero real HTTP)",
 
   it("lets a ':free' model through and sends that model to the OpenRouter endpoint (stubbed transport)", async () => {
     const seen: { url: string; model: string }[] = [];
-    vi.stubGlobal("fetch", vi.fn(async (url: unknown, init?: { body?: unknown }) => {
-      seen.push({ url: String(url), model: JSON.parse(String(init?.body)).model });
+    vi.stubGlobal("fetch", vi.fn(async (url: string | URL | Request, init?: RequestInit) => {
+      const request = url instanceof Request ? url : new Request(url, init);
+      seen.push({ url: request.url, model: JSON.parse(await request.text()).model });
       return new Response(JSON.stringify({ id: "x", model: "synthetic/free-model:free", provider: "Synthetic", choices: [{ finish_reason: "length", message: { content: "" } }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }), { status: 200, headers: { "content-type": "application/json" } });
     }));
     vi.stubEnv("OPENROUTER_API_KEY", "synthetic-not-a-real-key"); vi.stubEnv("OPENROUTER_MODEL", "synthetic/free-model:free");
