@@ -63,9 +63,11 @@ usage and quality measured on one provider do not verify another.
 
 ## What this does not establish
 
-The TanStack replacement is a synthetic-verified integration experiment, not a live model or
-ChatGPT-host verification. See [the migration notes](TANSTACK_OPENROUTER.md) for the pinned versions,
-non-streaming adapter entry point and the safety/metadata boundary that remains application code.
+The TanStack replacement is an integration experiment verified with synthetic fixtures plus one
+approved three-case live run on a free model (9/9 calls ok, no envelope mismatch); it is not a
+model-quality or ChatGPT-host verification. See [the migration notes](TANSTACK_OPENROUTER.md) for
+the pinned versions, non-streaming adapter entry point, the live-run record and the
+safety/metadata boundary that remains application code.
 
 Nothing here claims model quality. The adapter is verified with the real SDK and a stubbed fetch:
 request shape, header and routing flags, mapping of a valid draft, and every fail-closed path. A

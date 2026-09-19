@@ -14,7 +14,7 @@ ChatGPT (MCP client)  ──HTTP /mcp──▶  server/  (express + MCP SDK, loo
         ui://career-radar/widget-v7 ◀───┤  web/  React widget (strict parser of tool output)
                                         │
                                         ├─ domain/store        SQLite (node:sqlite, WAL)  data/career-radar.db
-                                        ├─ ai/                 OpenAI (Responses API) | OpenRouter (chat/completions)
+                                        ├─ ai/                 OpenAI (Responses API) | OpenRouter (chat/completions via @tanstack/ai-openrouter + request-local HTTP client boundary)
                                         ├─ domain/evidence     chunkers + BM25 retrieval (deterministic, model-free)
                                         ├─ domain/assessment   M1 policy → citation validator → screening validator
                                         └─ domain/trace        run id, stage records, data/traces/<runId>.json
@@ -91,7 +91,7 @@ What is transmitted, by path and by call:
 | Path | Who receives the inputs | Gate |
 | --- | --- | --- |
 | ChatGPT host → this server | ChatGPT processes the conversation, the tool inputs and the tool results under its own terms before and after the server does; the server then sends the model calls below to the configured provider | The host's own user consent; no CLI flag and no CI refusal on this path (`server/src/index.ts` → `createHttpApp` → `createAnalyzerFromEnv`) |
-| Configured provider (`docs/PROVIDERS.md`) | OpenAI directly, or OpenRouter, which forwards to the upstream endpoint that serves the model (recorded per call as `upstreamProvider`) | Provider choice is explicit, never a silent fallback |
+| Configured provider (`docs/PROVIDERS.md`) | OpenAI directly, or OpenRouter (through the TanStack AI adapter, `docs/TANSTACK_OPENROUTER.md`), which forwards to the upstream endpoint that serves the model (recorded per call as `upstreamProvider`) | Provider choice is explicit, never a silent fallback; the OpenRouter SDK's retries and loggers are pinned off |
 | `pnpm eval --mode model` | Same provider path | `--approve-transmission`; refused under CI/test; hard ceiling of 150 calls; OpenRouter live only with a `:free` model id unless `--approve-model-cost`; `--provider openai` needs the cost flag |
 | `pnpm measure:live` | Same provider path | `--approve-network` (search only) and `--approve-model-cost` plus a typed call cap for model calls; refused under CI/test; hard ceiling of 40 calls; no `:free` check — the configured model runs |
 | `pnpm usage-check` | Same provider path | `--approve-transmission` only: no CI/test refusal and no `:free` check — the configured provider and model run; bounded by at most five postings and a per-call deadline |

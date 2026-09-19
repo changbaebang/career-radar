@@ -186,11 +186,17 @@ implemented in the runner yet, and they and the #4 live measurement run only aft
 
 The prompts and output contracts are provider-neutral. Besides the default OpenAI Responses
 API, `CAREER_RADAR_PROVIDER=openrouter` routes the same three operations through OpenRouter's
-Chat Completions endpoint with strict JSON-schema output and `require_parameters` routing; the
-adapter re-validates every response and fails closed on refusals, truncation or schema
-mismatch. `modelVersion` records `openrouter/<model>@<upstream provider>`, so a result proves only
-that endpoint. `pnpm measure:live --provider openrouter` measures that path after the same
-approval flow. No provider was called for this slice. [Details](docs/PROVIDERS.md).
+Chat Completions endpoint with strict JSON-schema output and `require_parameters` routing. The
+OpenRouter request is made by [TanStack AI](https://github.com/TanStack/ai)'s official adapter
+(`@tanstack/ai-openrouter`, non-streaming `structuredOutput`); a request-local HTTP client
+boundary still records response model, upstream provider and request id, checks the finish
+reason and the SDK's inbound envelope schema, re-validates every response against the
+application's Zod contract, and fails closed with fixed messages on refusals, truncation,
+envelope or schema mismatch. `modelVersion` records `openrouter/<model>@<upstream provider>`,
+so a result proves only that endpoint. `pnpm measure:live --provider openrouter` measures that
+path after the same approval flow. One approved three-case live run on a free model passed
+9/9 calls with no envelope mismatch; three cases say nothing about quality.
+[Providers](docs/PROVIDERS.md) · [TanStack integration notes](docs/TANSTACK_OPENROUTER.md).
 
 ### Usage check (first round done)
 
