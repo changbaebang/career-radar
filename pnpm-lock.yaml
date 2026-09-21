@@ -49,8 +49,8 @@ importers:
         specifier: ^1.12.1
         version: 1.30.0(zod@4.4.3)
       '@openrouter/sdk':
-        specifier: 0.13.20
-        version: 0.13.20
+        specifier: 1.2.54
+        version: 1.2.54
       '@tanstack/ai':
         specifier: 0.46.0
         version: 0.46.0(zod@4.4.3)
@@ -377,6 +377,9 @@ packages:
 
   '@openrouter/sdk@0.13.20':
     resolution: {integrity: sha512-fx4o19FHgadEldfrSOgSbXAi32hCE3O708q1nxcoxYrW6fP6/WggX3o5PmnlnObzmxrqLMkZpqg188K+Twguhg==}
+
+  '@openrouter/sdk@1.2.54':
+    resolution: {integrity: sha512-i3Mj6TaQ9THR/gtzMLcedWR1Hk6oEz7Xnf6g+1wHQL42Gra7LE5jVjiS80/H2cHG1567oWQxSZS9ochFIWiasw==}
 
   '@oxc-project/types@0.144.0':
     resolution: {integrity: sha512-nuhZIOLuI6TFQ32I/WnUx+SCPY7SdSKwgnFHydAuoS1+Z4BRcaP+RRJmGzl9lw+0OFF7UmaESf7KQRXaNLHypg==}
@@ -1780,6 +1783,10 @@ snapshots:
       - supports-color
 
   '@openrouter/sdk@0.13.20':
+    dependencies:
+      zod: 4.4.3
+
+  '@openrouter/sdk@1.2.54':
     dependencies:
       zod: 4.4.3
 
