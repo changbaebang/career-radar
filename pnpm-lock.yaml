@@ -21,14 +21,14 @@ importers:
         specifier: ^8.42.0
         version: 8.67.0(eslint@10.8.1)(typescript@5.9.3)
       zod:
-        specifier: ^4.4.3
-        version: 4.4.3
+        specifier: ^4.5.2
+        version: 4.5.2
 
   packages/shared:
     dependencies:
       zod:
-        specifier: ^4.4.3
-        version: 4.4.3
+        specifier: ^4.5.2
+        version: 4.5.2
     devDependencies:
       typescript:
         specifier: ^5.9.2
@@ -44,19 +44,19 @@ importers:
         version: link:../packages/shared
       '@modelcontextprotocol/ext-apps':
         specifier: ^1.0.1
-        version: 1.7.5(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod@4.4.3)
+        version: 1.7.5(@modelcontextprotocol/sdk@1.30.0(zod@4.5.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod@4.5.2)
       '@modelcontextprotocol/sdk':
         specifier: ^1.12.1
-        version: 1.30.0(zod@4.4.3)
+        version: 1.30.0(zod@4.5.2)
       '@openrouter/sdk':
         specifier: 0.13.20
         version: 0.13.20
       '@tanstack/ai':
-        specifier: 0.46.0
-        version: 0.46.0(zod@4.4.3)
+        specifier: 0.52.0
+        version: 0.52.0(zod@4.5.2)
       '@tanstack/ai-openrouter':
-        specifier: 0.18.0
-        version: 0.18.0(@tanstack/ai@0.46.0(zod@4.4.3))
+        specifier: 0.19.5
+        version: 0.19.5(@tanstack/ai@0.52.0(zod@4.5.2))
       cheerio:
         specifier: 1.2.0
         version: 1.2.0
@@ -67,11 +67,11 @@ importers:
         specifier: 2.5.0
         version: 2.5.0
       openai:
-        specifier: ^7.4.0
-        version: 7.4.0(zod@4.4.3)
+        specifier: ^7.8.0
+        version: 7.8.0(undici@7.29.0)(zod@4.5.2)
       zod:
-        specifier: ^4.4.3
-        version: 4.4.3
+        specifier: ^4.5.2
+        version: 4.5.2
     devDependencies:
       '@types/express':
         specifier: ^5.0.3
@@ -477,19 +477,19 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@tanstack/ai-event-client@0.9.0':
-    resolution: {integrity: sha512-R4jd8Gt6ZGFezteh9nH3E2Zii5b2x6Pv6Y3Gk3MoU8f9vMxCLckm3rohkC6JqYY1zESiS9ZG0mxrkJAZc+p+GA==}
+  '@tanstack/ai-event-client@0.11.2':
+    resolution: {integrity: sha512-SlBC0jzlsjcdwYZqbvd7Wjny7GkGJGOZepHyJShDsfaiFNFUzGSP4SjOwV49YPfKwsFmR8hX67jQtBAmsnZWqQ==}
 
-  '@tanstack/ai-openrouter@0.18.0':
-    resolution: {integrity: sha512-E0EdPRwtUAeCMOCssfi/CRg1rkMVUwNXDp8/iD9K4o8jjPL4kty/97Ah/SxZcSz7/XbeJnLudmWVx+mQf9Z8lQ==}
+  '@tanstack/ai-openrouter@0.19.5':
+    resolution: {integrity: sha512-HiLRrOaAT+qnOBq1Q/cQPKEPWC5zyoO75qAm6siyivTf3OM57MEx/ueeBRKEHy3STP2UBtiOxPvYUT7XXLaPFA==}
     peerDependencies:
-      '@tanstack/ai': ^0.46.0
+      '@tanstack/ai': ^0.52.0
 
   '@tanstack/ai-utils@0.4.0':
     resolution: {integrity: sha512-xqvAgPJkIuGk1m+jZKyb7vBTQIaBmUD9EVzlPkDWWMp80n69uwL0TnBZCVk+OwL9goTQiFy648dnBfLsiJgl6A==}
 
-  '@tanstack/ai@0.46.0':
-    resolution: {integrity: sha512-c0L9MssuCEdVTxNlWQ8R39v1sTqvahDA3OsFfUSWIFwtE39fc3SKY5osOElkPs5/UpwsCvhVmMOHDFA2PrdtzQ==}
+  '@tanstack/ai@0.52.0':
+    resolution: {integrity: sha512-a2a+A+QguzZ3b8D7dqaA94A+CT42WUgxGYfscLrKJ+e2gHuEI8VNFGLq17KFuJI60A481bGpoGZ17fKpJF7q1A==}
     engines: {node: '>=18'}
     peerDependencies:
       '@opentelemetry/api': '>=1.9.0'
@@ -1231,14 +1231,15 @@ packages:
   once@1.4.0:
     resolution: {integrity: sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==}
 
-  openai@7.4.0:
-    resolution: {integrity: sha512-+C9Muit5x8j9R8ej8ZzVgKcrVDtqFqTy9gxFdov0EItLgU68zrJtF9ZeT0cyqJQW9S3PCJkdFgADtRGquRBtew==}
+  openai@7.8.0:
+    resolution: {integrity: sha512-/2g9JzdnXNcjX1W/UlSNu+OdSFDAaAVt0n9Onom0kPenH54o59G2WrX/xjTnr26UHNSh6hxcAf58doGYRme2rw==}
     engines: {node: '>=22.0.0'}
     peerDependencies:
       '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
       '@smithy/hash-node': '>=4.3.0 <5'
       '@smithy/signature-v4': '>=5.4.0 <6'
-      ws: ^8.18.0
+      undici: '>=5 <9'
+      ws: ^8.21.0
       zod: ^3.25 || ^4.0
     peerDependenciesMeta:
       '@aws-sdk/credential-provider-node':
@@ -1246,6 +1247,8 @@ packages:
       '@smithy/hash-node':
         optional: true
       '@smithy/signature-v4':
+        optional: true
+      undici:
         optional: true
       ws:
         optional: true
@@ -1605,14 +1608,14 @@ packages:
     peerDependencies:
       zod: ^3.25.28 || ^4
 
-  zod@4.4.3:
-    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
+  zod@4.5.2:
+    resolution: {integrity: sha512-XkYXCol10+ba/6F/cueWV+TezUeOqXW0hdeJt5CdXjTYeAgAQg5N03RQdJ80mhfFE72+pblvYMW4wy2Qp4Qbrg==}
 
 snapshots:
 
-  '@ag-ui/core@0.1.1-canary.beta.0(zod@4.4.3)':
+  '@ag-ui/core@0.1.1-canary.beta.0(zod@4.5.2)':
     optionalDependencies:
-      zod: 4.4.3
+      zod: 4.5.2
 
   '@esbuild/aix-ppc64@0.28.2':
     optional: true
@@ -1748,16 +1751,16 @@ snapshots:
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
-  '@modelcontextprotocol/ext-apps@1.7.5(@modelcontextprotocol/sdk@1.30.0(zod@4.4.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod@4.4.3)':
+  '@modelcontextprotocol/ext-apps@1.7.5(@modelcontextprotocol/sdk@1.30.0(zod@4.5.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(zod@4.5.2)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.30.0(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.30.0(zod@4.5.2)
       '@standard-schema/spec': 1.1.0
-      zod: 4.4.3
+      zod: 4.5.2
     optionalDependencies:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-  '@modelcontextprotocol/sdk@1.30.0(zod@4.4.3)':
+  '@modelcontextprotocol/sdk@1.30.0(zod@4.5.2)':
     dependencies:
       '@hono/node-server': 2.1.0(hono@4.13.1)
       ajv: 8.20.0
@@ -1774,14 +1777,14 @@ snapshots:
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
       raw-body: 3.0.2
-      zod: 4.4.3
-      zod-to-json-schema: 3.25.2(zod@4.4.3)
+      zod: 4.5.2
+      zod-to-json-schema: 3.25.2(zod@4.5.2)
     transitivePeerDependencies:
       - supports-color
 
   '@openrouter/sdk@0.13.20':
     dependencies:
-      zod: 4.4.3
+      zod: 4.5.2
 
   '@oxc-project/types@0.144.0': {}
 
@@ -1831,23 +1834,23 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@tanstack/ai-event-client@0.9.0':
+  '@tanstack/ai-event-client@0.11.2':
     dependencies:
       '@tanstack/devtools-event-client': 0.4.4
 
-  '@tanstack/ai-openrouter@0.18.0(@tanstack/ai@0.46.0(zod@4.4.3))':
+  '@tanstack/ai-openrouter@0.19.5(@tanstack/ai@0.52.0(zod@4.5.2))':
     dependencies:
       '@openrouter/sdk': 0.13.20
-      '@tanstack/ai': 0.46.0(zod@4.4.3)
+      '@tanstack/ai': 0.52.0(zod@4.5.2)
       '@tanstack/ai-utils': 0.4.0
 
   '@tanstack/ai-utils@0.4.0': {}
 
-  '@tanstack/ai@0.46.0(zod@4.4.3)':
+  '@tanstack/ai@0.52.0(zod@4.5.2)':
     dependencies:
-      '@ag-ui/core': 0.1.1-canary.beta.0(zod@4.4.3)
+      '@ag-ui/core': 0.1.1-canary.beta.0(zod@4.5.2)
       '@standard-schema/spec': 1.1.0
-      '@tanstack/ai-event-client': 0.9.0
+      '@tanstack/ai-event-client': 0.11.2
       '@tanstack/ai-utils': 0.4.0
       partial-json: 0.1.7
     transitivePeerDependencies:
@@ -2637,9 +2640,10 @@ snapshots:
     dependencies:
       wrappy: 1.0.2
 
-  openai@7.4.0(zod@4.4.3):
+  openai@7.8.0(undici@7.29.0)(zod@4.5.2):
     optionalDependencies:
-      zod: 4.4.3
+      undici: 7.29.0
+      zod: 4.5.2
 
   optionator@0.9.4:
     dependencies:
@@ -2953,8 +2957,8 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  zod-to-json-schema@3.25.2(zod@4.4.3):
+  zod-to-json-schema@3.25.2(zod@4.5.2):
     dependencies:
-      zod: 4.4.3
+      zod: 4.5.2
 
-  zod@4.4.3: {}
+  zod@4.5.2: {}
