@@ -21,15 +21,15 @@
   "dependencies": {
     "@career-radar/shared": "workspace:*",
     "@modelcontextprotocol/ext-apps": "^1.0.1",
-    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@modelcontextprotocol/sdk": "^1.30.1",
     "@openrouter/sdk": "0.13.20",
-    "@tanstack/ai": "0.46.0",
-    "@tanstack/ai-openrouter": "0.18.0",
+    "@tanstack/ai": "0.61.0",
+    "@tanstack/ai-openrouter": "0.19.20",
     "cheerio": "1.2.0",
     "express": "^5.1.0",
     "ipaddr.js": "2.5.0",
-    "openai": "^7.4.0",
-    "zod": "^4.4.3"
+    "openai": "^7.23.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",
